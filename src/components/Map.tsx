@@ -235,6 +235,72 @@ export default function Map({
     const m = map.current;
     if (!m || !ready) return;
     setPreview(null);
+    // The campus reads as part of the basemap, a soft footprint, a dot, and a
+    // label set in the map's own typography, instead of a floating pill.
+    for (const id of ["campus-glow", "campus-dot", "campus-label"])
+      if (m.getLayer(id)) m.removeLayer(id);
+    if (m.getSource("campus")) m.removeSource("campus");
+    m.addSource("campus", {
+      type: "geojson",
+      data: {
+        type: "Feature",
+        properties: { name: campus.name },
+        geometry: { type: "Point", coordinates: [campus.lng, campus.lat] },
+      },
+    });
+    m.addLayer({
+      id: "campus-glow",
+      type: "circle",
+      source: "campus",
+      paint: {
+        "circle-color": "#3b78d7",
+        "circle-opacity": 0.07,
+        "circle-blur": 0.6,
+        "circle-radius": [
+          "interpolate",
+          ["exponential", 2],
+          ["zoom"],
+          11,
+          10,
+          14,
+          80,
+          17,
+          640,
+        ],
+      },
+    });
+    m.addLayer({
+      id: "campus-dot",
+      type: "circle",
+      source: "campus",
+      paint: {
+        "circle-color": "#3b78d7",
+        "circle-radius": 5,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+    });
+    m.addLayer({
+      id: "campus-label",
+      type: "symbol",
+      source: "campus",
+      layout: {
+        "text-field": ["get", "name"],
+        "text-font": ["Noto Sans Bold"],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 15, 13],
+        "text-letter-spacing": 0.02,
+        "text-max-width": 9,
+        "text-offset": [0, 0.9],
+        "text-anchor": "top",
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+      },
+      paint: {
+        "text-color": "#24519b",
+        "text-halo-color": "rgba(255,255,255,0.92)",
+        "text-halo-width": 1.6,
+      },
+    });
     if (m.getLayer(`${ZONE_SOURCE}-fill`)) m.removeLayer(`${ZONE_SOURCE}-fill`);
     if (m.getLayer(`${ZONE_SOURCE}-line`)) m.removeLayer(`${ZONE_SOURCE}-line`);
     if (m.getSource(ZONE_SOURCE)) m.removeSource(ZONE_SOURCE);
@@ -321,14 +387,6 @@ export default function Map({
       markers.current.push(marker);
       return marker;
     };
-    add(
-      el(
-        "campus-marker-wrap",
-        `<span class="campus-marker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>${campus.name}</span>`,
-      ),
-      campus.lng,
-      campus.lat,
-    );
     const pins = new globalThis.Map<string, HTMLElement>();
     for (const item of listings) {
       if (!Number.isFinite(item.lat) || !Number.isFinite(item.lng)) continue;

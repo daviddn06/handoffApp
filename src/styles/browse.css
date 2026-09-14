@@ -1164,11 +1164,11 @@
   box-shadow: 0 0 0 1.5px #fff, 0 0 0 2.5px rgb(59 120 215 / 0.3);
 }
 .legend-swatch.campus {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: var(--ink);
-  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgb(16 24 40 / 0.15);
+  background: var(--blue);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgb(59 120 215 / 0.15);
 }
 .legend-swatch.zone {
   border: 1.5px dashed #159a6a;
