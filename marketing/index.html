@@ -4,23 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#ffffff" />
-    <title>Handoff | Student subleases, a little simpler.</title>
+    <title>Handoff | Leave your lease without losing money.</title>
     <meta
       name="description"
-      content="Find a place near campus or pass yours on. Browse student subleases, verify your campus email, and connect when a handoff request is accepted."
+      content="Sublease your place to a verified student for less than you pay. The student leaving stops paying for a lease they cannot use, and the student moving in pays less. Built for USC, UCLA, LMU, and CSULB."
     />
     <meta
       property="og:title"
-      content="Handoff | Your campus. Your next place."
+      content="Handoff | Leave your lease without losing money."
     />
     <meta
       property="og:description"
-      content="A simpler way to find a student sublease or pass your place on. Built for USC, UCLA, LMU, and CSULB."
+      content="Sublease it to a verified student for less than you pay, and everyone comes out ahead."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://handofflease.com/" />
     <link rel="canonical" href="https://handofflease.com/" />
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="preconnect" href="https://app.handofflease.com" />
     <link
       rel="preload"
       href="assets/geist-regular.woff2"
@@ -78,16 +79,12 @@
           <rect x="5" y="10" width="14" height="11" rx="2" />
           <path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" />
         </symbol>
-        <symbol id="home" viewBox="0 0 24 24">
-          <path d="m3 10 9-7 9 7M5 9v11h14V9M9 20v-7h6v7" />
-        </symbol>
         <symbol id="cap" viewBox="0 0 24 24">
           <path d="m2 8 10-5 10 5-10 5L2 8Zm4 2v7l6 3 6-3v-7m4-2v8" />
         </symbol>
-        <symbol id="heart" viewBox="0 0 24 24">
-          <path
-            d="M20.8 4.6a5.4 5.4 0 0 0-7.6 0L12 5.8l-1.2-1.2a5.4 5.4 0 0 0-7.6 7.6L12 21l8.8-8.8a5.4 5.4 0 0 0 0-7.6Z"
-          />
+        <symbol id="wallet" viewBox="0 0 24 24">
+          <rect x="3" y="6" width="18" height="13" rx="3" />
+          <path d="M3 10h18M16 14.5h2" />
         </symbol>
         <symbol id="plus" viewBox="0 0 24 24">
           <path d="M12 5v14M5 12h14" />
@@ -95,226 +92,220 @@
       </defs>
     </svg>
     <a class="skip-link" href="#main">Skip to content</a>
+
     <header class="site-header">
       <div class="header-inner wrap">
         <a
           class="wordmark"
           href="https://handofflease.com/"
           aria-label="Handoff home"
+          ><span class="mark" aria-hidden="true"
+            ><svg class="icon"><use href="#key" /></svg></span
           >Handoff</a
         >
         <nav class="header-nav" aria-label="Main navigation">
-          <a href="#why-handoff">Why Handoff</a
-          ><a href="#how-it-works">How it works</a><a href="#faq">FAQ</a>
+          <a href="#the-win">Why Handoff</a><a href="#how-it-works">How it works</a
+          ><a href="#campuses">Campuses</a><a href="#faq">FAQ</a>
         </nav>
         <div class="header-actions">
           <a class="sign-in" href="https://app.handofflease.com/sign-in"
             >Sign in</a
           ><a
-            class="button button-small"
-            href="https://app.handofflease.com/sign-up"
-            >Get started<svg class="icon" aria-hidden="true">
+            class="button primary small"
+            href="https://app.handofflease.com/browse"
+            >Open the app<svg class="icon" aria-hidden="true">
               <use href="#arrow" /></svg
           ></a>
         </div>
       </div>
     </header>
+
     <main id="main">
+      <!-- Hero -->
       <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-glow" aria-hidden="true"></div>
-        <div class="hero-inner wrap">
-          <div class="hero-copy">
-            <span class="eyebrow hero-eyebrow"
-              ><span class="small-dot"></span>Between semesters. Between
-              students.</span
+        <div class="sky" aria-hidden="true">
+          <span class="sky-grid"></span>
+          <span class="cloud c1" data-parallax="0.09"></span>
+          <span class="cloud c2" data-parallax="0.16"></span>
+          <span class="cloud c3" data-parallax="0.06"></span>
+        </div>
+        <div class="wrap">
+          <div class="hero-copy stagger reveal">
+            <span class="hero-eyebrow"
+              ><span class="small-dot"></span>Student to student subleases</span
             >
             <h1 id="hero-title">
-              The student<br class="desktop-break" />
-              sublease market,<br class="desktop-break" />&#32;<span
-                >a little less guesswork.</span
-              >
+              Leave your lease without
+              <span class="accent">losing money.</span>
             </h1>
             <p class="hero-description">
-              A place for your next semester. A student for your next sublease.
-              Find each other through your campus, without the endless
-              back-and-forth.
+              Sublease it to a verified student for less than you pay, and
+              everyone comes out ahead.
             </p>
             <div class="hero-actions">
-              <a href="https://app.handofflease.com/browse" class="button"
-                >Browse listings<svg class="icon" aria-hidden="true">
+              <a
+                class="button primary large"
+                href="https://app.handofflease.com/browse"
+                >Browse subleases<svg class="icon" aria-hidden="true">
                   <use href="#arrow" /></svg></a
               ><a
+                class="button secondary large"
                 href="https://app.handofflease.com/listings/new"
-                class="button button-secondary"
                 >List your place</a
               >
+            </div>
+            <div class="savings-demo">
+              <span class="demo-label">What a handoff looks like</span>
+              <div class="savings-line">
+                <span class="now">$1,950</span><span class="per">/mo</span
+                ><span class="was">$2,250</span
+                ><span class="savings-tag">Save $300/mo</span>
+              </div>
+              <p class="demo-foot">
+                They pay less than the original lease. You stop paying for
+                months you are not there.
+              </p>
             </div>
             <div class="hero-proof">
               <span
                 ><svg class="icon" aria-hidden="true">
                   <use href="#shield" /></svg
                 >Campus email verified</span
-              ><span><span class="proof-dot"></span>Free to use</span>
+              ><span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#wallet" /></svg
+                >Free to list and browse</span
+              ><span
+                ><svg class="icon" aria-hidden="true"><use href="#cap" /></svg
+                >USC, UCLA, LMU, CSULB</span
+              >
             </div>
           </div>
-          <figure class="product-figure" aria-labelledby="preview-caption">
-            <div class="preview-kicker">
-              <span class="mini-dot"></span>A little look inside
-            </div>
-            <div class="product-window" aria-hidden="true">
-              <div class="browser-bar">
-                <span class="browser-dots"><i></i><i></i><i></i></span
-                ><span class="browser-address"
-                  ><svg class="icon"><use href="#lock" /></svg
-                  >app.handofflease.com</span
-                ><span class="browser-sample">PREVIEW</span>
-              </div>
-              <div class="preview-app-header">
-                <strong>Handoff</strong
-                ><span class="preview-active">Browse</span><span>Saved</span
-                ><span class="preview-campus"
-                  ><svg class="icon"><use href="#cap" /></svg>USC</span
-                >
-              </div>
-              <div class="preview-filter">
-                <span class="preview-search"
-                  ><svg class="icon"><use href="#search" /></svg>Find a place
-                  near campus</span
-                ><span class="preview-filter-chip">Summer</span
-                ><span class="preview-filter-chip">Private room</span>
-              </div>
-              <div class="preview-workspace">
-                <div class="preview-results">
-                  <span class="preview-results-title">Your next place</span>
-                  <div class="mini-listing selected">
-                    <div class="mini-photo">
-                      <img
-                        src="assets/sample-room.jpg"
-                        width="1600"
-                        height="1067"
-                        alt=""
-                      /><span
-                        ><svg class="icon"><use href="#heart" /></svg
-                      ></span>
-                    </div>
-                    <strong>$1,200 <small>/ month</small></strong
-                    ><b>A sunny place to land</b>
-                    <p>Private room · Furnished</p>
-                    <span class="mini-dates">May to August</span>
-                  </div>
-                  <div class="mini-listing second-listing">
-                    <div class="mini-photo">
-                      <img
-                        src="assets/sample-living-room.jpg"
-                        width="1600"
-                        height="1068"
-                        alt=""
-                      />
-                    </div>
-                    <strong>$950 <small>/ month</small></strong
-                    ><b>A room with good light</b>
-                    <p>Shared apartment</p>
-                  </div>
-                </div>
-                <div class="preview-map">
-                  <svg
-                    class="map-art"
-                    viewBox="0 0 390 435"
-                    preserveAspectRatio="xMidYMid slice"
-                  >
-                    <rect width="390" height="435" fill="#f1f3f2" />
-                    <g fill="#e6ebE9">
-                      <rect x="20" y="20" width="68" height="57" rx="4" />
-                      <rect x="109" y="20" width="80" height="57" rx="4" />
-                      <rect x="209" y="20" width="78" height="57" rx="4" />
-                      <rect x="313" y="20" width="69" height="57" rx="4" />
-                      <rect x="20" y="97" width="68" height="54" rx="4" />
-                      <rect x="109" y="97" width="80" height="54" rx="4" />
-                      <rect x="209" y="97" width="78" height="54" rx="4" />
-                      <rect x="313" y="97" width="69" height="54" rx="4" />
-                      <rect x="21" y="174" width="67" height="73" rx="4" />
-                      <rect x="313" y="174" width="69" height="74" rx="4" />
-                      <rect x="20" y="271" width="68" height="58" rx="4" />
-                      <rect x="112" y="271" width="79" height="58" rx="4" />
-                      <rect x="208" y="271" width="79" height="58" rx="4" />
-                      <rect x="313" y="271" width="69" height="58" rx="4" />
-                      <rect x="20" y="351" width="68" height="72" rx="4" />
-                      <rect x="111" y="351" width="78" height="72" rx="4" />
-                      <rect x="208" y="351" width="79" height="72" rx="4" />
-                    </g>
-                    <g stroke="#fff" stroke-width="10" fill="none">
-                      <path
-                        d="M0 86H390M0 163H390M0 259H390M0 340H390M99 0V435M199 0V435M300 0V435"
-                      />
-                      <path
-                        d="m332-20 7 90 26 91 12 67 7 105"
-                        stroke-width="15"
-                      />
-                    </g>
-                    <rect
-                      x="111"
-                      y="177"
-                      width="174"
-                      height="65"
-                      rx="10"
-                      fill="#dce9de"
-                    />
-                    <path d="M142 191h110v39H142z" fill="#f1eddf" />
-                    <path
-                      d="M126 193v35m143-35v35M185 177v65M215 177v65"
-                      stroke="#c6d9c9"
-                      stroke-width="3"
-                    />
-                    <g
-                      font-family="Geist,sans-serif"
-                      font-size="8"
-                      fill="#9ca7a2"
-                    >
-                      <text x="128" y="154">UNIVERSITY PARK</text>
-                      <text x="8" y="258" transform="rotate(-90 8 258)">
-                        VERMONT AVENUE
-                      </text>
-                      <text x="114" y="337">JEFFERSON BOULEVARD</text>
-                      <text x="329" y="310" transform="rotate(-90 329 310)">
-                        FIGUEROA STREET
-                      </text>
-                    </g></svg
-                  ><span class="sample-pin pin-one">$950</span
-                  ><span class="sample-pin pin-two">$1,450</span
-                  ><span class="sample-pin pin-three active">$1,200</span
-                  ><span class="campus-pin"
-                    ><svg class="icon"><use href="#cap" /></svg>USC</span
-                  ><span class="sample-pin pin-four">$1,100</span>
-                  <div class="map-controls"><span>+</span><span>−</span></div>
-                </div>
-              </div>
-              <div class="preview-status">
-                <span class="small-dot"></span>Find the right fit for your dates
-                and your budget.
-              </div>
-            </div>
-            <div class="connection-note" aria-hidden="true">
-              <span class="connection-icon"
-                ><svg class="icon"><use href="#check" /></svg
-              ></span>
-              <div>
-                <strong>Request accepted</strong
-                ><span>Now you can get in touch.</span>
-              </div>
-              <svg class="icon connection-mail"><use href="#mail" /></svg>
-            </div>
-            <figcaption id="preview-caption">
-              Illustrative preview. Sample places, not live listings.
-            </figcaption>
-          </figure>
         </div>
       </section>
-      <section class="campuses wrap" aria-labelledby="campuses-title">
-        <div class="campus-intro">
+
+      <!-- Live app -->
+      <section class="live-section reveal" aria-labelledby="live-title">
+        <div class="wrap">
+          <div class="live-head">
+            <div>
+              <h2 id="live-title">This is the actual app.</h2>
+              <p>
+                Real listings, real map, running right here. Pan it, zoom it,
+                open anything you like.
+              </p>
+            </div>
+            <a
+              class="button secondary"
+              href="https://app.handofflease.com/browse"
+              >Open the app<svg class="icon" aria-hidden="true">
+                <use href="#arrow-up" /></svg
+            ></a>
+          </div>
+          <div class="device">
+            <div class="device-notch" aria-hidden="true"></div>
+            <div class="device-bar" aria-hidden="true">
+              <span class="device-dots"><i></i><i></i><i></i></span
+              ><span class="device-url"
+                ><svg class="icon"><use href="#lock" /></svg
+                >app.handofflease.com</span
+              >
+            </div>
+            <span class="live-pill" aria-hidden="true"
+              ><span class="live-dot"></span>Live app, try it</span
+            >
+            <div class="device-frame">
+              <iframe
+                src="https://app.handofflease.com/browse?embed=1"
+                title="Handoff app"
+                loading="lazy"
+              ></iframe>
+            </div>
+          </div>
+          <div class="live-fallback">
+            <a
+              class="button primary"
+              href="https://app.handofflease.com/browse"
+              >Open the app<svg class="icon" aria-hidden="true">
+                <use href="#arrow" /></svg
+            ></a>
+            <p>
+              If the frame above does not load, everything is one tap away at
+              app.handofflease.com.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Two sided win -->
+      <section class="section wrap" id="the-win" aria-labelledby="win-title">
+        <div class="section-heading reveal">
+          <p class="eyebrow">The two sided win</p>
+          <h2 id="win-title">One lease, two students, nobody overpays.</h2>
+          <p class="lede">
+            A sublease only works when both sides come out ahead. Handoff is
+            built around that one idea.
+          </p>
+        </div>
+        <div class="sides stagger reveal">
+          <article class="side-card">
+            <span class="pill blue">You are leaving</span>
+            <h3>Stop paying for months you are not there.</h3>
+            <p>
+              Study abroad, an internship, graduation, a lease that runs past
+              your plans. Hand it to another student instead of eating the rent.
+            </p>
+            <div class="side-visual">
+              <div class="ledger">
+                <div class="ledger-row">
+                  <span>Four months you cannot use</span
+                  ><b class="loss">$9,000</b>
+                </div>
+                <div class="ledger-row">
+                  <span>Covered by your subtenant</span><b>$7,800</b>
+                </div>
+                <div class="ledger-row total">
+                  <span>Out of pocket</span><b class="gain">$1,200</b>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article class="side-card">
+            <span class="pill green">You are moving in</span>
+            <h3>Pay less than the original lease.</h3>
+            <p>
+              Furnished, near campus, already set up, and priced under what the
+              place normally rents for. No broker fee, no year long commitment.
+            </p>
+            <div class="side-visual">
+              <div class="ledger">
+                <div class="ledger-row">
+                  <span>Original lease</span><b class="loss">$2,250/mo</b>
+                </div>
+                <div class="ledger-row">
+                  <span>Sublease price</span><b>$1,950/mo</b>
+                </div>
+                <div class="ledger-row total">
+                  <span>You save</span
+                  ><span class="savings-tag">$300/mo</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Campuses -->
+      <section
+        class="section tight wrap"
+        id="campuses"
+        aria-labelledby="campuses-title"
+      >
+        <div class="campus-intro reveal">
           <p class="eyebrow" id="campuses-title">Start with your campus</p>
           <p>Four campuses. One less thing to figure out.</p>
         </div>
-        <div class="campus-links">
+        <div class="campus-links stagger reveal">
           <a href="https://app.handofflease.com/browse?campusId=usc"
             ><strong>USC</strong><span>Southern California</span
             ><svg class="icon" aria-hidden="true">
@@ -333,368 +324,393 @@
           ></a>
         </div>
       </section>
-      <section
-        class="benefits section wrap"
-        id="why-handoff"
-        aria-labelledby="benefits-title"
-      >
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">A little less guesswork</p>
-            <h2 id="benefits-title">
-              More context.<br /><span>A better first connection.</span>
-            </h2>
-          </div>
-          <p>
-            A sublease is personal. The way you find one should feel a little
-            more considered.
-          </p>
-        </div>
-        <div class="benefit-grid">
-          <article class="benefit-card">
-            <div class="benefit-visual verification-visual" aria-hidden="true">
-              <div class="email-chip">
-                <svg class="icon"><use href="#mail" /></svg
-                ><span>you<span class="email-domain">@usc.edu</span></span
-                ><span class="check-circle"
-                  ><svg class="icon"><use href="#check" /></svg
-                ></span>
-              </div>
-              <div class="verified-line">
-                <svg class="icon"><use href="#shield" /></svg>Student email
-                verified
-              </div>
-            </div>
-            <div class="benefit-text">
-              <span class="feature-label">A campus connection</span>
-              <h3>Start with something<br />in common.</h3>
-              <p>
-                Use an email that matches your campus. Verify it before posting
-                a place or sending a request.
-              </p>
-            </div>
-          </article>
-          <article class="benefit-card">
-            <div class="benefit-visual fit-visual" aria-hidden="true">
-              <span class="fit-map"
-                ><svg class="icon"><use href="#pin" /></svg
-              ></span>
-              <div class="fit-tags">
-                <span
-                  >Your dates
-                  <svg class="icon"><use href="#check" /></svg></span
-                ><span
-                  >Your budget
-                  <svg class="icon"><use href="#check" /></svg></span
-                ><span
-                  >Your kind of place
-                  <svg class="icon"><use href="#check" /></svg
-                ></span>
-              </div>
-            </div>
-            <div class="benefit-text">
-              <span class="feature-label">The details, together</span>
-              <h3>Find the place that<br />fits your plans.</h3>
-              <p>
-                Compare rent, dates, photos, and amenities. Switch between
-                listings and the map to get your bearings.
-              </p>
-            </div>
-          </article>
-          <article class="benefit-card">
-            <div class="benefit-visual privacy-visual" aria-hidden="true">
-              <div class="privacy-row">
-                <span class="privacy-avatar">You</span
-                ><span class="connection-dashes"></span
-                ><svg class="icon"><use href="#lock" /></svg
-                ><span class="connection-dashes"></span
-                ><span class="privacy-avatar other">Them</span>
-              </div>
-              <span class="privacy-caption"
-                >A request first. Contact details after.</span
-              >
-            </div>
-            <div class="benefit-text">
-              <span class="feature-label">An introduction on your terms</span>
-              <h3>Your email stays<br />private until it’s time.</h3>
-              <p>
-                Send a short introduction. Both emails are revealed when the
-                listing owner accepts the request.
-              </p>
-            </div>
-          </article>
-        </div>
-      </section>
+
+      <!-- How it works -->
       <section
         class="how-section"
         id="how-it-works"
         aria-labelledby="how-title"
       >
-        <div class="wrap">
-          <div class="how-heading">
+        <div class="sky" aria-hidden="true" style="opacity: 0.55">
+          <span class="cloud c2" data-parallax="0.1"></span>
+        </div>
+        <div class="wrap" style="position: relative; z-index: 1">
+          <div class="section-heading reveal">
             <p class="eyebrow">How it works</p>
-            <h2 id="how-title">One place. Two next chapters.</h2>
-            <p>Whether you’re moving in or moving on, here’s your next step.</p>
-            <div
-              class="how-switch"
-              role="group"
-              aria-label="Choose your handoff journey"
+            <h2 id="how-title">Three steps, start to keys.</h2>
+            <p class="lede">
+              The same screens you just scrolled past, in the order you will
+              meet them.
+            </p>
+          </div>
+          <nav class="step-rail" aria-label="How it works steps">
+            <a href="#step-1" data-rail="step-1"
+              ><span class="num">01</span>Find the place</a
+            ><a href="#step-2" data-rail="step-2"
+              ><span class="num">02</span>See the real price</a
+            ><a href="#step-3" data-rail="step-3"
+              ><span class="num">03</span>Hand it off</a
             >
-              <button
-                type="button"
-                aria-pressed="true"
-                aria-controls="finding-steps"
-                data-journey="finding"
-              >
-                <svg class="icon" aria-hidden="true"><use href="#search" /></svg
-                >I’m finding a place</button
-              ><button
-                type="button"
-                aria-pressed="false"
-                aria-controls="listing-steps"
-                data-journey="listing"
-              >
-                <svg class="icon" aria-hidden="true"><use href="#key" /></svg
-                >I’m listing a place
-              </button>
-            </div>
-          </div>
-          <div id="finding-steps" class="journey-panel">
-            <ol class="steps">
-              <li>
-                <div class="step-top">
-                  <span>01</span><i></i
-                  ><svg class="icon" aria-hidden="true">
-                    <use href="#search" />
-                  </svg>
+          </nav>
+          <ol class="steps">
+            <li class="step reveal" id="step-1">
+              <div class="step-top">
+                <span class="step-num">01</span>
+                <svg class="icon" aria-hidden="true"><use href="#search" /></svg>
+              </div>
+              <h3>Find the place.</h3>
+              <p>
+                Pick your campus, then filter by dates, budget, and the kind of
+                room you want. Every listing is posted by a verified student.
+              </p>
+              <div class="step-stage">
+                <div class="stage-cards">
+                  <article class="listing-card compact is-active">
+                    <div class="card-photo sage" aria-hidden="true">
+                      <span class="room-badge">Private</span>
+                    </div>
+                    <div class="card-body">
+                      <div class="card-topline">
+                        <div class="card-price">
+                          <strong>$1,950</strong><span>/mo</span>
+                        </div>
+                        <span class="savings-tag">Save $300</span>
+                      </div>
+                      <p class="card-title">Sunny room, 6 minute walk</p>
+                      <p class="card-meta">Furnished · Jan to Aug</p>
+                      <p class="card-meta">
+                        <span class="card-distance">0.4 mi</span> from campus
+                      </p>
+                    </div>
+                  </article>
+                  <article class="listing-card compact">
+                    <div class="card-photo beige" aria-hidden="true">
+                      <span class="room-badge">Studio</span>
+                    </div>
+                    <div class="card-body">
+                      <div class="card-topline">
+                        <div class="card-price">
+                          <strong>$1,400</strong><span>/mo</span>
+                        </div>
+                        <span class="savings-tag">Save $250</span>
+                      </div>
+                      <p class="card-title">Studio on Hoover</p>
+                      <p class="card-meta">Utilities included · May to Aug</p>
+                    </div>
+                  </article>
                 </div>
-                <h3>Find your fit.</h3>
-                <p>
-                  Choose your campus and narrow things down by dates, budget,
-                  and the kind of place you want.
-                </p>
-              </li>
-              <li>
-                <div class="step-top">
-                  <span>02</span><i></i
-                  ><svg class="icon" aria-hidden="true">
-                    <use href="#mail" />
-                  </svg>
+              </div>
+            </li>
+            <li class="step reveal" id="step-2">
+              <div class="step-top">
+                <span class="step-num">02</span>
+                <svg class="icon" aria-hidden="true"><use href="#pin" /></svg>
+              </div>
+              <h3>See the real price.</h3>
+              <p>
+                Prices sit on the map, so distance and rent land together. A
+                green ring means the sublease is under the original lease.
+              </p>
+              <div class="step-stage">
+                <div class="stage-map" aria-hidden="true">
+                  <span class="road h"></span><span class="road v"></span
+                  ><span class="park"></span>
                 </div>
-                <h3>Make an introduction.</h3>
-                <p>
-                  Verify your student email, then send a short request. Share a
-                  bit about yourself and your plans.
-                </p>
-              </li>
-              <li>
-                <div class="step-top">
-                  <span>03</span><i></i
-                  ><svg class="icon" aria-hidden="true">
-                    <use href="#key" />
-                  </svg>
+                <div class="stage-pins" aria-hidden="true">
+                  <span class="price-marker p1 has-savings">$1,400</span>
+                  <span class="price-marker p2">$2,100</span>
+                  <span class="cluster-marker">12</span>
+                  <span class="campus-marker"
+                    ><svg class="icon"><use href="#cap" /></svg>USC</span
+                  >
+                  <span class="price-marker p3 is-active has-savings"
+                    >$1,950</span
+                  >
                 </div>
-                <h3>Take the next step.</h3>
-                <p>
-                  Once the owner accepts, exchange emails to arrange a visit,
-                  review the lease, and talk through the details.
-                </p>
-              </li>
-            </ol>
-            <a href="https://app.handofflease.com/browse" class="text-link"
-              >Find your next place<svg class="icon" aria-hidden="true">
-                <use href="#arrow" /></svg
-            ></a>
-          </div>
-          <div id="listing-steps" class="journey-panel" hidden>
-            <ol class="steps">
-              <li>
-                <div class="step-top">
-                  <span>01</span><i></i
-                  ><svg class="icon" aria-hidden="true">
-                    <use href="#home" />
-                  </svg>
+              </div>
+            </li>
+            <li class="step reveal" id="step-3">
+              <div class="step-top">
+                <span class="step-num">03</span>
+                <svg class="icon" aria-hidden="true"><use href="#check" /></svg>
+              </div>
+              <h3>Hand it off.</h3>
+              <p>
+                Send a short request. When the owner accepts, both emails are
+                revealed and you sort the lease out directly.
+              </p>
+              <div class="step-stage">
+                <div class="stage-handoff">
+                  <div class="handoff-card">
+                    <div class="handoff-top">
+                      <span class="handoff-avatar">MC</span
+                      ><span class="who">Maya's place</span
+                      ><span class="pill green">Accepted</span>
+                    </div>
+                    <div class="handoff-price">
+                      <strong>$1,950</strong
+                      ><span class="card-original">$2,250</span
+                      ><span class="savings-tag pop-tag">Save $300/mo</span>
+                    </div>
+                    <p class="handoff-note">
+                      Emails shared. Visit and lease handled between you.
+                    </p>
+                  </div>
+                  <div class="handoff-both">
+                    <div>
+                      +$7,800<span>Covered for the student leaving</span>
+                    </div>
+                    <div>
+                      &minus;$1,200<span>Saved by the student moving in</span>
+                    </div>
+                  </div>
                 </div>
-                <h3>Show the space.</h3>
-                <p>
-                  Verify your student email and add your rent, dates, details,
-                  and photos. Save a draft until it’s ready.
-                </p>
-              </li>
-              <li>
-                <div class="step-top">
-                  <span>02</span><i></i
-                  ><svg class="icon" aria-hidden="true">
-                    <use href="#mail" />
-                  </svg>
-                </div>
-                <h3>Find the right connection.</h3>
-                <p>
-                  Publish your listing and review introductions from interested
-                  students. Accept when you’re ready to talk.
-                </p>
-              </li>
-              <li>
-                <div class="step-top">
-                  <span>03</span><i></i
-                  ><svg class="icon" aria-hidden="true">
-                    <use href="#check" />
-                  </svg>
-                </div>
-                <h3>Pass it on.</h3>
-                <p>
-                  Coordinate the visit and lease directly. Once you’ve found
-                  your next student, mark the place as handed off.
-                </p>
-              </li>
-            </ol>
-            <a
-              href="https://app.handofflease.com/listings/new"
-              class="text-link"
-              >List your place<svg class="icon" aria-hidden="true">
-                <use href="#arrow" /></svg
-            ></a>
-          </div>
-          <p class="how-note">
+              </div>
+            </li>
+          </ol>
+          <p class="how-note reveal">
             <svg class="icon" aria-hidden="true"><use href="#shield" /></svg
             >Handoff makes the introduction. You handle the lease and payments
             directly.
           </p>
         </div>
       </section>
-      <section
-        class="faq-section section wrap"
-        id="faq"
-        aria-labelledby="faq-title"
-      >
-        <div class="faq-intro">
-          <p class="eyebrow">Good questions</p>
-          <h2 id="faq-title">A few things<br />you might be wondering.</h2>
-          <p>A clearer picture before you make your move.</p>
-          <a href="https://app.handofflease.com/browse" class="text-link"
-            >Take a look around<svg class="icon" aria-hidden="true">
-              <use href="#arrow" /></svg
-          ></a>
+
+      <!-- Benefits -->
+      <section class="section wrap" aria-labelledby="benefits-title">
+        <div class="section-heading reveal">
+          <p class="eyebrow">Built for students</p>
+          <h2 id="benefits-title">Fewer strangers, fewer surprises.</h2>
+          <p class="lede">
+            A sublease is personal. The way you find one should feel a little
+            more considered.
+          </p>
         </div>
-        <div class="faq-list">
-          <details open>
-            <summary>
-              How does student verification work?<svg
-                class="icon"
-                aria-hidden="true"
+        <div class="benefit-grid stagger reveal">
+          <article class="benefit-card">
+            <div class="benefit-visual" aria-hidden="true">
+              <span class="email-chip"
+                ><svg class="icon"><use href="#mail" /></svg
+                ><span>you<span class="email-domain">@usc.edu</span></span
+                ><span class="check-circle"
+                  ><svg class="icon"><use href="#check" /></svg></span
+              ></span>
+              <span class="verified-line"
+                ><svg class="icon"><use href="#shield" /></svg>Student email
+                verified</span
               >
-                <use href="#plus" />
-              </svg>
-            </summary>
-            <div>
-              <p>
-                Choose your campus and sign up with its matching school email
-                address. We’ll send a verification link. Verify your email
-                before you list a place or send a handoff request.
-              </p>
-              <p>
-                Verification confirms access to that email. It doesn’t verify a
-                person’s identity, enrollment, property, or lease.
-              </p>
             </div>
-          </details>
-          <details>
-            <summary>
-              Is Handoff free to use?<svg class="icon" aria-hidden="true">
-                <use href="#plus" />
-              </svg>
-            </summary>
-            <div>
-              <p>
-                Yes. Browsing, posting listings, and sending requests are free
-                to use. Handoff doesn’t collect rent or deposits. You and the
-                other student arrange the lease and any payments directly.
-              </p>
+            <span class="feature-label">A campus connection</span>
+            <h3>Students only, verified by email.</h3>
+            <p>
+              Sign up with the email that matches your campus and verify it
+              before you post a place or send a request.
+            </p>
+          </article>
+          <article class="benefit-card">
+            <div class="benefit-visual" aria-hidden="true">
+              <div class="fit-chips">
+                <span class="chip is-active"
+                  ><svg class="icon"><use href="#cap" /></svg>USC</span
+                ><span class="chip">Jan to Aug</span
+                ><span class="chip">Under $2,000</span
+                ><span class="chip">Private room</span>
+              </div>
             </div>
-          </details>
-          <details id="contact-privacy">
-            <summary>
-              When is my email shared?<svg class="icon" aria-hidden="true">
-                <use href="#plus" />
-              </svg>
-            </summary>
-            <div>
-              <p>
-                Your email isn’t shown on public listings or pending requests.
-                When a listing owner accepts a request, both students can see
-                each other’s email in the app. Keep contact details out of your
-                listing and introduction if you want them to stay private until
-                then.
-              </p>
-            </div>
-          </details>
-          <details>
-            <summary>
-              Can I list a room in a shared apartment?<svg
-                class="icon"
-                aria-hidden="true"
+            <span class="feature-label">The details, together</span>
+            <h3>Filter to what actually fits.</h3>
+            <p>
+              Dates, budget, room type, distance from campus. Compare listings
+              and the map side by side.
+            </p>
+          </article>
+          <article class="benefit-card">
+            <div class="benefit-visual" aria-hidden="true">
+              <div class="privacy-row">
+                <span class="privacy-avatar">You</span
+                ><span class="connection-dashes"></span
+                ><svg class="icon"><use href="#lock" /></svg
+                ><span class="connection-dashes"></span
+                ><span class="privacy-avatar">Them</span>
+              </div>
+              <span class="privacy-caption"
+                >A request first. Contact details after.</span
               >
-                <use href="#plus" />
-              </svg>
-            </summary>
-            <div>
-              <p>
-                Yes. Choose a private room, shared room, or entire place.
-                Include clear photos, accurate dates, and the details someone
-                would want to know about roommates, shared spaces, utilities,
-                and lease requirements.
-              </p>
             </div>
-          </details>
-          <details>
-            <summary>
-              Which campuses are supported?<svg class="icon" aria-hidden="true">
-                <use href="#plus" />
-              </svg>
-            </summary>
-            <div>
-              <p>
-                You can sign up and browse at USC, UCLA, LMU, and CSULB.
-                Listings are added by students, so availability varies by
-                campus. If yours is quiet, your place could be the first.
-              </p>
-            </div>
-          </details>
-          <details>
-            <summary>
-              What should we handle before moving in?<svg
-                class="icon"
-                aria-hidden="true"
-              >
-                <use href="#plus" />
-              </svg>
-            </summary>
-            <div>
-              <p>
-                Arrange a visit, check the property and lease details, and
-                confirm any required landlord approval. Agree on the terms
-                directly. Handoff connects students and doesn’t inspect
-                properties, sign leases, process payments, or resolve lease
-                disputes.
-              </p>
-            </div>
-          </details>
+            <span class="feature-label">An introduction on your terms</span>
+            <h3>Your email stays private until it is time.</h3>
+            <p>
+              Send a short introduction. Both emails are revealed only when the
+              listing owner accepts the request.
+            </p>
+          </article>
         </div>
       </section>
+
+      <!-- FAQ -->
+      <section class="section wrap" id="faq" aria-labelledby="faq-title">
+        <div class="faq-grid">
+          <div class="faq-intro reveal">
+            <p class="eyebrow">Good questions</p>
+            <h2 id="faq-title">A few things you might be wondering.</h2>
+            <p>A clearer picture before you make your move.</p>
+            <a href="https://app.handofflease.com/browse" class="text-link"
+              >Take a look around<svg class="icon" aria-hidden="true">
+                <use href="#arrow" /></svg
+            ></a>
+          </div>
+          <div class="faq-list reveal">
+            <details open>
+              <summary>
+                How does student verification work?<svg
+                  class="icon"
+                  aria-hidden="true"
+                >
+                  <use href="#plus" />
+                </svg>
+              </summary>
+              <div class="faq-body">
+                <p>
+                  Choose your campus and sign up with its matching school email
+                  address. We email you a six digit code and a link, either one
+                  works. You can browse right away and verify when you want to
+                  list a place or send a handoff request.
+                </p>
+                <p>
+                  Verification confirms access to that email. It does not verify
+                  a person's identity, enrollment, property, or lease.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Why is a sublease cheaper than the lease?<svg
+                  class="icon"
+                  aria-hidden="true"
+                >
+                  <use href="#plus" />
+                </svg>
+              </summary>
+              <div class="faq-body">
+                <p>
+                  The student leaving is already on the hook for the rent. Any
+                  month they recover is money back, so most subleases are priced
+                  under the original lease. Both sides end up better off than an
+                  empty room.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Is Handoff free to use?<svg class="icon" aria-hidden="true">
+                  <use href="#plus" />
+                </svg>
+              </summary>
+              <div class="faq-body">
+                <p>
+                  Yes. Browsing, posting listings, and sending requests are free.
+                  Handoff does not collect rent or deposits. You and the other
+                  student arrange the lease and any payments directly.
+                </p>
+              </div>
+            </details>
+            <details id="contact-privacy">
+              <summary>
+                When is my email shared?<svg class="icon" aria-hidden="true">
+                  <use href="#plus" />
+                </svg>
+              </summary>
+              <div class="faq-body">
+                <p>
+                  Your email is not shown on public listings or pending
+                  requests. When a listing owner accepts a request, both
+                  students can see each other's email in the app. Keep contact
+                  details out of your listing and introduction if you want them
+                  to stay private until then.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Can I list a room in a shared apartment?<svg
+                  class="icon"
+                  aria-hidden="true"
+                >
+                  <use href="#plus" />
+                </svg>
+              </summary>
+              <div class="faq-body">
+                <p>
+                  Yes. Choose a private room, shared room, or entire place.
+                  Include clear photos, accurate dates, and the details someone
+                  would want to know about roommates, shared spaces, utilities,
+                  and lease requirements.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                Which campuses are supported?<svg
+                  class="icon"
+                  aria-hidden="true"
+                >
+                  <use href="#plus" />
+                </svg>
+              </summary>
+              <div class="faq-body">
+                <p>
+                  You can sign up and browse at USC, UCLA, LMU, and CSULB.
+                  Listings are added by students, so availability varies by
+                  campus. If yours is quiet, your place could be the first.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>
+                What should we handle before moving in?<svg
+                  class="icon"
+                  aria-hidden="true"
+                >
+                  <use href="#plus" />
+                </svg>
+              </summary>
+              <div class="faq-body">
+                <p>
+                  Arrange a visit, check the property and lease details, and
+                  confirm any required landlord approval. Agree on the terms
+                  directly. Handoff connects students and does not inspect
+                  properties, sign leases, process payments, or resolve lease
+                  disputes.
+                </p>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Final CTA -->
       <section class="final-section wrap">
-        <div class="final-card">
+        <div class="final-card reveal">
+          <div class="sky" aria-hidden="true">
+            <span class="cloud c1" data-parallax="0.05"></span
+            ><span class="cloud c3" data-parallax="0.08"></span>
+          </div>
           <span class="final-icon" aria-hidden="true"
             ><svg class="icon"><use href="#key" /></svg
           ></span>
-          <p class="eyebrow">Here’s to what’s next</p>
-          <h2>Your next chapter<br />needs a place.</h2>
-          <p>Find yours. Or help another student find theirs.</p>
+          <h2>Your lease does not have to cost you.</h2>
+          <p>
+            Hand it to a student who needs it, or find the one someone else is
+            leaving behind.
+          </p>
           <div class="final-actions">
-            <a class="button" href="https://app.handofflease.com/browse"
-              >Find a place<svg class="icon" aria-hidden="true">
+            <a
+              class="button primary large"
+              href="https://app.handofflease.com/browse"
+              >Browse subleases<svg class="icon" aria-hidden="true">
                 <use href="#arrow" /></svg></a
             ><a
-              class="button button-secondary"
+              class="button secondary large"
               href="https://app.handofflease.com/listings/new"
               >List your place</a
             >
@@ -702,6 +718,7 @@
         </div>
       </section>
     </main>
+
     <footer class="site-footer wrap">
       <div class="footer-top">
         <div>
@@ -709,19 +726,22 @@
             href="https://handofflease.com/"
             class="wordmark"
             aria-label="Handoff home"
+            ><span class="mark" aria-hidden="true"
+              ><svg class="icon"><use href="#key" /></svg></span
             >Handoff</a
           >
-          <p>A place for your next chapter.</p>
+          <p>Student to student subleases, without the loss.</p>
         </div>
         <nav aria-label="Footer navigation">
           <a href="https://app.handofflease.com/browse">Browse listings</a
           ><a href="https://app.handofflease.com/listings/new"
             >List your place</a
+          ><a href="https://app.handofflease.com/sign-in">Sign in</a
           ><a href="#how-it-works">How it works</a><a href="#faq">FAQ</a>
         </nav>
       </div>
       <div class="footer-bottom">
-        <span>© <span id="year">2026</span> Handoff</span
+        <span>&copy; <span id="year">2026</span> Handoff</span
         ><span>For students, between chapters.</span
         ><a href="#contact-privacy"
           >How contact sharing works<svg class="icon" aria-hidden="true">
