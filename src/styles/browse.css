@@ -1209,7 +1209,8 @@
   box-shadow: 2px 2px 3px rgb(16 24 40 / 0.08);
 }
 .map-preview-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg), var(--ring);
@@ -1222,12 +1223,16 @@
 .map-preview-photo {
   position: relative;
   height: 132px;
+  flex: none;
+  overflow: hidden;
   background: var(--soft-2);
   display: grid;
   place-items: center;
   color: var(--muted-2);
 }
 .map-preview-photo img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1252,7 +1257,8 @@
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  min-width: 0;
 }
 .map-preview-price {
   display: flex;

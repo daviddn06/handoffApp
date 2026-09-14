@@ -195,9 +195,13 @@ export default function Browse() {
   );
   const activeSource = useRef<"list" | "map">("list");
 
-  const query = new URLSearchParams(params);
+  // Only known filters reach the API. Marketing or tracking params are ignored.
+  const query = new URLSearchParams();
+  for (const key of [...filterKeys, "query", "sort"]) {
+    const value = params.get(key);
+    if (value) query.set(key, value);
+  }
   query.set("campusId", campus?.id || "usc");
-  query.delete("embed");
   const { data, loading, error, refresh } = useResource<{
     listings: Listing[];
   }>(`/listings?${query}`);
