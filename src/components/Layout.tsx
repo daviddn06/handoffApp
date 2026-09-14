@@ -196,7 +196,19 @@ export function Layout() {
         )}
       </main>
       <nav className="mobile-nav" aria-label="Mobile navigation">
-        {links.map(({ to, label, icon: Icon }) => (
+        {links.slice(0, 2).map(({ to, label, icon: Icon }) => (
+          <NavLink key={to} to={to}>
+            <Icon size={20} />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+        <Link to="/listings/new" className="mobile-list-action">
+          <span className="mobile-list-button">
+            <Plus size={22} strokeWidth={2.4} />
+          </span>
+          <span>List</span>
+        </Link>
+        {links.slice(2).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to}>
             <Icon size={20} />
             <span>{label}</span>

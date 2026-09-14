@@ -314,6 +314,30 @@ ${button}
     }
   };
 
+  // Students at campuses Handoff has not opened yet leave an email.
+  app.post(
+    "/api/waitlist",
+    limit("waitlist-ip", 20, HOUR),
+    limit("waitlist-email", 5, HOUR, accountIdentity),
+    (req, res) => {
+      const input = parse(
+        z
+          .object({
+            email: z.string().trim().toLowerCase().email().max(254),
+            school: z.string().trim().min(2).max(160),
+            domain: z.string().trim().toLowerCase().max(100).default(""),
+          })
+          .strict(),
+        req.body,
+      );
+      db.prepare(
+        "INSERT OR IGNORE INTO waitlist(id,email,school,domain,created_at) VALUES(?,?,?,?,?)",
+      ).run(randomUUID(), input.email, input.school, input.domain, iso());
+      res.status(202).json({
+        message: `Thanks. We will email ${input.email} when Handoff opens at ${input.school}.`,
+      });
+    },
+  );
   app.get("/api/health", (req, res) => {
     db.prepare("SELECT 1").get();
     res.json({ ok: true, version: "1.0.0" });

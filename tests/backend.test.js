@@ -368,6 +368,19 @@ test("a six digit code from the email verifies the signed in student, wrong code
   );
 });
 
+test("waitlist takes an email for an unsupported school once", async (t) => {
+  const env = await setup(t);
+  const body = { email: "sam@stanford.edu", school: "Stanford University", domain: "stanford.edu" };
+  const first = await env.client().call("/api/waitlist", { method: "POST", body });
+  assert.equal(first.status, 202, JSON.stringify(first.body));
+  await env.client().call("/api/waitlist", { method: "POST", body });
+  assert.equal(env.app.locals.db.prepare("SELECT COUNT(*) AS c FROM waitlist").get().c, 1);
+  assert.equal(
+    (await env.client().call("/api/waitlist", { method: "POST", body: { email: "nope", school: "X" } })).status,
+    400,
+  );
+});
+
 test("two-student workflow preserves ownership and hides contacts until acceptance", async (t) => {
   const env = await setup(t);
   const owner = await env.verified("owner@usc.edu", "Olivia Owner");
@@ -1017,7 +1030,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 3);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 4);
   assert.throws(
     () =>
       createApp({
@@ -1313,7 +1326,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   t.after(() => rm(dataDir, { recursive: true, force: true }));
   const initial = createApp({ dataDir, mailTransport: null, origin: ORIGIN });
   initial.locals.db.exec(
-    "ALTER TABLE listings DROP COLUMN moderation_locked; ALTER TABLE listings DROP COLUMN original_price; PRAGMA user_version=1;",
+    "ALTER TABLE listings DROP COLUMN moderation_locked; ALTER TABLE listings DROP COLUMN original_price; DROP TABLE waitlist; PRAGMA user_version=1;",
   );
   initial.locals.db
     .prepare(
@@ -1333,7 +1346,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      3,
+      4,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
@@ -1343,6 +1356,11 @@ test("version one upgrade makes a consistent backup before preserving data in sc
     assert.equal(files.length, 2);
     assert.match(files[0], /^before-schema-2-/);
     assert.match(files[1], /^before-schema-3-/);
+    assert.ok(
+      migrated.locals.db
+        .prepare("SELECT name FROM sqlite_master WHERE name='waitlist'")
+        .get(),
+    );
     const backup = new Database(join(dataDir, "backups", files[0]), {
       readonly: true,
     });

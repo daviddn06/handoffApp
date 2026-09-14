@@ -13,7 +13,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 3) {
+  if (version > 4) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -89,11 +89,15 @@ export function openDatabase(dataDir) {
         WHERE status IN ('pending','accepted');
       CREATE INDEX requests_listing ON handoff_requests(listing_id, created_at);
       CREATE INDEX requests_requester ON handoff_requests(requester_id, created_at);
+      CREATE TABLE waitlist (
+        id TEXT PRIMARY KEY, email TEXT NOT NULL COLLATE NOCASE, school TEXT NOT NULL, domain TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, UNIQUE(email, school)
+      );
       CREATE TABLE reports (
         id TEXT PRIMARY KEY, listing_id TEXT NOT NULL REFERENCES listings(id), reporter_id TEXT NOT NULL REFERENCES users(id),
         reason TEXT NOT NULL, details TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL
       );
-      PRAGMA user_version = 3;
+      PRAGMA user_version = 4;
     `);
     })();
   if (version === 1) {
@@ -125,6 +129,15 @@ export function openDatabase(dataDir) {
       if (!columns.includes("original_price"))
         db.exec("ALTER TABLE listings ADD COLUMN original_price INTEGER");
       db.pragma("user_version = 3");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 3) {
+    db.transaction(() => {
+      db.exec(`CREATE TABLE IF NOT EXISTS waitlist (
+        id TEXT PRIMARY KEY, email TEXT NOT NULL COLLATE NOCASE, school TEXT NOT NULL, domain TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, UNIQUE(email, school)
+      )`);
+      db.pragma("user_version = 4");
     })();
   }
   return db;

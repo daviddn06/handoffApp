@@ -1089,9 +1089,11 @@ html.is-embed .route-progress {
     color var(--duration-quick) var(--ease-out),
     background-color var(--duration-quick) var(--ease-out);
 }
-.desktop-nav a:hover {
-  color: var(--ink);
-  background: var(--soft-2);
+@media (hover: hover) {
+  .desktop-nav a:hover {
+    color: var(--ink);
+    background: var(--soft-2);
+  }
 }
 .desktop-nav a.active {
   color: var(--ink);
@@ -1398,11 +1400,9 @@ html.is-embed .route-progress {
   .desktop-nav {
     display: none;
   }
-  .header-actions .list-place span {
-    display: none;
-  }
+  /* The header plus is redundant on a phone, the bottom bar carries List. */
   .header-actions .list-place {
-    padding: 6px 10px;
+    display: none;
   }
   .mobile-nav {
     display: grid;
@@ -1433,6 +1433,27 @@ html.is-embed .route-progress {
   }
   .mobile-nav a.active {
     color: var(--blue);
+  }
+  .mobile-list-action {
+    position: relative;
+    color: var(--ink) !important;
+  }
+  .mobile-list-button {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-top: -18px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: #fff;
+    box-shadow:
+      0 0 0 4px #fff,
+      0 6px 16px rgb(59 120 215 / 0.4);
+    transition: transform var(--duration-quick) var(--ease-out);
+  }
+  .mobile-list-action:active .mobile-list-button {
+    transform: scale(0.94);
   }
   main {
     padding-bottom: var(--mobile-nav-h);

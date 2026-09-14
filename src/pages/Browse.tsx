@@ -30,6 +30,7 @@ import { Button, EmptyState, ErrorBox, Loading, Modal } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
 import { Popover } from "../components/Popover";
 import { inBounds, type MapBounds } from "../lib/dps";
+import { CampusPicker } from "../components/CampusPicker";
 import { isEmbed } from "../components/Layout";
 const Map = lazy(() => import("../components/Map"));
 
@@ -95,11 +96,22 @@ export default function Browse() {
         (params.get("campusId") || user?.campusId || remembered || "usc"),
     ) || campuses[0];
   // First visit without an account or a remembered campus asks where to look.
-  const [pickCampus, setPickCampus] = useState(
-    () => !user && !remembered && !params.get("campusId") && !isEmbed(),
-  );
+  const [pickCampus, setPickCampus] = useState(() => {
+    if (user || isEmbed()) return false;
+    try {
+      if (sessionStorage.getItem("handoff:campus-picked")) return false;
+    } catch {
+      /* ignore */
+    }
+    return true;
+  });
   const chooseCampus = (id: string) => {
     rememberCampus(id);
+    try {
+      sessionStorage.setItem("handoff:campus-picked", "1");
+    } catch {
+      /* ignore */
+    }
     setParam("campusId", id);
     setPickCampus(false);
   };
@@ -390,7 +402,7 @@ export default function Browse() {
         <div className="panel-head">
           <div className="head-row">
             <Popover
-              width={300}
+              width={360}
               trigger={(props) => (
                 <button type="button" className="campus-switch" {...props}>
                   <span className="campus-icon">
@@ -405,25 +417,15 @@ export default function Browse() {
               )}
             >
               {(close) => (
-                <div className="popover-list" role="listbox">
-                  {campuses.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      role="option"
-                      aria-selected={c.id === campus.id}
-                      className={c.id === campus.id ? "is-selected" : ""}
-                      onClick={() => {
-                        chooseCampus(c.id);
-                        close();
-                      }}
-                    >
-                      <span>
-                        <strong>{c.name}</strong>
-                      </span>
-                      {c.id === campus.id && <Check size={15} />}
-                    </button>
-                  ))}
+                <div className="popover-body">
+                  <CampusPicker
+                    campuses={campuses}
+                    current={campus.id}
+                    onChoose={(id) => {
+                      chooseCampus(id);
+                      close();
+                    }}
+                  />
                 </div>
               )}
             </Popover>
@@ -861,26 +863,14 @@ export default function Browse() {
         title="Where are you looking?"
       >
         <p className="muted">
-          Pick a campus to see subleases nearby. You can change it any time.
+          Search your school to see subleases nearby. Not open at yours yet?
+          Join the waitlist and we will tell you first.
         </p>
-        <div className="campus-picker-grid" style={{ marginTop: 16 }}>
-          {campuses.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className="campus-option"
-              onClick={() => chooseCampus(c.id)}
-            >
-              <span className="campus-icon">
-                <GraduationCap size={16} />
-              </span>
-              <span>
-                <strong>{c.name}</strong>
-              </span>
-              <ArrowRight size={16} />
-            </button>
-          ))}
-        </div>
+        <CampusPicker
+          campuses={campuses}
+          current={campus.id}
+          onChoose={chooseCampus}
+        />
       </Modal>
     </div>
   );

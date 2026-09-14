@@ -20,7 +20,14 @@ const requireId = () => {
     throw new Error("Provide a valid UUID.");
 };
 try {
-  if (command === "reports") {
+  if (command === "waitlist") {
+    const rows = db
+      .prepare(
+        "SELECT school, domain, COUNT(*) AS students, MIN(created_at) AS first_signup FROM waitlist GROUP BY school, domain ORDER BY students DESC, school",
+      )
+      .all();
+    console.table(rows);
+  } else if (command === "reports") {
     const status = argument || "open";
     if (!["open", "all"].includes(status))
       throw new Error("Usage: reports [open|all]");
