@@ -1,6 +1,6 @@
 # Handoff
 
-Student sublease app at https://app.handofflease.com. Fresh app repository created September 14, 2026. The marketing site remains a separately hosted copy of the existing published page.
+Student sublease app at https://app.handofflease.com. Fresh app repository created September 14, 2026. The homepage in marketing/ is a polished standalone page based on the preferred Vercel design, linked to the app in both directions.
 
 ## Local development
 
@@ -27,3 +27,9 @@ Application releases live at `/opt/handoff/releases`, selected through `/opt/han
 The original Vercel app's configured Supabase hostname did not resolve during this rebuild. No old user accounts or listings have been imported. Preserve the old source and project until the original database is recovered or explicitly retired.
 
 See `API.md`, `server/README.md`, and the migration record in the Handoff zone deliverables for verification and rollout details.
+
+## Homepage
+
+The static homepage lives in `marketing/` and shares the app wordmark, typography, and blue. Preview it with `python3 -m http.server 4744 --bind 127.0.0.1 --directory marketing`. Its sample product preview is illustrative; campus links and all account/listing actions open the live app. It makes no enrollment or inventory claims beyond the actual supported campuses.
+
+`bash deploy-homepage.sh` publishes a committed static release at `/opt/handoff-marketing-releases`, atomically points `/opt/handoff-marketing` at it, and verifies the HTML, CSS, JavaScript, and app health. Previous releases are preserved for rollback. It does not change Caddy, DNS, or the app service. Use the regular app deployment only when the app source also changed.

@@ -1,6 +1,6 @@
 # Handoff app
 
-Fresh app-only rebuild authorized September 14, 2026. Production target is app.handofflease.com on the same VPS as Vecka. The marketing site is out of scope for content or design changes.
+Fresh app-only rebuild authorized September 14, 2026. Production target is app.handofflease.com on the same VPS as Vecka. David subsequently authorized a refined homepage based on the preferred Vercel landing. Its standalone source lives in marketing/, with root-domain deployment through deploy-homepage.sh. The original marketing exclusion is superseded.
 
 Read the Documents and Handoff zone briefs. The original code in ../handoff and unfinished landing in ../handoff-rebuild are reference only. Never modify or deploy those as part of the new app.
 

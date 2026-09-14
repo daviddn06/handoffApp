@@ -30,9 +30,13 @@ const links = [
 ];
 export function Brand() {
   return (
-    <Link className="brand" to="/browse" aria-label="Handoff home">
+    <a
+      className="brand"
+      href="https://handofflease.com/"
+      aria-label="Handoff home"
+    >
       Handoff
-    </Link>
+    </a>
   );
 }
 export function Layout() {
