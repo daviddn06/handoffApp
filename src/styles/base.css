@@ -1541,3 +1541,18 @@ html.is-embed .browse-page {
 html:has(.verify-banner) .browse-page {
   height: calc(100dvh - var(--header-h) - 41px);
 }
+
+.menu-legal {
+  display: flex;
+  gap: 12px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.menu-legal a {
+  font-size: 12px;
+  color: var(--muted);
+}
+.menu-legal a:hover {
+  color: var(--ink);
+}

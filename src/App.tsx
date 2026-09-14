@@ -24,6 +24,7 @@ const MyListings = lazy(() =>
 const Requests = lazy(() =>
   import("./pages/Account").then((m) => ({ default: m.Requests })),
 );
+const Legal = lazy(() => import("./pages/Legal"));
 const Profile = lazy(() =>
   import("./pages/Account").then((m) => ({ default: m.Profile })),
 );
@@ -61,6 +62,8 @@ export default function App() {
                   <Route key={mode} path={mode} element={<Auth mode={mode} />} />
                 ),
               )}
+              <Route path="terms" element={<Legal kind="terms" />} />
+              <Route path="privacy" element={<Legal kind="privacy" />} />
               <Route element={<RequireAuth />}>
                 <Route path="listings/new" element={<ListingEditor />} />
                 <Route path="listings/:id/edit" element={<ListingEditor />} />

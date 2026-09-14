@@ -96,6 +96,7 @@ export default function ListingDetail() {
     outgoing: HandoffRequest[];
   }>(user ? "/requests" : null);
   const [photo, setPhoto] = useState<number | null>(null),
+    [galleryIndex, setGalleryIndex] = useState(0),
     [requestOpen, setRequestOpen] = useState(false),
     [reportOpen, setReportOpen] = useState(false),
     [message, setMessage] = useState(""),
@@ -108,6 +109,7 @@ export default function ListingDetail() {
     [reportBusy, setReportBusy] = useState(false);
   useEffect(() => {
     setPhoto(null);
+    setGalleryIndex(0);
     setMessage("");
     setCreatedRequest(null);
     setRequestError("");
@@ -272,7 +274,17 @@ export default function ListingDetail() {
         </div>
       </div>
 
-      <div className={`gallery count-${Math.min(photos.length, 5)}`}>
+      <div className="gallery-wrap">
+      <div
+        className={`gallery count-${Math.min(photos.length, 5)}`}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          if (!photos.length) return;
+          const step = el.scrollWidth / photos.length;
+          const at = step ? Math.round(el.scrollLeft / step) : 0;
+          setGalleryIndex(Math.min(photos.length - 1, Math.max(0, at)));
+        }}
+      >
         {photos.length ? (
           photos.map((url, i) => (
             <button
@@ -295,14 +307,22 @@ export default function ListingDetail() {
           </div>
         )}
         {photos.length > 1 && (
-          <button
-            className="button secondary small all-photos"
-            onClick={() => setPhoto(0)}
-          >
-            <Grid2X2 size={15} />
-            Show all {photos.length} photos
-          </button>
+          <>
+            <button
+              className="button secondary small all-photos"
+              onClick={() => setPhoto(0)}
+            >
+              <Grid2X2 size={15} />
+              Show all {photos.length} photos
+            </button>
+          </>
         )}
+      </div>
+      {photos.length > 1 && (
+        <span className="gallery-counter" aria-hidden="true">
+          {galleryIndex + 1} / {photos.length}
+        </span>
+      )}
       </div>
 
       <div className="detail-layout">

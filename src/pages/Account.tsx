@@ -5,7 +5,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -25,6 +25,8 @@ import {
   Pencil,
   Eye,
   RotateCcw,
+  ChevronRight,
+  LogOut,
 } from "lucide-react";
 import {
   api,
@@ -342,6 +344,12 @@ export function MyListings() {
           {listings.map((l) => (
             <article className="mg-row" key={l.id}>
               <Link
+                className="mg-row-link"
+                to={`/listings/${l.id}`}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <Link
                 className="mg-thumb"
                 aria-label={`View ${l.title || "draft listing"}`}
                 to={`/listings/${l.id}`}
@@ -383,6 +391,9 @@ export function MyListings() {
                   Updated {dateLabel(l.updatedAt, true)}
                 </p>
               </div>
+              <span className="mg-chevron" aria-hidden="true">
+                <ChevronRight size={18} />
+              </span>
               <div className="mg-actions">
                 <Link
                   className="button small secondary"
@@ -781,15 +792,30 @@ export function Requests() {
 
 export function Profile() {
   const { user, setUser, campuses, notify } = useApp();
+  const navigate = useNavigate();
   const [name, setName] = useState(user?.name || ""),
     [bio, setBio] = useState(user?.bio || ""),
     [busy, setBusy] = useState(false),
+    [signingOut, setSigningOut] = useState(false),
     [error, setError] = useState("");
   const campus = campuses.find((c) => c.id === user?.campusId);
   useEffect(() => {
     setName(user?.name || "");
     setBio(user?.bio || "");
   }, [user]);
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await api("/auth/logout", { method: "POST" });
+      setUser(null);
+      navigate("/browse");
+      notify("You’re signed out.");
+    } catch (e) {
+      notify(errorMessage(e), "error");
+    } finally {
+      setSigningOut(false);
+    }
+  }
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -882,6 +908,15 @@ export function Profile() {
             </Button>
           </div>
         </form>
+        <button
+          type="button"
+          className="pf-signout"
+          onClick={signOut}
+          disabled={signingOut}
+        >
+          <LogOut size={17} />
+          {signingOut ? "Signing out…" : "Sign out"}
+        </button>
       </div>
     </div>
   );

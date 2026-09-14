@@ -1,36 +1,42 @@
-/* Auth: split page, form on the left, the real app on the right.
-   Sign in, stepped sign up, verification, forgot and reset. Self contained. */
+/* Auth: one centered box on the soft page, form on the left, a composed
+   preview of the real app UI on the right. Sign in, stepped sign up,
+   verification, forgot and reset. Self contained. */
 .auth-page {
   flex: 1;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(100dvh - var(--header-h));
+  padding: 32px var(--page-x) 56px;
+  background: var(--soft);
+}
+.auth-box {
+  display: flex;
   align-items: stretch;
   width: 100%;
-  max-width: none;
-  min-height: calc(100dvh - var(--header-h));
+  max-width: 920px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
   background: var(--surface);
+  box-shadow: var(--shadow-lg), var(--ring);
 }
 
-/* Left column, the form */
+/* Left section, the form */
 .auth-panel {
-  flex: 0 0 44%;
+  flex: 0 0 420px;
+  min-width: 0;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 28px 32px 48px;
-  background-color: var(--surface);
-  background-image: radial-gradient(
-    circle at 1px 1px,
-    rgb(16 24 40 / 0.05) 1px,
-    transparent 0
-  );
-  background-size: 22px 22px;
+  padding: 32px;
+  background: var(--surface);
 }
 .auth-panel-inner {
   width: 100%;
-  max-width: 380px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
 }
 .auth-brand {
   font-family: "Plus Jakarta Sans", "Geist", sans-serif;
@@ -294,46 +300,105 @@
   min-height: 40px;
 }
 
-/* Right column, the real app */
+/* Right section, a composed still life of the real app UI */
 .auth-preview {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  padding: 20px;
-  background:
-    radial-gradient(120% 90% at 100% 0%, #dcebff 0%, transparent 60%),
-    linear-gradient(180deg, #eef4fd 0%, #f6f8fa 100%);
-}
-.auth-preview-frame {
   position: relative;
   flex: 1;
   min-width: 0;
-  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 24px;
   overflow: hidden;
-  background: var(--surface);
-  box-shadow: var(--shadow-lg), var(--ring);
+  background:
+    radial-gradient(110% 80% at 85% 0%, #dcebff 0%, transparent 62%),
+    linear-gradient(180deg, #eef4fd 0%, #f6f8fa 100%);
+  box-shadow: inset 1px 0 0 var(--line);
 }
-.auth-preview-frame iframe {
+.auth-preview-stage {
+  position: relative;
+  flex: 1;
+  min-height: 350px;
+  pointer-events: none;
+}
+.auth-preview .listing-card.compact {
+  position: absolute;
+  width: min(100%, 320px);
+  grid-template-columns: 112px minmax(0, 1fr);
+  animation: auth-float 7s var(--ease-in-out) infinite;
+}
+.auth-card-behind {
+  left: 34px;
+  top: 92px;
+  opacity: 0.6;
+  rotate: -2.5deg;
+  animation-delay: 300ms;
+}
+.auth-card-front {
+  left: 0;
+  top: 170px;
+  box-shadow: var(--shadow-md), var(--ring);
+}
+.auth-photo {
   display: block;
   width: 100%;
   height: 100%;
-  border: 0;
-  opacity: 0;
-  transition: opacity var(--duration-slow) var(--ease-smooth-out);
+  min-height: 118px;
+  background: linear-gradient(145deg, #cfe0f8 0%, #9dc0ee 55%, #7aa5e3 100%);
 }
-.auth-preview-frame iframe.is-ready {
-  opacity: 1;
+.auth-photo.two {
+  background: linear-gradient(145deg, #dbe7d6 0%, #accba3 60%, #8ab581 100%);
 }
-.auth-preview-pill {
+/* The map markers carry left: 0 by default, so each one resets what it does
+   not use. */
+.auth-preview .price-marker,
+.auth-preview .cluster-marker {
   position: absolute;
-  left: 14px;
-  bottom: 14px;
-  display: inline-flex;
-  align-items: center;
+  left: auto;
+  top: auto;
+  transform: none;
+  opacity: 1;
+  cursor: default;
+  animation: auth-float 7s var(--ease-in-out) infinite;
+}
+.auth-pin.one {
+  right: 8%;
+  top: 2%;
+}
+.auth-pin.two {
+  left: 6%;
+  top: 13%;
+  animation-delay: 600ms;
+}
+.auth-pin.three {
+  right: 30%;
+  top: 13%;
+  animation-delay: 1200ms;
+}
+.auth-preview .cluster-marker {
+  right: 3%;
+  top: 34%;
+  animation-delay: 900ms;
+}
+@keyframes auth-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -6px;
+  }
+}
+.auth-preview-caption {
+  position: relative;
+  align-self: flex-start;
   padding: 6px 12px;
+  margin: 0;
   border-radius: var(--r-pill);
   background: rgb(255 255 255 / 0.92);
   backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: var(--ink-2);
   font-size: 12px;
   font-weight: 500;
@@ -370,44 +435,21 @@
   }
 }
 
-@media (max-width: 1199px) and (min-width: 900px) {
-  .auth-panel {
-    padding: 28px 24px 40px;
-  }
-}
-@media (min-width: 1200px) {
-  .auth-panel {
-    flex: 0 0 480px;
-  }
-}
 @media (max-width: 899px) {
   .auth-preview {
     display: none;
   }
   .auth-page {
-    justify-content: center;
-    padding: 20px 18px 40px;
-    background-color: var(--soft);
-    background-image: radial-gradient(
-      circle at 1px 1px,
-      rgb(16 24 40 / 0.07) 1px,
-      transparent 0
-    );
-    background-size: 20px 20px;
+    align-items: flex-start;
+    padding: 24px 18px 40px;
     min-height: calc(100dvh - var(--header-h) - var(--mobile-nav-h));
+  }
+  .auth-box {
+    max-width: 460px;
   }
   .auth-panel {
     flex: 1 1 auto;
-    max-width: 440px;
-    padding: 22px 18px 26px;
-    border-radius: var(--r-lg);
-    background-image: none;
-    box-shadow: var(--shadow-md), var(--ring);
-    align-self: flex-start;
-  }
-  .auth-panel-inner {
-    max-width: none;
-    gap: 20px;
+    padding: 24px 20px 26px;
   }
   .auth-head h1 {
     font-size: 22px;
@@ -417,6 +459,12 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .auth-preview .listing-card.compact,
+  .auth-preview .price-marker,
+  .auth-preview .cluster-marker {
+    animation: none !important;
+    translate: none !important;
+  }
   .auth-shake {
     animation: none !important;
     transform: none !important;

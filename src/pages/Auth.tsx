@@ -55,21 +55,51 @@ function SuccessCheck() {
   );
 }
 
-/** The real app in the right column, same origin so it renders locally. */
+/** A composed still life of the real app UI, built from the app's own classes. */
 function Preview() {
-  const [ready, setReady] = useState(false);
   return (
-    <aside className="auth-preview">
-      <div className="auth-preview-frame">
-        <iframe
-          src="/browse?embed=1&campusId=usc"
-          title="Handoff preview"
-          loading="lazy"
-          className={ready ? "is-ready" : ""}
-          onLoad={() => setReady(true)}
-        />
-        <span className="auth-preview-pill">Live listings near USC</span>
+    <aside className="auth-preview" aria-hidden="true">
+      <div className="auth-preview-stage">
+        <article className="listing-card compact auth-card-behind">
+          <div className="card-photo">
+            <span className="auth-photo two" />
+          </div>
+          <div className="card-body">
+            <div className="card-topline">
+              <div className="card-price">
+                <strong>$940</strong>
+                <span>/mo</span>
+              </div>
+            </div>
+            <h2 className="card-title">Shared room on Ellendale</h2>
+            <p className="card-meta">Shared room · 2 bd · 1 ba</p>
+          </div>
+        </article>
+        <article className="listing-card compact auth-card-front">
+          <div className="card-photo">
+            <span className="auth-photo one" />
+          </div>
+          <div className="card-body">
+            <div className="card-topline">
+              <div className="card-price">
+                <strong>$1,180</strong>
+                <span>/mo</span>
+              </div>
+              <span className="savings-tag">Save $320</span>
+            </div>
+            <h2 className="card-title">Sunny room off Jefferson</h2>
+            <p className="card-meta">Private room · 1 bd · 1 ba</p>
+            <p className="card-meta">
+              Jan 5 to Aug 10 · <span className="card-distance">0.4 mi</span>
+            </p>
+          </div>
+        </article>
+        <span className="price-marker auth-pin one">$1,180</span>
+        <span className="price-marker auth-pin two">$940</span>
+        <span className="price-marker auth-pin three">$1,450</span>
+        <span className="cluster-marker auth-cluster">12</span>
       </div>
+      <p className="auth-preview-caption">Real listings near campus</p>
     </aside>
   );
 }
@@ -191,6 +221,7 @@ export default function Auth({ mode }: { mode: Mode }) {
     [signedUp, setSignedUp] = useState(false),
     [verified, setVerified] = useState(false),
     [digits, setDigits] = useState(["", "", "", "", "", ""]),
+    [fieldErrors, setFieldErrors] = useState<Record<string, string>>({}),
     [cooldown, setCooldown] = useState(0);
   const verifiedToken = useRef("");
   const shakeRef = useRef<HTMLDivElement>(null);
@@ -211,6 +242,7 @@ export default function Auth({ mode }: { mode: Mode }) {
     setBusy(false);
     setStep(1);
     setSignedUp(false);
+    setFieldErrors({});
   }, [mode]);
   useEffect(() => {
     if (detected) setCampusId(detected.id);
@@ -250,6 +282,34 @@ export default function Auth({ mode }: { mode: Mode }) {
       })
       .finally(() => setBusy(false));
   }, [mode, params, setUser]);
+
+  /* Our own validation, so the browser never shows its native bubble. */
+  function validate(fields: Array<"email" | "name" | "password" | "newPassword">) {
+    const next: Record<string, string> = {};
+    const address = email.trim();
+    if (fields.includes("email")) {
+      if (!address) next.email = "Enter your student email.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))
+        next.email = "That does not look like an email address.";
+    }
+    if (fields.includes("name") && name.trim().length < 2)
+      next.name = "Tell us the name other students will see.";
+    if (fields.includes("password") && !password)
+      next.password = "Enter your password.";
+    if (fields.includes("newPassword")) {
+      if (!password) next.password = "Choose a password.";
+      else if (password.length < 10)
+        next.password = "Use at least 10 characters.";
+    }
+    setFieldErrors(next);
+    const ok = Object.keys(next).length === 0;
+    if (!ok) setShake((s) => s + 1);
+    return ok;
+  }
+  const clearField = (key: string) =>
+    setFieldErrors((current) =>
+      current[key] ? { ...current, [key]: "" } : current,
+    );
 
   const failed = useCallback((e: unknown) => {
     setError(errorMessage(e));
@@ -302,6 +362,13 @@ export default function Auth({ mode }: { mode: Mode }) {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    const needs: Array<"email" | "name" | "password" | "newPassword"> =
+      mode === "sign-in"
+        ? ["email", "password"]
+        : mode === "forgot-password"
+          ? ["email"]
+          : ["newPassword"];
+    if (!validate(needs)) return;
     setError("");
     setBusy(true);
     try {
@@ -363,6 +430,7 @@ export default function Auth({ mode }: { mode: Mode }) {
     e.preventDefault();
     setError("");
     if (step === 1) {
+      if (!validate(["email"])) return;
       if (!detected) {
         setError(`Use your school email. We cover ${domains}.`);
         setShake((s) => s + 1);
@@ -370,11 +438,7 @@ export default function Auth({ mode }: { mode: Mode }) {
       }
       setStep(2);
     } else if (step === 2) {
-      if (name.trim().length < 2) {
-        setError("Tell us the name other students will see.");
-        setShake((s) => s + 1);
-        return;
-      }
+      if (!validate(["name"])) return;
       setStep(3);
     }
   }
@@ -411,18 +475,20 @@ export default function Auth({ mode }: { mode: Mode }) {
   function shell(children: React.ReactNode, switcher?: React.ReactNode) {
     return (
       <div className="auth-page">
-        <section className="auth-panel">
-          <div className="auth-panel-inner enter-stagger">
-            <Link to="/browse" className="auth-brand">
-              Handoff
-            </Link>
-            <div className="auth-shake" ref={shakeRef}>
-              {children}
+        <div className="auth-box">
+          <section className="auth-panel">
+            <div className="auth-panel-inner enter-stagger">
+              <Link to="/browse" className="auth-brand">
+                Handoff
+              </Link>
+              <div className="auth-shake" ref={shakeRef}>
+                {children}
+              </div>
+              {switcher && <p className="auth-switch">{switcher}</p>}
             </div>
-            {switcher && <p className="auth-switch">{switcher}</p>}
-          </div>
-        </section>
-        <Preview />
+          </section>
+          <Preview />
+        </div>
       </div>
     );
   }
@@ -476,20 +542,25 @@ export default function Auth({ mode }: { mode: Mode }) {
           </header>
           {error && <ErrorBox message={error} />}
           <form
+            noValidate
             className="auth-form"
             onSubmit={(e) => {
               e.preventDefault();
+              if (!validate(["email"])) return;
               resend();
             }}
           >
-            <Field label="Student email">
+            <Field label="Student email" error={fieldErrors.email}>
               <input
                 type="email"
                 autoComplete="email"
                 placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearField("email");
+                }}
               />
             </Field>
             <Button type="submit" busy={busy} className="auth-cta">
@@ -513,16 +584,18 @@ export default function Auth({ mode }: { mode: Mode }) {
         </header>
         {error && <ErrorBox message={error} />}
         <OtpInput digits={digits} setDigits={setDigits} disabled={busy} />
-        <Button
-          type="button"
-          busy={busy}
-          className="auth-cta"
-          disabled={code.length !== 6}
-          onClick={() => submitCode(code)}
-        >
-          Verify
-          <ArrowRight size={17} />
-        </Button>
+        <div className="auth-pinned">
+          <Button
+            type="button"
+            busy={busy}
+            className="auth-cta"
+            disabled={code.length !== 6}
+            onClick={() => submitCode(code)}
+          >
+            Verify
+            <ArrowRight size={17} />
+          </Button>
+        </div>
         <div className="auth-verify-aside">
           <button
             type="button"
@@ -557,19 +630,22 @@ export default function Auth({ mode }: { mode: Mode }) {
           <p>Sign in to pick up where you left off.</p>
         </header>
         {error && <ErrorBox message={error} />}
-        <form className="auth-form" onSubmit={submit}>
-          <Field label="Student email">
+        <form className="auth-form" noValidate onSubmit={submit}>
+          <Field label="Student email" error={fieldErrors.email}>
             <input
               type="email"
               name="email"
               autoComplete="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearField("email");
+              }}
               placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
             />
           </Field>
-          <Field label="Password">
+          <Field label="Password" error={fieldErrors.password}>
             <div className="password-input">
               <input
                 type={showPassword ? "text" : "password"}
@@ -578,7 +654,10 @@ export default function Auth({ mode }: { mode: Mode }) {
                 minLength={1}
                 maxLength={128}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearField("password");
+                }}
               />
               <button
                 type="button"
@@ -656,8 +735,12 @@ export default function Auth({ mode }: { mode: Mode }) {
             aria-hidden={step !== 1}
             style={{ "--t-page-from-x": "-8px" } as React.CSSProperties}
           >
-            <form className="auth-form" onSubmit={advance}>
-              <Field label="Student email" hint="Use your school email.">
+            <form className="auth-form" noValidate onSubmit={advance}>
+              <Field
+                label="Student email"
+                hint="Use your school email."
+                error={fieldErrors.email}
+              >
                 <input
                   type="email"
                   name="email"
@@ -665,7 +748,10 @@ export default function Auth({ mode }: { mode: Mode }) {
                   required
                   tabIndex={step === 1 ? undefined : -1}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearField("email");
+                  }}
                   placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
                 />
               </Field>
@@ -695,8 +781,12 @@ export default function Auth({ mode }: { mode: Mode }) {
               { "--t-page-from-x": step > 2 ? "-8px" : "8px" } as React.CSSProperties
             }
           >
-            <form className="auth-form" onSubmit={advance}>
-              <Field label="Your name" hint="First and last, the way students will see it.">
+            <form className="auth-form" noValidate onSubmit={advance}>
+              <Field
+                label="Your name"
+                hint="First and last, the way students will see it."
+                error={fieldErrors.name}
+              >
                 <input
                   name="name"
                   autoComplete="name"
@@ -705,7 +795,10 @@ export default function Auth({ mode }: { mode: Mode }) {
                   required
                   tabIndex={step === 2 ? undefined : -1}
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    clearField("name");
+                  }}
                   placeholder="First and last name"
                 />
               </Field>
@@ -755,8 +848,12 @@ export default function Auth({ mode }: { mode: Mode }) {
             aria-hidden={step !== 3}
             style={{ "--t-page-from-x": "8px" } as React.CSSProperties}
           >
-            <form className="auth-form" onSubmit={submit}>
-              <Field label="Password" hint={strength || "At least 10 characters."}>
+            <form className="auth-form" noValidate onSubmit={submit}>
+              <Field
+                label="Password"
+                hint={strength || "At least 10 characters."}
+                error={fieldErrors.password}
+              >
                 <div className="password-input">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -766,7 +863,10 @@ export default function Auth({ mode }: { mode: Mode }) {
                     maxLength={128}
                     tabIndex={step === 3 ? undefined : -1}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      clearField("password");
+                    }}
                   />
                   <button
                     type="button"
@@ -857,16 +957,19 @@ export default function Auth({ mode }: { mode: Mode }) {
         </p>
       </header>
       {error && <ErrorBox message={error} />}
-      <form className="auth-form" onSubmit={submit}>
+      <form className="auth-form" noValidate onSubmit={submit}>
         {forgot ? (
-          <Field label="Student email">
+          <Field label="Student email" error={fieldErrors.email}>
             <input
               type="email"
               name="email"
               autoComplete="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearField("email");
+              }}
               placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
             />
           </Field>
@@ -874,6 +977,7 @@ export default function Auth({ mode }: { mode: Mode }) {
           <Field
             label="New password"
             hint="At least 10 characters. Make it something only you know."
+            error={fieldErrors.password}
           >
             <div className="password-input">
               <input
@@ -883,7 +987,10 @@ export default function Auth({ mode }: { mode: Mode }) {
                 minLength={10}
                 maxLength={128}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearField("password");
+                }}
               />
               <button
                 type="button"

@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -15,6 +14,8 @@ import {
   ChevronDown,
   X,
   Plus,
+  Map as MapIcon,
+  List,
   GraduationCap,
   CalendarDays,
   BedDouble,
@@ -115,75 +116,28 @@ export default function Browse() {
     setParam("campusId", id);
     setPickCampus(false);
   };
-  // Mobile bottom sheet. The listing panel slides over a full screen map and
-  // snaps to three heights, a peek with search, half, and full.
-  const [sheet, setSheet] = useState<"peek" | "half" | "full">("half");
-  const [sheetY, setSheetY] = useState<number | null>(null);
-  const [dragging, setDragging] = useState(false);
+  // Phones choose between a full map with a card carousel and a full list.
+  const [mobileView, setMobileView] = useState<"map" | "list">(() => {
+    try {
+      return sessionStorage.getItem("handoff:mobile-view") === "list"
+        ? "list"
+        : "map";
+    } catch {
+      return "map";
+    }
+  });
+  const switchMobileView = (view: "map" | "list") => {
+    setMobileView(view);
+    try {
+      sessionStorage.setItem("handoff:mobile-view", view);
+    } catch {
+      /* ignore */
+    }
+  };
   const pageRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const snapFor = useCallback((name: "peek" | "half" | "full") => {
-    const h = pageRef.current?.clientHeight || window.innerHeight;
-    return name === "full" ? 0 : name === "half" ? Math.round(h * 0.5) : h - 132;
-  }, []);
-  const startSheetDrag = (e: ReactPointerEvent<HTMLElement>) => {
-    if (window.innerWidth > 760) return;
-    const scroller = scrollRef.current;
-    const fromScroll = (e.target as HTMLElement).closest(".panel-scroll");
-    // Inside the list only a downward drag from the very top moves the sheet.
-    if (fromScroll && sheet === "full" && (scroller?.scrollTop || 0) > 0) return;
-    const startY = e.clientY,
-      startOffset = snapFor(sheet),
-      startTime = performance.now();
-    let last = startY,
-      lastTime = startTime,
-      moved = false;
-    const h = pageRef.current?.clientHeight || window.innerHeight;
-    const move = (ev: PointerEvent) => {
-      const dy = ev.clientY - startY;
-      if (!moved && Math.abs(dy) < 6) return;
-      if (fromScroll && !moved && dy < 0) {
-        stop();
-        return;
-      }
-      moved = true;
-      setDragging(true);
-      setSheetY(Math.max(0, Math.min(h - 96, startOffset + dy)));
-      last = ev.clientY;
-      lastTime = performance.now();
-    };
-    const stop = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
-      if (!moved) return;
-      const dt = Math.max(1, performance.now() - lastTime);
-      const velocity = (last - startY) / Math.max(1, performance.now() - startTime);
-      const current = Math.max(0, Math.min(h - 96, startOffset + (last - startY)));
-      const snaps: Array<["peek" | "half" | "full", number]> = [
-        ["full", snapFor("full")],
-        ["half", snapFor("half")],
-        ["peek", snapFor("peek")],
-      ];
-      let next: "peek" | "half" | "full";
-      if (Math.abs(velocity) > 0.45 && dt < 120) {
-        // A flick moves one step in the flick direction.
-        const order: Array<"full" | "half" | "peek"> = ["full", "half", "peek"];
-        const i = order.indexOf(sheet);
-        next = order[Math.max(0, Math.min(2, i + (velocity > 0 ? 1 : -1)))];
-      } else {
-        next = snaps.reduce((best, s) =>
-          Math.abs(s[1] - current) < Math.abs(best[1] - current) ? s : best,
-        )[0];
-      }
-      setDragging(false);
-      setSheetY(null);
-      setSheet(next);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-  };
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [search, setSearch] = useState(params.get("query") || "");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [inViewOnly, setInViewOnly] = useState(false);
@@ -224,8 +178,13 @@ export default function Browse() {
   const handleMapActive = useCallback((id: string | null) => {
     activeSource.current = "map";
     setActiveId(id);
-    // On a phone a tapped pin shows its card above the peeking sheet.
-    if (id && window.innerWidth <= 760) setSheet("peek");
+    // On a phone a tapped pin brings its card into the carousel.
+    if (id && window.innerWidth <= 760) {
+      const card = carouselRef.current?.querySelector<HTMLElement>(
+        `[data-id="${id}"]`,
+      );
+      card?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    }
   }, []);
   const handleListActive = useCallback((id: string | null) => {
     activeSource.current = "list";
@@ -251,7 +210,7 @@ export default function Browse() {
   }, [activeId]);
 
   // Sidebar resizing. Width is clamped and remembered per browser.
-  const startResize = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     const startX = e.clientX,
       startWidth = panelWidth;
@@ -390,27 +349,10 @@ export default function Browse() {
   return (
     <div
       ref={pageRef}
-      className={`browse-page sheet-${sheet} ${resizing ? "is-resizing" : ""} ${dragging ? "is-dragging" : ""}`}
-      style={
-        {
-          "--panel-w": `${panelWidth}px`,
-          "--sheet-y": `${sheetY ?? snapFor(sheet)}px`,
-        } as React.CSSProperties
-      }
+      className={`browse-page mobile-${mobileView} ${resizing ? "is-resizing" : ""}`}
+      style={{ "--panel-w": `${panelWidth}px` } as React.CSSProperties}
     >
-      <aside
-        className="browse-panel"
-        aria-label="Listings"
-        onPointerDown={startSheetDrag}
-      >
-        <button
-          type="button"
-          className="sheet-handle"
-          aria-label={sheet === "full" ? "Collapse the list" : "Expand the list"}
-          onClick={() => setSheet(sheet === "full" ? "peek" : sheet === "half" ? "full" : "half")}
-        >
-          <span />
-        </button>
+      <aside className="browse-panel" aria-label="Listings">
         <div className="panel-head">
           <div className="head-row">
             <Popover
@@ -860,15 +802,79 @@ export default function Browse() {
             onActive={handleMapActive}
             onListing={navigateListing}
             onBounds={setBounds}
-            bottomInset={
-              window.innerWidth <= 760
-                ? (pageRef.current?.clientHeight || window.innerHeight) -
-                  snapFor("half")
-                : 0
-            }
+            bottomInset={window.innerWidth <= 760 ? 200 : 0}
+            focusId={focusId}
           />
         </Suspense>
+        {!loading && visible.length > 0 && (
+          <div
+            className="mobile-carousel"
+            ref={carouselRef}
+            aria-label="Listings on the map"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              window.clearTimeout(
+                (el as HTMLDivElement & { _t?: number })._t,
+              );
+              (el as HTMLDivElement & { _t?: number })._t = window.setTimeout(
+                () => {
+                  const center = el.scrollLeft + el.clientWidth / 2;
+                  let best: HTMLElement | null = null,
+                    bestDist = Infinity;
+                  el.querySelectorAll<HTMLElement>("[data-id]").forEach((c) => {
+                    const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - center);
+                    if (d < bestDist) {
+                      bestDist = d;
+                      best = c;
+                    }
+                  });
+                  const id = best ? (best as HTMLElement).dataset.id || null : null;
+                  if (id && id !== activeId) {
+                    activeSource.current = "list";
+                    setActiveId(id);
+                    setFocusId(id);
+                  }
+                },
+                120,
+              );
+            }}
+          >
+            {visible.map((listing) => (
+              <div className="carousel-item" data-id={listing.id} key={listing.id}>
+                <ListingCard
+                  listing={listing}
+                  campus={campus}
+                  variant="compact"
+                  active={listing.id === activeId}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </section>
+      <div className="mobile-view-toggle t-tabs" role="tablist" aria-label="Map or list">
+        <button
+          type="button"
+          role="tab"
+          className="t-tab"
+          aria-selected={mobileView === "map"}
+          onClick={() => switchMobileView("map")}
+        >
+          <MapIcon size={15} />
+          Map
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="t-tab"
+          aria-selected={mobileView === "list"}
+          onClick={() => switchMobileView("list")}
+        >
+          <List size={15} />
+          List
+        </button>
+        <span className="t-tabs-pill" aria-hidden="true" data-pos={mobileView} />
+      </div>
       <Modal
         open={pickCampus}
         onClose={() => chooseCampus(campus.id)}

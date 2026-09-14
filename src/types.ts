@@ -12,6 +12,7 @@ export type User = {
   email: string;
   campusId: string;
   verified: boolean;
+  termsAccepted: boolean;
   bio: string;
 };
 export type Listing = {

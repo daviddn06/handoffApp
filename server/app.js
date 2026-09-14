@@ -193,6 +193,7 @@ export function createApp({
     email: user.email,
     campusId: user.campus_id,
     verified: Boolean(user.verified_at),
+    termsAccepted: Boolean(user.terms_accepted_at),
     bio: user.bio,
   });
   const setSession = (res, userId) => {
@@ -314,6 +315,26 @@ ${button}
     }
   };
 
+  // Publishing and requesting need the marketplace terms accepted once.
+  app.post("/api/auth/accept-terms", requireUser, (req, res) => {
+    db.prepare(
+      "UPDATE users SET terms_accepted_at=COALESCE(terms_accepted_at,?),updated_at=? WHERE id=?",
+    ).run(iso(), iso(), req.user.id);
+    res.json({
+      user: serializeUser(
+        db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id),
+      ),
+    });
+  });
+  const requireTerms = (req, res, next) =>
+    req.user?.terms_accepted_at
+      ? next()
+      : next(
+          new HttpError(
+            403,
+            "Please accept the Terms of Service and Privacy Policy first.",
+          ),
+        );
   // Students at campuses Handoff has not opened yet leave an email.
   app.post(
     "/api/waitlist",
@@ -715,6 +736,11 @@ ${button}
           403,
           "Verify your student email to publish. Your draft is safe until then.",
         );
+      if (input.status === "active" && !req.user.terms_accepted_at)
+        throw new HttpError(
+          403,
+          "Please accept the Terms of Service and Privacy Policy before publishing.",
+        );
       validateListing(input);
       validatePhotos(input.photos, req.user.id);
       const id = randomUUID();
@@ -787,6 +813,15 @@ ${button}
         throw new HttpError(
           403,
           "Verify your student email to publish. Your draft is safe until then.",
+        );
+      if (
+        input.status === "active" &&
+        row.status !== "active" &&
+        !req.user.terms_accepted_at
+      )
+        throw new HttpError(
+          403,
+          "Please accept the Terms of Service and Privacy Policy before publishing.",
         );
       if (row.moderation_locked && input.status === "active")
         throw new HttpError(
@@ -1100,6 +1135,7 @@ ${button}
   app.post(
     "/api/requests",
     requireVerified,
+    requireTerms,
     limit("request-create", 15, HOUR, (req) => req.user.id),
     async (req, res) => {
       const input = parse(requestSchema, req.body);

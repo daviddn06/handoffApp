@@ -198,6 +198,9 @@ export function Modal({
         }
       }}
     >
+      <span className="sheet-grip" aria-hidden="true">
+        <span />
+      </span>
       <div className="modal-heading">
         <h2 id={id}>{title}</h2>
         <button

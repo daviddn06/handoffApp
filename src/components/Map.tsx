@@ -42,8 +42,10 @@ type Props = {
   onPin?: (point: { lat: number; lng: number }) => void;
   /** Compact mode hides the legend and shrinks controls (editor, detail). */
   compact?: boolean;
-  /** Pixels covered along the bottom edge, the phone sheet, kept clear when framing. */
+  /** Pixels covered along the bottom edge, the phone carousel, kept clear when framing. */
   bottomInset?: number;
+  /** Listing to glide to, used by the phone carousel. */
+  focusId?: string | null;
 };
 
 // OpenFreeMap serves the Positron style without an API key.
@@ -100,6 +102,7 @@ export default function Map({
   onPin,
   compact = false,
   bottomInset = 0,
+  focusId = null,
 }: Props) {
   const element = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
@@ -179,6 +182,18 @@ export default function Map({
       new maplibregl.AttributionControl({ compact: true }),
       "bottom-right",
     );
+    // MapLibre opens the compact attribution on narrow maps and again on
+    // every resize. Keep it folded behind the info button, the credits are
+    // one tap away.
+    const foldAttribution = () =>
+      requestAnimationFrame(() =>
+        m
+          .getContainer()
+          .querySelector(".maplibregl-ctrl-attrib")
+          ?.classList.remove("maplibregl-compact-show"),
+      );
+    m.on("load", foldAttribution);
+    m.on("resize", foldAttribution);
     map.current = m;
     if (import.meta.env.DEV)
       (window as unknown as { __map?: maplibregl.Map }).__map = m;
@@ -547,6 +562,19 @@ export default function Map({
       node.classList.toggle("is-active", active);
     }
   }, [activeId, listings]);
+
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !ready || !focusId) return;
+    const item = listings.find((l) => l.id === focusId);
+    if (!item) return;
+    m.easeTo({
+      center: [item.lng, item.lat],
+      offset: [0, -bottomInset / 2],
+      duration: 450,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   const recenter = () => {
     setPreview(null);

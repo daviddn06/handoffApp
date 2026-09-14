@@ -44,11 +44,21 @@ export function Brand() {
 export const isEmbed = () =>
   new URLSearchParams(window.location.search).get("embed") === "1";
 
+/** Routes where the header must not offer sign in or listing actions. */
+const AUTH_ROUTES = new Set([
+  "/sign-in",
+  "/sign-up",
+  "/verify",
+  "/forgot-password",
+  "/reset-password",
+]);
+
 export function Layout() {
   const { user, setUser, loading, error, retry, notify } = useApp(),
     navigate = useNavigate(),
     location = useLocation();
   const embed = isEmbed();
+  const onAuthRoute = AUTH_ROUTES.has(location.pathname);
   useEffect(() => {
     document.documentElement.classList.toggle("is-embed", embed);
     if (!embed) return;
@@ -81,6 +91,8 @@ export function Layout() {
       "/verify": "Verify your email",
       "/forgot-password": "Forgot password",
       "/reset-password": "Reset password",
+      "/terms": "Terms of Service",
+      "/privacy": "Privacy Policy",
       "/listings/new": "List your place",
     };
     document.title = `${names[location.pathname] || "Your next place"} · Handoff`;
@@ -130,10 +142,12 @@ export function Layout() {
             ))}
           </nav>
           <div className="header-actions">
-            <Link to="/listings/new" className="button primary list-place">
-              <Plus size={17} />
-              <span>List your place</span>
-            </Link>
+            {!onAuthRoute && (
+              <Link to="/listings/new" className="button primary list-place">
+                <Plus size={17} />
+                <span>List your place</span>
+              </Link>
+            )}
             {user ? (
               <div className="user-menu" ref={menuRef}>
                 <button
@@ -172,10 +186,14 @@ export function Layout() {
                       <LogOut size={16} />
                       {loggingOut ? "Signing out…" : "Sign out"}
                     </button>
+                    <div className="menu-legal">
+                      <Link to="/terms">Terms</Link>
+                      <Link to="/privacy">Privacy</Link>
+                    </div>
                   </div>
                 )}
               </div>
-            ) : (
+            ) : onAuthRoute ? null : (
               <Link to="/sign-in" className="button ghost sign-in-link">
                 Sign in <ArrowUpRight size={16} />
               </Link>

@@ -13,7 +13,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 4) {
+  if (version > 5) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -40,7 +40,7 @@ export function openDatabase(dataDir) {
       CREATE TABLE users (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE COLLATE NOCASE,
         campus_id TEXT NOT NULL, password_hash TEXT NOT NULL, verified_at TEXT,
-        bio TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        bio TEXT NOT NULL DEFAULT '', terms_accepted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE TABLE sessions (
         token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -97,7 +97,7 @@ export function openDatabase(dataDir) {
         id TEXT PRIMARY KEY, listing_id TEXT NOT NULL REFERENCES listings(id), reporter_id TEXT NOT NULL REFERENCES users(id),
         reason TEXT NOT NULL, details TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL
       );
-      PRAGMA user_version = 4;
+      PRAGMA user_version = 5;
     `);
     })();
   if (version === 1) {
@@ -138,6 +138,17 @@ export function openDatabase(dataDir) {
         created_at TEXT NOT NULL, UNIQUE(email, school)
       )`);
       db.pragma("user_version = 4");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 4) {
+    db.transaction(() => {
+      const columns = db
+        .prepare("PRAGMA table_info(users)")
+        .all()
+        .map((column) => column.name);
+      if (!columns.includes("terms_accepted_at"))
+        db.exec("ALTER TABLE users ADD COLUMN terms_accepted_at TEXT");
+      db.pragma("user_version = 5");
     })();
   }
   return db;

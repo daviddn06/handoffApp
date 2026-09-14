@@ -135,6 +135,9 @@ async function setup(t, overrides = {}) {
     });
     assert.equal(result.status, 200, JSON.stringify(result.body));
     user.id = result.body.user.id;
+    const terms = await user.call("/api/auth/accept-terms", { method: "POST" });
+    assert.equal(terms.status, 200);
+    assert.equal(terms.body.user.termsAccepted, true);
     return user;
   };
   const upload = async (user) => {
@@ -365,6 +368,37 @@ test("a six digit code from the email verifies the signed in student, wrong code
       })
     ).status,
     400,
+  );
+});
+
+test("publishing needs the terms accepted once, drafts do not", async (t) => {
+  const env = await setup(t);
+  const owner = await env.signup("terms@usc.edu", "Terms Student");
+  await owner.call("/api/auth/verify", {
+    method: "POST",
+    body: { token: env.tokenFor("terms@usc.edu") },
+  });
+  const photos = await env.upload(owner);
+  const draft = await owner.call("/api/listings", {
+    method: "POST",
+    body: validListing(photos, { status: "draft" }),
+  });
+  assert.equal(draft.status, 201, JSON.stringify(draft.body));
+  const publish = await owner.call(`/api/listings/${draft.body.listing.id}`, {
+    method: "PATCH",
+    body: { status: "active" },
+  });
+  assert.equal(publish.status, 403);
+  assert.match(publish.body.error, /Terms of Service/);
+  assert.equal((await owner.call("/api/auth/accept-terms", { method: "POST" })).status, 200);
+  assert.equal(
+    (
+      await owner.call(`/api/listings/${draft.body.listing.id}`, {
+        method: "PATCH",
+        body: { status: "active" },
+      })
+    ).status,
+    200,
   );
 });
 
@@ -1030,7 +1064,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 4);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 5);
   assert.throws(
     () =>
       createApp({
@@ -1326,7 +1360,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   t.after(() => rm(dataDir, { recursive: true, force: true }));
   const initial = createApp({ dataDir, mailTransport: null, origin: ORIGIN });
   initial.locals.db.exec(
-    "ALTER TABLE listings DROP COLUMN moderation_locked; ALTER TABLE listings DROP COLUMN original_price; DROP TABLE waitlist; PRAGMA user_version=1;",
+    "ALTER TABLE listings DROP COLUMN moderation_locked; ALTER TABLE listings DROP COLUMN original_price; DROP TABLE waitlist; ALTER TABLE users DROP COLUMN terms_accepted_at; PRAGMA user_version=1;",
   );
   initial.locals.db
     .prepare(
@@ -1346,7 +1380,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      4,
+      5,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
