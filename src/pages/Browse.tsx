@@ -862,10 +862,7 @@ export default function Browse() {
         onClose={() => chooseCampus(campus.id)}
         title="Where are you looking?"
       >
-        <p className="muted">
-          Search your school to see subleases nearby. Not open at yours yet?
-          Join the waitlist and we will tell you first.
-        </p>
+        <p className="muted">Pick a campus to see subleases nearby.</p>
         <CampusPicker
           campuses={campuses}
           current={campus.id}

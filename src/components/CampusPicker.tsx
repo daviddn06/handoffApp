@@ -37,19 +37,20 @@ export function CampusPicker({
   );
   const supported = (school: School) =>
     school.d.map((d) => supportedDomains.get(d)).find(Boolean) || null;
+  const live = useMemo(
+    () => campuses.map((c) => ({ n: c.name, d: [c.domain], s: "" })),
+    [campuses],
+  );
+  const searching = query.trim().length > 0;
   const results = useMemo(() => {
-    if (!schools) return [];
-    if (!query.trim()) {
-      // Supported campuses first, then the rest alphabetically as a preview.
-      const first = campuses.map((c) => ({
-        n: c.name,
-        d: [c.domain],
-        s: "",
-      }));
-      return [...first, ...searchSchools(schools, "", 8).filter((s) => !supported(s))];
-    }
-    return searchSchools(schools, query, 14);
-  }, [schools, query, campuses]);
+    if (!schools || !searching) return live;
+    // Live campuses that match come first, then the closest other schools.
+    const found = searchSchools(schools, query, 40);
+    const open = found.filter((s) => supported(s));
+    const rest = found.filter((s) => !supported(s));
+    return [...open, ...rest].slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schools, query, searching, live]);
 
   async function joinWaitlist(e: FormEvent) {
     e.preventDefault();
@@ -133,11 +134,11 @@ export function CampusPicker({
   return (
     <div className="campus-picker">
       <label className="search-field campus-search">
-        <Search size={16} />
+        <Search size={17} />
         <input
           ref={input}
           aria-label="Search schools"
-          placeholder="Search your school"
+          placeholder="Search any school"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -152,11 +153,14 @@ export function CampusPicker({
           </button>
         )}
       </label>
+      {!searching && <div className="campus-group-label">Live now</div>}
       <div className="campus-results" role="listbox" aria-label="Schools">
-        {!schools && <div className="muted campus-hint">Loading schools…</div>}
-        {schools && results.length === 0 && (
+        {searching && !schools && (
+          <div className="muted campus-hint">Loading schools…</div>
+        )}
+        {searching && schools && results.length === 0 && (
           <div className="muted campus-hint">
-            No school matches "{query}". Try the full name or the email domain.
+            Nothing matches. Try the full name or the email domain.
           </div>
         )}
         {results.map((school) => {
@@ -167,7 +171,7 @@ export function CampusPicker({
               type="button"
               role="option"
               aria-selected={!!campus && campus.id === current}
-              className={`campus-option ${campus ? "is-open" : ""}`}
+              className="campus-option"
               onClick={() => (campus ? onChoose(campus.id) : setWaiting(school))}
             >
               <span className="campus-icon">
@@ -175,20 +179,26 @@ export function CampusPicker({
               </span>
               <span className="campus-option-text">
                 <strong>{school.n}</strong>
-                <small>
-                  {campus ? "Open on Handoff" : "Not open yet, join the waitlist"}
-                  {school.d[0] ? ` · ${school.d[0]}` : ""}
-                </small>
               </span>
               {campus ? (
-                <span className="pill green">Open</span>
+                campus.id === current ? (
+                  <Check size={16} className="campus-check" />
+                ) : (
+                  <ArrowRight size={15} className="campus-arrow" />
+                )
               ) : (
-                <ArrowRight size={15} />
+                <span className="campus-waitlist-tag">Waitlist</span>
               )}
             </button>
           );
         })}
       </div>
+      {!searching && (
+        <p className="campus-foot">
+          Not at one of these? Search your school above and we will let you
+          know when Handoff opens there.
+        </p>
+      )}
     </div>
   );
 }
