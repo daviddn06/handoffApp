@@ -14,37 +14,36 @@ import {
   Bath,
   BedDouble,
   CalendarRange,
+  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
+  House,
   Image as ImageIcon,
   ImagePlus,
+  ListChecks,
   MapPin,
+  Rocket,
   Save,
+  Sparkles,
   Star,
   Upload,
+  Wallet,
   X,
-  Eye,
 } from "lucide-react";
-import { AMENITIES, ROOM_LABELS, type Listing } from "../types";
+import { AMENITIES, ROOM_LABELS, type Listing, type User } from "../types";
 import {
   api,
   dateLabel,
   errorMessage,
   json,
   money,
+  today,
   useResource,
 } from "../lib/api";
 import { useApp } from "../lib/context";
-import {
-  BackLink,
-  Button,
-  ErrorBox,
-  Field,
-  Loading,
-  Modal,
-  PageHeading,
-} from "../components/ui";
+import { Button, ErrorBox, Field, Loading } from "../components/ui";
 const Map = lazy(() => import("../components/Map"));
 type Draft = {
   title: string;
@@ -63,28 +62,61 @@ type Draft = {
   amenities: string[];
   photos: string[];
 };
-const STEPS = ["The basics", "The details", "Photos", "Review"];
-const STEP_NOTES = [
-  "Location and type",
-  "Rent and availability",
-  "Show the space",
-  "Publish when ready",
-];
-const STEP_TITLES = [
-  "Start with the place",
-  "The details that matter",
-  "Give them a look around",
-  "One last look",
-];
-const STEP_SUBTITLES = [
-  "Where is it, and what are you offering?",
-  "Set expectations clearly, so the next conversation is easy.",
-  "Add bright, recent photos that show the actual space.",
-  "Check everything before your listing goes live.",
-];
+type Errors = Record<string, string>;
+const STEPS = [
+  {
+    key: "basics",
+    label: "Basics",
+    note: "Title and space",
+    icon: House,
+    title: "Start with the basics",
+    sub: "What are you offering, and how big is the place?",
+  },
+  {
+    key: "location",
+    label: "Location",
+    note: "Address and pin",
+    icon: MapPin,
+    title: "Where is it?",
+    sub: "Drop the pin on your building so students understand the area.",
+  },
+  {
+    key: "terms",
+    label: "Dates and price",
+    note: "When and how much",
+    icon: Wallet,
+    title: "Dates and price",
+    sub: "Set expectations clearly, so the next conversation is easy.",
+  },
+  {
+    key: "details",
+    label: "Amenities",
+    note: "What is included",
+    icon: ListChecks,
+    title: "Amenities and details",
+    sub: "Tell them what comes with the place.",
+  },
+  {
+    key: "photos",
+    label: "Photos",
+    note: "Show the space",
+    icon: Camera,
+    title: "Give them a look around",
+    sub: "Bright, recent photos of the actual space work best.",
+  },
+  {
+    key: "review",
+    label: "Review",
+    note: "Publish when ready",
+    icon: ClipboardCheck,
+    title: "Review and publish",
+    sub: "One last look before students can find it.",
+  },
+] as const;
+const LAST = STEPS.length - 1;
 export default function ListingEditor() {
   const { id } = useParams(),
-    { user, campuses, notify } = useApp(),
+    { user, setUser, campuses, notify } = useApp(),
     navigate = useNavigate();
   const campus = campuses.find((c) => c.id === user?.campusId) || campuses[0];
   const { data, loading, error, refresh } = useResource<{ listing: Listing }>(
@@ -108,25 +140,35 @@ export default function ListingEditor() {
       photos: [],
     }),
     [step, setStep] = useState(0),
+    [reached, setReached] = useState(0),
+    [dir, setDir] = useState<"fwd" | "back">("fwd"),
     [pinPlaced, setPinPlaced] = useState(false),
     [dirty, setDirty] = useState(false),
     [saving, setSaving] = useState(false),
     [uploading, setUploading] = useState(false),
     [pending, setPending] = useState(0),
     [dragOver, setDragOver] = useState(false),
-    [formError, setFormError] = useState(""),
-    [showPublish, setShowPublish] = useState(false);
+    [agreed, setAgreed] = useState(false),
+    [published, setPublished] = useState(false),
+    [errors, setErrors] = useState<Errors>({}),
+    [formError, setFormError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null),
-    topRef = useRef<HTMLDivElement>(null),
-    fieldsRef = useRef<HTMLDivElement>(null);
+    bodyRef = useRef<HTMLDivElement>(null),
+    timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const termsAccepted = Boolean(user?.termsAccepted);
   // Error shake, transitions.dev 12-error-state-shake.
-  function fail(message: string) {
-    setFormError(message);
-    const el = fieldsRef.current;
+  function shake() {
+    const el = bodyRef.current;
     if (!el) return;
     el.classList.remove("is-shaking");
     void el.offsetWidth;
     el.classList.add("is-shaking");
+  }
+  /** Field messages carry the detail, so the summary box is only for the rest. */
+  function fail(message: string, fields: Errors = {}) {
+    setFormError(Object.keys(fields).length ? "" : message);
+    setErrors(fields);
+    shake();
   }
   useEffect(() => {
     if (data?.listing) {
@@ -161,88 +203,108 @@ export default function ListingEditor() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => ({ ...d, [key]: value }));
     setDirty(true);
     setFormError("");
+    setErrors((e) => (e[key as string] ? { ...e, [key]: "" } : e));
   }
-  function validatePart(part: number) {
-    if (part === 0) {
-      if (draft.title.trim().length < 8)
-        return "Give your listing a clear title of at least 8 characters.";
+  /** Field level messages for one step. An empty object means the step is good. */
+  function checkStep(part: number): Errors {
+    const found: Errors = {};
+    const price = Number(draft.price),
+      deposit = Number(draft.deposit),
+      original = Number(draft.originalPrice);
+    if (part === 0 && draft.title.trim().length < 8)
+      found.title = "Give your listing a clear title of at least 8 characters.";
+    if (part === 1) {
       if (draft.address.trim().length < 5)
-        return "Add the street address or building name.";
+        found.address = "Add the street address or building name.";
       if (!pinPlaced)
-        return "Place a pin on the map so students can find the area.";
-      if (
+        found.pin = "Place a pin on the map so students can find the area.";
+      else if (
         !Number.isFinite(draft.lat) ||
         !Number.isFinite(draft.lng) ||
-        draft.lat > 90 ||
-        draft.lat < -90 ||
-        draft.lng > 180 ||
-        draft.lng < -180
+        Math.abs(draft.lat) > 90 ||
+        Math.abs(draft.lng) > 180
       )
-        return "Please choose a valid location.";
+        found.pin = "Those coordinates are outside the map. Pick the spot again.";
     }
-    if (part === 1) {
-      if (
-        !draft.price ||
-        Number(draft.price) < 1 ||
-        Number(draft.price) > 20000
-      )
-        return "Enter a monthly rent between $1 and $20,000.";
-      if (Number(draft.deposit) < 0 || Number(draft.deposit) > 50000)
-        return "Enter a deposit between $0 and $50,000.";
-      if (
-        draft.originalPrice &&
-        (Number(draft.originalPrice) < 1 || Number(draft.originalPrice) > 50000)
-      )
-        return "Enter what you pay now, between $1 and $50,000, or leave it blank.";
-      if (
-        !draft.availableFrom ||
-        !draft.availableTo ||
-        draft.availableTo <= draft.availableFrom
-      )
-        return "Choose a move-out date after the move-in date.";
-      if (draft.availableTo < new Date().toISOString().slice(0, 10))
-        return "Choose an availability end date that hasn’t passed.";
-      if (draft.description.trim().length < 40)
-        return "Write at least 40 characters about the place, roommates, and lease details.";
+    if (part === 2) {
+      if (!draft.price || price < 1 || price > 20000)
+        found.price = "Enter a monthly rent between $1 and $20,000.";
+      if (deposit < 0 || deposit > 50000)
+        found.deposit = "Enter a deposit between $0 and $50,000.";
+      if (draft.originalPrice && (original < 1 || original > 50000))
+        found.originalPrice =
+          "Enter what you pay now, between $1 and $50,000, or leave it blank.";
+      if (!draft.availableFrom) found.availableFrom = "Pick a move-in date.";
+      if (!draft.availableTo || draft.availableTo <= draft.availableFrom)
+        found.availableTo = "Pick a move-out date after the move-in date.";
+      else if (draft.availableTo < today())
+        found.availableTo = "Choose an availability end date that has not passed.";
     }
-    if (part === 2 && !draft.photos.length)
-      return "Add at least one photo before publishing.";
-    return "";
+    if (part === 3 && draft.description.trim().length < 40)
+      found.description =
+        "Write at least 40 characters about the place, roommates, and lease details.";
+    if (part === 4 && !draft.photos.length)
+      found.photos = "Add at least one photo before publishing.";
+    return found;
+  }
+  const firstMessage = (found: Errors) => Object.values(found)[0] || "";
+  function goTo(target: number) {
+    if (target === step) return;
+    if (target > step) {
+      for (let i = step; i < target; i++) {
+        const found = checkStep(i);
+        if (Object.keys(found).length) {
+          setStep(i);
+          fail(firstMessage(found), found);
+          return;
+        }
+      }
+    }
+    setErrors({});
+    setFormError("");
+    setDir(target > step ? "fwd" : "back");
+    setStep(target);
+    setReached((r) => Math.max(r, target));
+    // Desktop scrolls the step body, the phone flow scrolls the page.
+    bodyRef.current?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
   }
   function next(e: FormEvent) {
     e.preventDefault();
-    const err = validatePart(step);
-    if (err) {
-      fail(err);
+    if (step === LAST) {
+      publish();
       return;
     }
-    setStep((s) => Math.min(s + 1, 3));
-    setFormError("");
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const found = checkStep(step);
+    if (Object.keys(found).length) {
+      fail(firstMessage(found), found);
+      return;
+    }
+    goTo(step + 1);
   }
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setFormError("");
-    if (files.length + draft.photos.length > 8) {
-      fail("Choose up to 8 photos in total.");
-      return;
-    }
-    if (Array.from(files).some((f) => f.size > 8 * 1024 * 1024)) {
-      fail("Each photo needs to be under 8 MB.");
-      return;
-    }
+    if (files.length + draft.photos.length > 8)
+      return fail("Choose up to 8 photos in total.");
+    if (Array.from(files).some((f) => f.size > 8 * 1024 * 1024))
+      return fail("Each photo needs to be under 8 MB.");
     if (
       Array.from(files).some(
         (f) => !["image/jpeg", "image/png", "image/webp"].includes(f.type),
       )
-    ) {
-      fail("Use JPG, PNG, or WebP photos.");
-      return;
-    }
+    )
+      return fail("Use JPG, PNG, or WebP photos.");
     setUploading(true);
     setPending(files.length);
     const form = new FormData();
@@ -254,6 +316,7 @@ export default function ListingEditor() {
       });
       setDraft((d) => ({ ...d, photos: [...d.photos, ...result.photos] }));
       setDirty(true);
+      setErrors((e) => ({ ...e, photos: "" }));
       notify(
         `${result.photos.length} photo${result.photos.length === 1 ? "" : "s"} uploaded.`,
       );
@@ -272,18 +335,6 @@ export default function ListingEditor() {
     upload(e.dataTransfer.files);
   }
   async function save(status: "draft" | "active") {
-    setFormError("");
-    if (status === "active") {
-      for (let i = 0; i < 3; i++) {
-        const err = validatePart(i);
-        if (err) {
-          setStep(i);
-          fail(err);
-          setShowPublish(false);
-          return;
-        }
-      }
-    }
     setSaving(true);
     try {
       const payload = {
@@ -300,27 +351,64 @@ export default function ListingEditor() {
         { method: id ? "PATCH" : "POST", body: json(payload) },
       );
       setDirty(false);
-      setShowPublish(false);
-      notify(
-        status === "active"
-          ? "Your listing is live."
-          : "Draft saved. Pick it up from My listings.",
-      );
-      navigate(
-        status === "active" ? `/listings/${result.listing.id}` : "/my-listings",
+      if (status === "draft") {
+        notify("Draft saved. Pick it up from My listings.");
+        navigate("/my-listings");
+        return;
+      }
+      // Success check, transitions.dev 10-success-check, then hand over.
+      setPublished(true);
+      notify("Your listing is live.");
+      timer.current = setTimeout(
+        () => navigate(`/listings/${result.listing.id}`),
+        1100,
       );
     } catch (e) {
       fail(errorMessage(e));
-      setShowPublish(false);
     } finally {
       setSaving(false);
     }
+  }
+  async function publish() {
+    setFormError("");
+    for (let i = 0; i < LAST; i++) {
+      const found = checkStep(i);
+      if (Object.keys(found).length) {
+        setStep(i);
+        fail(firstMessage(found), found);
+        return;
+      }
+    }
+    if (!termsAccepted && !agreed) {
+      fail("Please agree to the Terms of Service and Privacy Policy first.", {
+        terms: "Tick the box to continue.",
+      });
+      return;
+    }
+    if (!termsAccepted) {
+      setSaving(true);
+      try {
+        const result = await api<{ user: User }>("/auth/accept-terms", {
+          method: "POST",
+        });
+        setUser(result.user);
+      } catch (e) {
+        setSaving(false);
+        fail(errorMessage(e));
+        return;
+      }
+      setSaving(false);
+    }
+    await save("active");
   }
   if (loading) return <Loading label="Loading your listing…" />;
   if (error)
     return (
       <div className="page-container narrow">
-        <BackLink to="/my-listings" />
+        <Link to="/my-listings" className="back-link">
+          <ArrowLeft size={16} />
+          My listings
+        </Link>
         <ErrorBox message={error} retry={refresh} />
       </div>
     );
@@ -331,50 +419,53 @@ export default function ListingEditor() {
       </div>
     );
   const live = data?.listing.status === "active";
+  const current = STEPS[step];
+  const savingsAmount =
+    Number(draft.originalPrice) > Number(draft.price) && Number(draft.price) > 0
+      ? Number(draft.originalPrice) - Number(draft.price)
+      : 0;
   return (
-    <div className="page-container editor-page" ref={topRef}>
-      <BackLink to="/my-listings">My listings</BackLink>
-      <PageHeading
-        title={id ? "Edit listing" : "List your place"}
-        description={`Four short steps. Students at ${campus?.shortName || "your campus"} see it once you publish.`}
-      >
-        <span className={`pill ${live ? "green" : "blue"}`}>
-          {live ? "Live" : "Draft"}
-        </span>
-      </PageHeading>
-      <div className="editor-layout">
-        <aside className="editor-rail">
-          <ol className="step-rail">
-            {STEPS.map((label, i) => (
+    <div className="editor-shell">
+      <aside className="editor-rail">
+        <div className="rail-head">
+          <Link to="/my-listings" className="rail-back">
+            <ArrowLeft size={15} />
+            My listings
+          </Link>
+          <h1>{id ? "Edit listing" : "List your place"}</h1>
+          <span className={`pill ${live ? "green" : "blue"}`}>
+            {live ? "Live" : "Draft"}
+          </span>
+        </div>
+        <ol className="step-rail">
+          {STEPS.map((s, i) => {
+            const Icon = s.icon;
+            const done = i < step;
+            return (
               <li
-                key={label}
-                className={`step-item ${i === step ? "is-current" : ""} ${i < step ? "is-done" : ""}`}
+                key={s.key}
+                className={`step-item ${i === step ? "is-current" : ""} ${done ? "is-done" : ""}`}
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    if (i < step) {
-                      setStep(i);
-                      setFormError("");
-                    }
-                  }}
-                  disabled={i > step}
+                  onClick={() => goTo(i)}
+                  disabled={i > reached && i > step}
                   aria-current={i === step ? "step" : undefined}
                 >
                   <span className="step-dot">
-                    {i < step ? (
+                    {done ? (
                       <span
-                        className="step-check"
+                        className="t-success-check step-check"
                         data-state="in"
                         aria-hidden="true"
                       >
                         <svg
                           viewBox="0 0 24 24"
-                          width="15"
-                          height="15"
+                          width="14"
+                          height="14"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="2.6"
+                          strokeWidth="3"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
@@ -382,671 +473,777 @@ export default function ListingEditor() {
                         </svg>
                       </span>
                     ) : (
-                      i + 1
+                      <Icon size={14} strokeWidth={2} aria-hidden="true" />
                     )}
                   </span>
                   <span className="step-text">
-                    <strong>{label}</strong>
-                    <small>{STEP_NOTES[i]}</small>
+                    <strong>
+                      <em>{i + 1}.</em> {s.label}
+                    </strong>
+                    <small>{s.note}</small>
                   </span>
                 </button>
               </li>
+            );
+          })}
+        </ol>
+        <p className="draft-note">
+          {dirty
+            ? "You have unsaved changes."
+            : "Your draft stays private until you publish."}
+        </p>
+      </aside>
+      <section className="editor-main">
+        <form
+          id="listing-form"
+          noValidate
+          onSubmit={next}
+          className="editor-form"
+        >
+          <header className="editor-head">
+            <div className="head-text">
+              <span className="step-count">
+                Step {step + 1} of {STEPS.length}
+              </span>
+              <h2>{current.title}</h2>
+              <p>{current.sub}</p>
+            </div>
+          </header>
+          <div className="mobile-progress" aria-hidden="true">
+            {STEPS.map((s, i) => (
+              <span
+                key={s.key}
+                className={`${i === step ? "is-current" : ""} ${i < step ? "is-done" : ""}`}
+              />
             ))}
-          </ol>
-          <p className="draft-note">
-            {dirty
-              ? "You have unsaved changes."
-              : "Your draft stays private until you publish."}
-          </p>
-        </aside>
-        <section className="editor-content">
-          <form
-            id="listing-form"
-            onSubmit={
-              step === 3
-                ? (e) => {
-                    e.preventDefault();
-                    setShowPublish(true);
-                  }
-                : next
+          </div>
+          <div
+            className="editor-body"
+            data-dir={dir}
+            ref={bodyRef}
+            onAnimationEnd={() =>
+              bodyRef.current?.classList.remove("is-shaking")
             }
           >
-            <div className="editor-section-head">
-              <div>
-                <h2>{STEP_TITLES[step]}</h2>
-                <p>{STEP_SUBTITLES[step]}</p>
-              </div>
-              <span className="step-count">Step {step + 1} of 4</span>
-            </div>
-            <div
-              className="editor-fields"
-              ref={fieldsRef}
-              onAnimationEnd={() =>
-                fieldsRef.current?.classList.remove("is-shaking")
-              }
-            >
-              {step === 0 && (
-                <div className="stack">
-                  <Field
-                    label="Listing title"
-                    hint="Keep it specific. A feature, neighborhood, or building name works well."
-                  >
-                    <input
-                      autoFocus
-                      required
-                      minLength={8}
-                      maxLength={100}
-                      value={draft.title}
-                      onChange={(e) => update("title", e.target.value)}
-                      placeholder="Sunny private room near campus"
-                    />
-                  </Field>
-                  <fieldset className="room-type-field">
-                    <legend>What are you offering?</legend>
-                    <div className="room-options">
-                      {Object.entries(ROOM_LABELS).map(([value, label]) => (
-                        <label
-                          key={value}
-                          className={draft.roomType === value ? "selected" : ""}
+            {STEPS.map((s, i) => (
+              <div
+                key={s.key}
+                className="t-page"
+                data-pos={i === step ? "current" : i < step ? "before" : "after"}
+                aria-hidden={i !== step}
+                inert={i !== step ? true : undefined}
+              >
+                <div className="step-inner">
+                  {i === 0 && (
+                    <div className="stack">
+                      <Field
+                        label="Listing title"
+                        hint="Keep it specific. A feature, neighborhood, or building name works well."
+                        error={errors.title}
+                        className={errors.title ? "is-error" : ""}
+                      >
+                        <input
+                          required
+                          minLength={8}
+                          maxLength={100}
+                          value={draft.title}
+                          onChange={(e) => update("title", e.target.value)}
+                          placeholder="Sunny private room near campus"
+                        />
+                      </Field>
+                      <fieldset className="room-type-field">
+                        <legend>
+                          <House size={14} aria-hidden="true" />
+                          What are you offering?
+                        </legend>
+                        <div className="room-options">
+                          {Object.entries(ROOM_LABELS).map(([value, label]) => (
+                            <label
+                              key={value}
+                              className={
+                                draft.roomType === value ? "selected" : ""
+                              }
+                            >
+                              <input
+                                type="radio"
+                                name="roomType"
+                                value={value}
+                                checked={draft.roomType === value}
+                                onChange={() =>
+                                  update(
+                                    "roomType",
+                                    value as Listing["roomType"],
+                                  )
+                                }
+                              />
+                              <span>{label}</span>
+                              <small>
+                                {value === "private"
+                                  ? "A bedroom to yourself"
+                                  : value === "shared"
+                                    ? "A room with a roommate"
+                                    : "The whole home"}
+                              </small>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                      <div className="field-row">
+                        <Field label="Bedrooms in the home">
+                          <select
+                            value={draft.bedrooms}
+                            onChange={(e) => update("bedrooms", e.target.value)}
+                          >
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                              <option key={n} value={n}>
+                                {n === 0 ? "Studio" : n}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Field label="Bathrooms in the home">
+                          <select
+                            value={draft.bathrooms}
+                            onChange={(e) =>
+                              update("bathrooms", e.target.value)
+                            }
+                          >
+                            {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6].map((n) => (
+                              <option key={n} value={n}>
+                                {n}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </div>
+                    </div>
+                  )}
+                  {i === 1 && (
+                    <div className="stack">
+                      <Field
+                        label="Street address or building"
+                        hint="This is visible on your listing. Leave out your unit number."
+                        error={errors.address}
+                        className={errors.address ? "is-error" : ""}
+                      >
+                        <input
+                          required
+                          minLength={5}
+                          maxLength={200}
+                          autoComplete="street-address"
+                          value={draft.address}
+                          onChange={(e) => update("address", e.target.value)}
+                          placeholder="123 West 30th Street, Los Angeles"
+                        />
+                      </Field>
+                      <div className="field map-field">
+                        <div className="field-label">
+                          <MapPin size={14} aria-hidden="true" />
+                          Put it on the map
+                        </div>
+                        {campus && reached >= 1 && (
+                          <div className="editor-map">
+                            <Suspense
+                              fallback={<Loading label="Loading map…" />}
+                            >
+                              <Map
+                                compact
+                                campus={campus}
+                                pin={
+                                  pinPlaced
+                                    ? { lat: draft.lat, lng: draft.lng }
+                                    : undefined
+                                }
+                                onPin={(point) => {
+                                  setDraft((d) => ({ ...d, ...point }));
+                                  setPinPlaced(true);
+                                  setDirty(true);
+                                  setFormError("");
+                                  setErrors((e) => ({ ...e, pin: "" }));
+                                }}
+                              />
+                            </Suspense>
+                          </div>
+                        )}
+                        <div className="map-foot">
+                          <span
+                            className={`pin-status ${pinPlaced ? "placed" : ""}`}
+                          >
+                            <MapPin size={13} />
+                            {pinPlaced
+                              ? "Location pin placed"
+                              : "Tap the map to place your pin"}
+                          </span>
+                          <details className="coordinate-fields">
+                            <summary>Enter coordinates instead</summary>
+                            <div className="field-row">
+                              <Field label="Latitude">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="-90"
+                                  max="90"
+                                  value={draft.lat}
+                                  onChange={(e) => {
+                                    update("lat", Number(e.target.value));
+                                    setPinPlaced(true);
+                                  }}
+                                />
+                              </Field>
+                              <Field label="Longitude">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="-180"
+                                  max="180"
+                                  value={draft.lng}
+                                  onChange={(e) => {
+                                    update("lng", Number(e.target.value));
+                                    setPinPlaced(true);
+                                  }}
+                                />
+                              </Field>
+                            </div>
+                          </details>
+                        </div>
+                        {errors.pin && (
+                          <span className="field-error">{errors.pin}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {i === 2 && (
+                    <div className="stack">
+                      <div className="field-row">
+                        <Field
+                          label="Available from"
+                          error={errors.availableFrom}
+                          className={errors.availableFrom ? "is-error" : ""}
                         >
                           <input
-                            type="radio"
-                            name="roomType"
-                            value={value}
-                            checked={draft.roomType === value}
-                            onChange={() =>
-                              update("roomType", value as Listing["roomType"])
+                            type="date"
+                            required
+                            value={draft.availableFrom}
+                            onChange={(e) =>
+                              update("availableFrom", e.target.value)
                             }
                           />
-                          <span>{label}</span>
-                          <small>
-                            {value === "private"
-                              ? "A bedroom to yourself"
-                              : value === "shared"
-                                ? "A room with a roommate"
-                                : "The whole home"}
-                          </small>
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <Field
-                    label="Street address or building"
-                    hint="This is visible on your listing. Leave out your unit number."
-                  >
-                    <input
-                      required
-                      minLength={5}
-                      maxLength={200}
-                      autoComplete="street-address"
-                      value={draft.address}
-                      onChange={(e) => update("address", e.target.value)}
-                      placeholder="123 West 30th Street, Los Angeles"
-                    />
-                  </Field>
-                  <div className="field">
-                    <div className="field-label">Put it on the map</div>
-                    <p className="field-hint">
-                      Place the pin at your building, so students can understand
-                      the location.
-                    </p>
-                    {campus && (
-                      <div className="editor-map">
-                        <Suspense fallback={<Loading label="Loading map…" />}>
-                          <Map
-                            compact
-                            campus={campus}
-                            pin={
-                              pinPlaced
-                                ? { lat: draft.lat, lng: draft.lng }
-                                : undefined
+                        </Field>
+                        <Field
+                          label="Available until"
+                          error={errors.availableTo}
+                          className={errors.availableTo ? "is-error" : ""}
+                        >
+                          <input
+                            type="date"
+                            required
+                            min={draft.availableFrom || undefined}
+                            value={draft.availableTo}
+                            onChange={(e) =>
+                              update("availableTo", e.target.value)
                             }
-                            onPin={(point) => {
-                              setDraft((d) => ({ ...d, ...point }));
-                              setPinPlaced(true);
-                              setDirty(true);
-                              setFormError("");
-                            }}
                           />
-                        </Suspense>
+                        </Field>
                       </div>
-                    )}
-                    <div className={`pin-status ${pinPlaced ? "placed" : ""}`}>
-                      <MapPin size={14} />
-                      {pinPlaced
-                        ? "Location pin placed"
-                        : "Choose your building on the map"}
-                    </div>
-                    <details className="coordinate-fields">
-                      <summary>Enter coordinates instead</summary>
                       <div className="field-row">
-                        <Field label="Latitude">
-                          <input
-                            type="number"
-                            step="any"
-                            min="-90"
-                            max="90"
-                            value={draft.lat}
-                            onChange={(e) => {
-                              update("lat", Number(e.target.value));
-                              setPinPlaced(true);
-                            }}
-                          />
-                        </Field>
-                        <Field label="Longitude">
-                          <input
-                            type="number"
-                            step="any"
-                            min="-180"
-                            max="180"
-                            value={draft.lng}
-                            onChange={(e) => {
-                              update("lng", Number(e.target.value));
-                              setPinPlaced(true);
-                            }}
-                          />
-                        </Field>
-                      </div>
-                    </details>
-                  </div>
-                </div>
-              )}
-              {step === 1 && (
-                <div className="stack">
-                  <div className="field-row">
-                    <Field label="Monthly rent">
-                      <div className="input-prefix">
-                        <span>$</span>
-                        <input
-                          type="number"
-                          required
-                          min="1"
-                          max="20000"
-                          step="1"
-                          value={draft.price}
-                          onChange={(e) => update("price", e.target.value)}
-                          placeholder="1,200"
-                        />
-                      </div>
-                    </Field>
-                    <Field
-                      label="Security deposit"
-                      hint="Enter 0 if there’s no deposit."
-                    >
-                      <div className="input-prefix">
-                        <span>$</span>
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          max="50000"
-                          step="1"
-                          value={draft.deposit}
-                          onChange={(e) => update("deposit", e.target.value)}
-                        />
-                      </div>
-                    </Field>
-                  </div>
-                  <div className="savings-field">
-                    <Field
-                      label="What you pay now (optional)"
-                      hint="Your current monthly rent on the original lease. Students love seeing a deal, and this is what makes Handoff a win for both sides."
-                    >
-                      <div className="input-prefix">
-                        <span>$</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="50000"
-                          step="1"
-                          value={draft.originalPrice}
-                          onChange={(e) =>
-                            update("originalPrice", e.target.value)
-                          }
-                          placeholder="Same as rent"
-                        />
-                      </div>
-                    </Field>
-                    {Number(draft.originalPrice) > Number(draft.price) &&
-                      Number(draft.price) > 0 && (
-                        <div className="savings-callout">
-                          <strong>
-                            Subleasers save{" "}
-                            {money(
-                              Number(draft.originalPrice) - Number(draft.price),
-                            )}{" "}
-                            a month
-                          </strong>
-                          <span>
-                            That is{" "}
-                            {Math.round(
-                              ((Number(draft.originalPrice) -
-                                Number(draft.price)) /
-                                Number(draft.originalPrice)) *
-                                100,
-                            )}
-                            % below your lease. Listings with savings are
-                            highlighted on the map and sort to the top.
-                          </span>
-                        </div>
-                      )}
-                  </div>
-                  <div className="field-row">
-                    <Field label="Available from">
-                      <input
-                        type="date"
-                        required
-                        value={draft.availableFrom}
-                        onChange={(e) =>
-                          update("availableFrom", e.target.value)
-                        }
-                      />
-                    </Field>
-                    <Field label="Available until">
-                      <input
-                        type="date"
-                        required
-                        min={draft.availableFrom || undefined}
-                        value={draft.availableTo}
-                        onChange={(e) => update("availableTo", e.target.value)}
-                      />
-                    </Field>
-                  </div>
-                  <div className="field-row">
-                    <Field label="Bedrooms in the home">
-                      <select
-                        value={draft.bedrooms}
-                        onChange={(e) => update("bedrooms", e.target.value)}
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                          <option key={n} value={n}>
-                            {n === 0 ? "Studio" : n}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Bathrooms in the home">
-                      <select
-                        value={draft.bathrooms}
-                        onChange={(e) => update("bathrooms", e.target.value)}
-                      >
-                        {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                  </div>
-                  <Field
-                    label="Tell them about the place"
-                    hint="Mention roommates, utilities, lease requirements, and what makes the space work for a student."
-                  >
-                    <textarea
-                      required
-                      minLength={40}
-                      maxLength={5000}
-                      rows={6}
-                      value={draft.description}
-                      onChange={(e) => update("description", e.target.value)}
-                      placeholder="The room gets morning light and comes furnished. You’d be living with…"
-                    />
-                  </Field>
-                  <fieldset className="amenities-field">
-                    <legend>What’s included?</legend>
-                    <div className="amenity-chips">
-                      {AMENITIES.map((a) => {
-                        const on = draft.amenities.includes(a);
-                        return (
-                          <label
-                            key={a}
-                            className={`chip amenity-chip ${on ? "is-active" : ""}`}
-                          >
+                        <Field
+                          label="Monthly rent"
+                          error={errors.price}
+                          className={errors.price ? "is-error" : ""}
+                        >
+                          <div className="input-prefix">
+                            <span>$</span>
                             <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={on}
+                              type="number"
+                              required
+                              min="1"
+                              max="20000"
+                              step="1"
+                              value={draft.price}
+                              onChange={(e) => update("price", e.target.value)}
+                              placeholder="1,200"
+                            />
+                          </div>
+                        </Field>
+                        <Field
+                          label="Security deposit"
+                          hint="Enter 0 if there is no deposit."
+                          error={errors.deposit}
+                          className={errors.deposit ? "is-error" : ""}
+                        >
+                          <div className="input-prefix">
+                            <span>$</span>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              max="50000"
+                              step="1"
+                              value={draft.deposit}
                               onChange={(e) =>
-                                update(
-                                  "amenities",
-                                  e.target.checked
-                                    ? [...draft.amenities, a]
-                                    : draft.amenities.filter((v) => v !== a),
-                                )
+                                update("deposit", e.target.value)
                               }
                             />
-                            <Check size={14} aria-hidden="true" />
-                            {a}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </fieldset>
-                </div>
-              )}
-              {step === 2 && (
-                <div className="stack">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    multiple
-                    accept="image/jpeg,image/png,image/webp"
-                    className="sr-only"
-                    tabIndex={-1}
-                    onChange={(e) => upload(e.target.files)}
-                  />
-                  <button
-                    className={`photo-dropzone ${dragOver ? "is-dragover" : ""}`}
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    disabled={uploading || draft.photos.length >= 8}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={onDrop}
-                  >
-                    <span className="upload-symbol">
-                      <ImagePlus size={24} />
-                    </span>
-                    <strong>
-                      {draft.photos.length >= 8
-                        ? "All 8 photo spots filled"
-                        : "Drag photos here, or choose files"}
-                    </strong>
-                    <span className="dropzone-hint">
-                      JPG, PNG, or WebP. Up to 8 photos, 8 MB each.
-                    </span>
-                    <span className="button secondary small">
-                      <Upload size={15} />
-                      Choose photos
-                    </span>
-                  </button>
-                  {(draft.photos.length > 0 || uploading) && (
-                    <div className="photo-manager">
-                      <div className="photo-upload-heading">
-                        <strong>{draft.photos.length} of 8 photos</strong>
-                        <span>The first photo is the cover.</span>
+                          </div>
+                        </Field>
                       </div>
-                      <div className="uploaded-photos">
-                        {draft.photos.map((url, i) => (
-                          <div key={url} className="uploaded-photo">
-                            <img src={url} alt={`Listing photo ${i + 1}`} />
-                            {i === 0 && <span className="cover-label">Cover</span>}
-                            <div className="photo-tools">
-                              <button
-                                type="button"
-                                className="photo-tool"
-                                disabled={i === 0}
-                                aria-label={`Move photo ${i + 1} earlier`}
-                                onClick={() => {
-                                  const p = [...draft.photos];
-                                  [p[i - 1], p[i]] = [p[i], p[i - 1]];
-                                  update("photos", p);
-                                }}
+                      <div className="savings-field">
+                        <Field
+                          label="What you pay now (optional)"
+                          hint="Your current rent on the original lease. Students love seeing a deal, and this is what makes Handoff a win for both sides."
+                          error={errors.originalPrice}
+                          className={errors.originalPrice ? "is-error" : ""}
+                        >
+                          <div className="input-prefix">
+                            <span>$</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="50000"
+                              step="1"
+                              value={draft.originalPrice}
+                              onChange={(e) =>
+                                update("originalPrice", e.target.value)
+                              }
+                              placeholder="Same as rent"
+                            />
+                          </div>
+                        </Field>
+                        {savingsAmount > 0 && (
+                          <div className="savings-callout">
+                            <strong>
+                              <Sparkles size={15} aria-hidden="true" />
+                              Subleasers save {money(savingsAmount)} a month
+                            </strong>
+                            <span>
+                              That is{" "}
+                              {Math.round(
+                                (savingsAmount / Number(draft.originalPrice)) *
+                                  100,
+                              )}
+                              % below your lease. Listings with savings are
+                              highlighted on the map and sort to the top.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {i === 3 && (
+                    <div className="stack">
+                      <fieldset className="amenities-field">
+                        <legend>
+                          <ListChecks size={14} aria-hidden="true" />
+                          What is included?
+                        </legend>
+                        <div className="amenity-chips">
+                          {AMENITIES.map((a) => {
+                            const on = draft.amenities.includes(a);
+                            return (
+                              <label
+                                key={a}
+                                className={`chip amenity-chip ${on ? "is-active" : ""}`}
                               >
-                                <ChevronLeft size={16} />
-                              </button>
-                              {i > 0 && (
+                                <input
+                                  type="checkbox"
+                                  className="sr-only"
+                                  checked={on}
+                                  onChange={(e) =>
+                                    update(
+                                      "amenities",
+                                      e.target.checked
+                                        ? [...draft.amenities, a]
+                                        : draft.amenities.filter(
+                                            (v) => v !== a,
+                                          ),
+                                    )
+                                  }
+                                />
+                                <Check size={14} aria-hidden="true" />
+                                {a}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
+                      <Field
+                        label="Tell them about the place"
+                        hint="Mention roommates, utilities, lease requirements, and what makes the space work for a student."
+                        error={errors.description}
+                        className={errors.description ? "is-error" : ""}
+                      >
+                        <textarea
+                          required
+                          minLength={40}
+                          maxLength={5000}
+                          rows={5}
+                          value={draft.description}
+                          onChange={(e) =>
+                            update("description", e.target.value)
+                          }
+                          placeholder="The room gets morning light and comes furnished. You would be living with…"
+                        />
+                      </Field>
+                    </div>
+                  )}
+                  {i === 4 && (
+                    <div className="stack">
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        multiple
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        tabIndex={-1}
+                        onChange={(e) => upload(e.target.files)}
+                      />
+                      <button
+                        className={`photo-dropzone ${dragOver ? "is-dragover" : ""}`}
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={uploading || draft.photos.length >= 8}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragOver(true);
+                        }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={onDrop}
+                      >
+                        <span className="upload-symbol">
+                          <ImagePlus size={22} />
+                        </span>
+                        <strong>
+                          {draft.photos.length >= 8
+                            ? "All 8 photo spots filled"
+                            : "Drag photos here, or choose files"}
+                        </strong>
+                        <span className="dropzone-hint">
+                          JPG, PNG, or WebP. Up to 8 photos, 8 MB each.
+                        </span>
+                        <span className="button secondary small">
+                          <Upload size={15} />
+                          Choose photos
+                        </span>
+                      </button>
+                      {errors.photos && (
+                        <span className="field-error">{errors.photos}</span>
+                      )}
+                      {(draft.photos.length > 0 || uploading) && (
+                        <div className="photo-manager">
+                          <div className="photo-upload-heading">
+                            <strong>{draft.photos.length} of 8 photos</strong>
+                            <span>The first photo is the cover.</span>
+                          </div>
+                          <div className="uploaded-photos">
+                            {draft.photos.map((url, index) => (
+                              <div key={url} className="uploaded-photo">
+                                <img
+                                  src={url}
+                                  alt={`Listing photo ${index + 1}`}
+                                />
+                                {index === 0 && (
+                                  <span className="cover-label">Cover</span>
+                                )}
+                                <div className="photo-tools">
+                                  <button
+                                    type="button"
+                                    className="photo-tool"
+                                    disabled={index === 0}
+                                    aria-label={`Move photo ${index + 1} earlier`}
+                                    onClick={() => {
+                                      const p = [...draft.photos];
+                                      [p[index - 1], p[index]] = [
+                                        p[index],
+                                        p[index - 1],
+                                      ];
+                                      update("photos", p);
+                                    }}
+                                  >
+                                    <ChevronLeft size={16} />
+                                  </button>
+                                  {index > 0 && (
+                                    <button
+                                      type="button"
+                                      className="photo-tool cover-tool"
+                                      aria-label={`Make photo ${index + 1} the cover`}
+                                      onClick={() =>
+                                        update("photos", [
+                                          url,
+                                          ...draft.photos.filter(
+                                            (p) => p !== url,
+                                          ),
+                                        ])
+                                      }
+                                    >
+                                      <Star size={14} />
+                                      Make cover
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="photo-tool"
+                                    disabled={index === draft.photos.length - 1}
+                                    aria-label={`Move photo ${index + 1} later`}
+                                    onClick={() => {
+                                      const p = [...draft.photos];
+                                      [p[index + 1], p[index]] = [
+                                        p[index],
+                                        p[index + 1],
+                                      ];
+                                      update("photos", p);
+                                    }}
+                                  >
+                                    <ChevronRight size={16} />
+                                  </button>
+                                </div>
                                 <button
                                   type="button"
-                                  className="photo-tool cover-tool"
-                                  aria-label={`Make photo ${i + 1} the cover`}
-                                  onClick={() => {
-                                    const p = draft.photos.filter(
-                                      (p) => p !== url,
-                                    );
-                                    update("photos", [url, ...p]);
-                                  }}
+                                  className="photo-remove"
+                                  aria-label={`Remove photo ${index + 1}`}
+                                  onClick={() =>
+                                    update(
+                                      "photos",
+                                      draft.photos.filter((p) => p !== url),
+                                    )
+                                  }
                                 >
-                                  <Star size={14} />
-                                  Make cover
+                                  <X size={15} />
                                 </button>
+                              </div>
+                            ))}
+                            {uploading &&
+                              Array.from({ length: pending || 1 }).map(
+                                (_, index) => (
+                                  <div
+                                    key={`pending-${index}`}
+                                    className="uploaded-photo is-pending"
+                                  >
+                                    <div className="skeleton" />
+                                  </div>
+                                ),
                               )}
-                              <button
-                                type="button"
-                                className="photo-tool"
-                                disabled={i === draft.photos.length - 1}
-                                aria-label={`Move photo ${i + 1} later`}
-                                onClick={() => {
-                                  const p = [...draft.photos];
-                                  [p[i + 1], p[i]] = [p[i], p[i + 1]];
-                                  update("photos", p);
-                                }}
-                              >
-                                <ChevronRight size={16} />
-                              </button>
-                            </div>
-                            <button
-                              type="button"
-                              className="photo-remove"
-                              aria-label={`Remove photo ${i + 1}`}
-                              onClick={() =>
-                                update(
-                                  "photos",
-                                  draft.photos.filter((p) => p !== url),
-                                )
-                              }
-                            >
-                              <X size={15} />
-                            </button>
                           </div>
-                        ))}
-                        {uploading &&
-                          Array.from({ length: pending || 1 }).map((_, i) => (
-                            <div
-                              key={`pending-${i}`}
-                              className="uploaded-photo is-pending"
-                            >
-                              <div className="skeleton" />
+                          {uploading && (
+                            <p className="upload-status" role="status">
+                              Uploading your photos…
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {i === 5 && (
+                    <div className="review-listing">
+                      <article className="listing-card compact review-card">
+                        <div className="card-photo">
+                          {draft.photos[0] ? (
+                            <img src={draft.photos[0]} alt="" />
+                          ) : (
+                            <div className="photo-placeholder">
+                              <ImageIcon size={18} strokeWidth={1.5} />
+                              No photo
                             </div>
-                          ))}
+                          )}
+                        </div>
+                        <div className="card-body">
+                          <div className="card-topline">
+                            <div className="card-price">
+                              <strong>{money(Number(draft.price))}</strong>
+                              <span>/mo</span>
+                            </div>
+                            <span className="pill blue">
+                              {ROOM_LABELS[draft.roomType]}
+                            </span>
+                          </div>
+                          <div className="card-title">{draft.title}</div>
+                          <div className="card-address">
+                            <MapPin size={13} />
+                            <span>{draft.address}</span>
+                          </div>
+                          <div className="card-details">
+                            <span>
+                              <BedDouble size={13} />
+                              {draft.bedrooms === "0"
+                                ? "Studio"
+                                : `${draft.bedrooms} bd`}
+                            </span>
+                            <span>
+                              <Bath size={13} />
+                              {draft.bathrooms} ba
+                            </span>
+                            <span>
+                              <CalendarRange size={13} />
+                              {draft.availableFrom
+                                ? `${dateLabel(draft.availableFrom)} to ${dateLabel(draft.availableTo)}`
+                                : "Dates to come"}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                      <dl className="review-facts">
+                        <div>
+                          <dt>Deposit</dt>
+                          <dd>{money(Number(draft.deposit))}</dd>
+                        </div>
+                        <div>
+                          <dt>Savings</dt>
+                          <dd>
+                            {savingsAmount > 0
+                              ? `${money(savingsAmount)} a month`
+                              : "Not shared"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Amenities</dt>
+                          <dd>{draft.amenities.length || "None"} listed</dd>
+                        </div>
+                        <div>
+                          <dt>Photos</dt>
+                          <dd>{draft.photos.length} uploaded</dd>
+                        </div>
+                      </dl>
+                      <div className="review-block">
+                        <h3>Description</h3>
+                        <p className="preserve-lines">{draft.description}</p>
                       </div>
-                      {uploading && (
-                        <p className="upload-status" role="status">
-                          Uploading your photos…
-                        </p>
-                      )}
+                      <div
+                        className={`terms-box ${errors.terms ? "is-error" : ""}`}
+                      >
+                        {termsAccepted ? (
+                          <p className="terms-done">
+                            <Check size={15} aria-hidden="true" />
+                            Terms accepted
+                          </p>
+                        ) : (
+                          <>
+                            <label className="terms-check">
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={agreed}
+                                onChange={(e) => {
+                                  setAgreed(e.target.checked);
+                                  setErrors((x) => ({ ...x, terms: "" }));
+                                  setFormError("");
+                                }}
+                              />
+                              <span className="t-checkbox" aria-hidden="true">
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  width="14"
+                                  height="14"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="3"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M5 12.5 10 17.5 19 7" />
+                                </svg>
+                              </span>
+                              <span>
+                                I agree to the{" "}
+                                <a
+                                  href="/terms"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Terms of Service
+                                </a>{" "}
+                                and{" "}
+                                <a
+                                  href="/privacy"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Privacy Policy
+                                </a>
+                                .
+                              </span>
+                            </label>
+                            {errors.terms && (
+                              <span className="field-error">
+                                {errors.terms}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   )}
-                </div>
-              )}
-              {step === 3 && (
-                <div className="review-listing">
-                  <article className="listing-card compact review-card">
-                    <div className="card-photo">
-                      {draft.photos[0] ? (
-                        <img src={draft.photos[0]} alt="" />
-                      ) : (
-                        <div className="photo-placeholder">
-                          <ImageIcon size={18} strokeWidth={1.5} />
-                          No photo
-                        </div>
-                      )}
-                    </div>
-                    <div className="card-body">
-                      <div className="card-topline">
-                        <div className="card-price">
-                          <strong>{money(Number(draft.price))}</strong>
-                          <span>/mo</span>
-                        </div>
-                        <span className="pill blue">
-                          {ROOM_LABELS[draft.roomType]}
-                        </span>
-                      </div>
-                      <div className="card-title">{draft.title}</div>
-                      <div className="card-address">
-                        <MapPin size={13} />
-                        <span>{draft.address}</span>
-                      </div>
-                      <div className="card-details">
-                        <span>
-                          <BedDouble size={13} />
-                          {draft.bedrooms === "0"
-                            ? "Studio"
-                            : `${draft.bedrooms} bd`}
-                        </span>
-                        <span>
-                          <Bath size={13} />
-                          {draft.bathrooms} ba
-                        </span>
-                        <span>
-                          <CalendarRange size={13} />
-                          {dateLabel(draft.availableFrom)} to{" "}
-                          {dateLabel(draft.availableTo)}
-                        </span>
-                      </div>
-                    </div>
-                  </article>
-                  <dl className="review-facts">
-                    <div>
-                      <dt>Monthly rent</dt>
-                      <dd>{money(Number(draft.price))}</dd>
-                    </div>
-                    <div>
-                      <dt>Deposit</dt>
-                      <dd>{money(Number(draft.deposit))}</dd>
-                    </div>
-                    {Number(draft.originalPrice) > 0 && (
-                      <div>
-                        <dt>Original lease</dt>
-                        <dd>{money(Number(draft.originalPrice))} a month</dd>
-                      </div>
-                    )}
-                    <div>
-                      <dt>Available</dt>
-                      <dd>
-                        {dateLabel(draft.availableFrom, true)} to{" "}
-                        {dateLabel(draft.availableTo, true)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>The space</dt>
-                      <dd>
-                        {draft.bedrooms === "0"
-                          ? "Studio"
-                          : `${draft.bedrooms} bed`}{" "}
-                        · {draft.bathrooms} bath
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Campus</dt>
-                      <dd>{campus?.name}</dd>
-                    </div>
-                    <div>
-                      <dt>Photos</dt>
-                      <dd>
-                        {draft.photos.length} uploaded
-                      </dd>
-                    </div>
-                  </dl>
-                  <div className="review-block">
-                    <h3>Description</h3>
-                    <p className="preserve-lines">{draft.description}</p>
-                  </div>
-                  {draft.amenities.length > 0 && (
-                    <div className="review-block">
-                      <h3>Included</h3>
-                      <div className="review-amenities">
-                        {draft.amenities.map((a) => (
-                          <span key={a} className="pill">
-                            <Check size={12} />
-                            {a}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                  {formError && step === i && (
+                    <ErrorBox message={formError} />
                   )}
-                  <div className="review-reminder">
-                    <Check size={16} />
-                    <p>
-                      By publishing, you confirm that this listing is accurate
-                      and that you’re allowed to offer this space for sublease.
-                    </p>
-                  </div>
                 </div>
-              )}
-              {formError && <ErrorBox message={formError} />}
-            </div>
-          </form>
-        </section>
-      </div>
-      <div className="editor-bar">
-        <div className="editor-bar-inner">
-          {step > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setStep((s) => s - 1);
-                setFormError("");
-              }}
-            >
-              <ArrowLeft size={16} />
-              Back
-            </Button>
-          ) : (
-            <Link className="button ghost" to="/my-listings">
-              Cancel
-            </Link>
-          )}
-          <div className="editor-bar-actions">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => save("draft")}
-              busy={saving}
-              disabled={uploading}
-            >
-              <Save size={16} />
-              Save draft
-            </Button>
-            <Button
-              type="submit"
-              form="listing-form"
-              disabled={uploading || saving}
-            >
-              {step === 3 ? (
-                <>
-                  <Eye size={16} />
-                  {id && data?.listing.status === "active"
-                    ? "Save & publish"
-                    : "Publish"}
-                </>
-              ) : (
-                <>
-                  Continue
-                  <ArrowRight size={16} />
-                </>
-              )}
-            </Button>
+              </div>
+            ))}
           </div>
-        </div>
-      </div>
-      <Modal
-        open={showPublish}
-        onClose={() => !saving && setShowPublish(false)}
-        title="Ready to put it on the map?"
-      >
-        <p className="muted">
-          Your listing will be visible to anyone browsing {campus?.shortName}.
-          Verified students can send you a request to connect.
-        </p>
-        <div className="modal-actions">
-          <Button
-            variant="secondary"
-            onClick={() => setShowPublish(false)}
-            disabled={saving}
-          >
-            Keep reviewing
-          </Button>
-          <Button onClick={() => save("active")} busy={saving}>
-            Publish listing
-            <ArrowRight size={17} />
-          </Button>
-        </div>
-      </Modal>
+          <footer className="editor-foot">
+            {step > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => goTo(step - 1)}
+                disabled={saving}
+              >
+                <ArrowLeft size={16} />
+                Back
+              </Button>
+            ) : (
+              <Link className="button ghost" to="/my-listings">
+                Cancel
+              </Link>
+            )}
+            <div className="foot-actions">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => save("draft")}
+                busy={saving && step !== LAST}
+                disabled={uploading || saving}
+              >
+                <Save size={16} />
+                Save draft
+              </Button>
+              <Button type="submit" disabled={uploading} busy={saving}>
+                {step === LAST ? (
+                  <>
+                    <Rocket size={16} />
+                    {live ? "Save and publish" : "Publish"}
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </Button>
+            </div>
+          </footer>
+        </form>
+        {published && (
+          <div className="editor-success" role="status">
+            <span className="t-success-check" data-state="in" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                width="46"
+                height="46"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M5 12.5 10 17.5 19 7" />
+              </svg>
+            </span>
+            <strong>Your listing is live</strong>
+            <span>Taking you to it now.</span>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
