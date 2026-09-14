@@ -5,7 +5,7 @@ JSON requests and responses, same-origin cookies. Errors use `{error: string}` w
 GET /api/config -> {emailReady:boolean,campuses:Campus[]}
 Campus {id,name,shortName,lat,lng,domain}
 GET /api/session -> {user:User|null}
-User {id,name,email,campusId,verified:boolean,bio:string}
+User {id,name,email,campusId,verified:boolean,termsAccepted:boolean,bio:string}
 POST /api/auth/signup (201 {user} and a session for a new or unverified email, 202 {user:null} when the email already has a verified account; the session is unverified until a code or link confirms it) {name,email,password,campusId} -> {message:string}. Sends verification link.
 POST /api/auth/login {email,password} -> {user:User}
 POST /api/auth/logout -> {ok:true}
@@ -34,6 +34,10 @@ PATCH /api/requests/:id {status:'accepted'|'declined'|'withdrawn'} -> {request:H
 POST /api/reports {listingId,reason,details} -> {ok:true}. Verified users only, persistent report for operator review.
 GET /api/health -> {ok:true,version:string}
 
-No seed listings in production. Separate test fixtures can populate temporary QA data directories. App root is browse, routes /browse, /listings/:id, /listings/new, /listings/:id/edit, /saved, /requests, /my-listings, /profile, /sign-in, /sign-up, /verify?token=, /forgot-password, /reset-password?token=.
+No seed listings in production. Separate test fixtures can populate temporary QA data directories. App root is browse, routes /browse, /listings/:id, /listings/new, /listings/:id/edit, /saved, /requests, /my-listings, /profile, /sign-in, /sign-up, /verify?token=, /forgot-password, /reset-password?token=, /terms, /privacy.
+
+POST /api/auth/accept-terms (needs a session) -> {user}. Records terms_accepted_at. Publishing a listing (creating as active or patching to active) and sending a handoff request return 403 until the user has accepted the terms.
+
+POST /api/waitlist {school,email} -> 202. Stores interest in an unsupported campus.
 
 Verification model. Signing up or signing in works without verification. Publishing a listing, sending or answering a handoff request, and reporting need a verified student email (403 otherwise). Saving places, drafts, uploads and profile edits only need a session.
