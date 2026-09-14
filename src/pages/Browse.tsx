@@ -233,9 +233,17 @@ export default function Browse() {
   }, []);
   useEffect(() => {
     if (!activeId || activeSource.current !== "map") return;
-    cardRefs.current
-      .get(activeId)
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const card = cardRefs.current.get(activeId),
+      scroller = scrollRef.current;
+    if (!card || !scroller) return;
+    // Center the card in the list so the highlight is never clipped.
+    const cardRect = card.getBoundingClientRect(),
+      box = scroller.getBoundingClientRect();
+    const target =
+      scroller.scrollTop +
+      (cardRect.top - box.top) -
+      (box.height - cardRect.height) / 2;
+    scroller.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }, [activeId]);
 
   // Sidebar resizing. Width is clamped and remembered per browser.
