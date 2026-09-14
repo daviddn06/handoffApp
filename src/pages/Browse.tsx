@@ -3,35 +3,36 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
+  useRef,
   useState,
-  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
   SlidersHorizontal,
   Map as MapIcon,
-  LayoutGrid,
+  List,
   ChevronDown,
-  MapPin,
   X,
   Plus,
-  ArrowRight,
-  House,
+  GraduationCap,
+  CalendarDays,
+  BedDouble,
+  Check,
+  LogIn,
+  Crosshair,
 } from "lucide-react";
 import { useApp } from "../lib/context";
-import { useResource } from "../lib/api";
+import { useResource, money } from "../lib/api";
 import { AMENITIES, ROOM_LABELS, type Listing } from "../types";
-import {
-  Button,
-  EmptyState,
-  ErrorBox,
-  Field,
-  Loading,
-  Modal,
-} from "../components/ui";
+import { Button, EmptyState, ErrorBox, Loading } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
+import { Popover } from "../components/Popover";
+import { inBounds, type MapBounds } from "../lib/dps";
 const Map = lazy(() => import("../components/Map"));
+
 const filterKeys = [
   "minPrice",
   "maxPrice",
@@ -40,27 +41,33 @@ const filterKeys = [
   "roomType",
   "bedrooms",
   "amenities",
+] as const;
+const PRICE_PRESETS = [
+  { label: "Under $1,000", min: "", max: "1000" },
+  { label: "$1,000 to $1,500", min: "1000", max: "1500" },
+  { label: "$1,500 to $2,200", min: "1500", max: "2200" },
+  { label: "$2,200 and up", min: "2200", max: "" },
 ];
-type Filters = {
-  minPrice: string;
-  maxPrice: string;
-  from: string;
-  to: string;
-  roomType: string;
-  bedrooms: string;
-  amenities: string[];
-};
-function readFilters(params: URLSearchParams): Filters {
-  return {
-    minPrice: params.get("minPrice") || "",
-    maxPrice: params.get("maxPrice") || "",
-    from: params.get("from") || "",
-    to: params.get("to") || "",
-    roomType: params.get("roomType") || "",
-    bedrooms: params.get("bedrooms") || "",
-    amenities: (params.get("amenities") || "").split(",").filter(Boolean),
-  };
+const PANEL_KEY = "handoff:panel-width";
+const PANEL_MIN = 360;
+const PANEL_DEFAULT = 440;
+
+function shortDate(value: string) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
+function readPanelWidth() {
+  try {
+    const stored = Number(localStorage.getItem(PANEL_KEY));
+    if (stored >= PANEL_MIN) return stored;
+  } catch {
+    /* Private mode or storage blocked. */
+  }
+  return PANEL_DEFAULT;
+}
+
 export default function Browse() {
   const { campuses, user } = useApp(),
     navigate = useNavigate(),
@@ -69,184 +76,538 @@ export default function Browse() {
     campuses.find(
       (c) => c.id === (params.get("campusId") || user?.campusId || "usc"),
     ) || campuses[0];
-  const [view, setView] = useState<"map" | "grid">(() =>
-    window.matchMedia("(max-width: 760px)").matches ? "grid" : "map",
+  const [mobileView, setMobileView] = useState<"list" | "map">("list");
+  const [search, setSearch] = useState(params.get("query") || "");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [inViewOnly, setInViewOnly] = useState(false);
+  const [bounds, setBounds] = useState<MapBounds | null>(null);
+  const [panelWidth, setPanelWidth] = useState(readPanelWidth);
+  const [resizing, setResizing] = useState(false);
+  const cardRefs = useRef<globalThis.Map<string, HTMLElement>>(
+    new globalThis.Map(),
   );
-  const [search, setSearch] = useState(params.get("query") || ""),
-    [filterOpen, setFilterOpen] = useState(false),
-    [filters, setFilters] = useState<Filters>(() => readFilters(params)),
-    [filterError, setFilterError] = useState("");
+  const activeSource = useRef<"list" | "map">("list");
+
   const query = new URLSearchParams(params);
   query.set("campusId", campus?.id || "usc");
+  query.delete("embed");
   const { data, loading, error, refresh } = useResource<{
     listings: Listing[];
   }>(`/listings?${query}`);
+
   useEffect(() => setSearch(params.get("query") || ""), [params]);
+
+  // Debounced search so typing filters without a submit.
+  useEffect(() => {
+    const current = params.get("query") || "";
+    if (search.trim() === current) return;
+    const t = window.setTimeout(() => setParam("query", search.trim()), 320);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
   const navigateListing = useCallback(
     (id: string) => navigate(`/listings/${id}`),
     [navigate],
   );
+  const handleMapActive = useCallback((id: string | null) => {
+    activeSource.current = "map";
+    setActiveId(id);
+  }, []);
+  const handleListActive = useCallback((id: string | null) => {
+    activeSource.current = "list";
+    setActiveId(id);
+  }, []);
+  const registerRef = useCallback((id: string, el: HTMLElement | null) => {
+    if (el) cardRefs.current.set(id, el);
+    else cardRefs.current.delete(id);
+  }, []);
+  useEffect(() => {
+    if (!activeId || activeSource.current !== "map") return;
+    cardRefs.current
+      .get(activeId)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [activeId]);
+
+  // Sidebar resizing. Width is clamped and remembered per browser.
+  const startResize = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX,
+      startWidth = panelWidth;
+    const max = Math.min(820, Math.round(window.innerWidth * 0.6));
+    setResizing(true);
+    const move = (ev: PointerEvent) => {
+      const next = Math.max(
+        PANEL_MIN,
+        Math.min(max, startWidth + ev.clientX - startX),
+      );
+      setPanelWidth(next);
+    };
+    const stop = () => {
+      setResizing(false);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      setPanelWidth((w) => {
+        try {
+          localStorage.setItem(PANEL_KEY, String(w));
+        } catch {
+          /* ignore */
+        }
+        return w;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  };
+  const resetResize = () => {
+    setPanelWidth(PANEL_DEFAULT);
+    try {
+      localStorage.removeItem(PANEL_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const filterCount = filterKeys.filter((key) => params.has(key)).length;
   function setParam(key: string, value: string) {
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      if (value) next.set(key, value);
-      else next.delete(key);
-      return next;
-    });
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  }
+  function setMany(entries: Record<string, string>) {
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        for (const [key, value] of Object.entries(entries)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
+        return next;
+      },
+      { replace: true },
+    );
   }
   function clearFilters() {
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      [...filterKeys, "query"].forEach((key) => next.delete(key));
-      return next;
-    });
+    setParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        [...filterKeys, "query"].forEach((key) => next.delete(key));
+        return next;
+      },
+      { replace: true },
+    );
     setSearch("");
   }
-  function submitSearch(e: FormEvent) {
-    e.preventDefault();
-    setParam("query", search.trim());
-  }
-  function applyFilters(e: FormEvent) {
-    e.preventDefault();
-    if (
-      filters.minPrice &&
-      filters.maxPrice &&
-      Number(filters.minPrice) > Number(filters.maxPrice)
-    ) {
-      setFilterError("The maximum price needs to be higher than the minimum.");
-      return;
-    }
-    if (filters.from && filters.to && filters.to <= filters.from) {
-      setFilterError("Move-out needs to be after move-in.");
-      return;
-    }
-    setParams((previous) => {
-      const next = new URLSearchParams(previous);
-      Object.entries(filters).forEach(([key, value]) => {
-        const val = Array.isArray(value) ? value.join(",") : value;
-        if (val) next.set(key, val);
-        else next.delete(key);
-      });
-      return next;
-    });
-    setFilterOpen(false);
-  }
+
+  const listings = data?.listings || [];
+  const visible = useMemo(() => {
+    if (!inViewOnly || !bounds) return listings;
+    return listings.filter((l) => inBounds(bounds, l.lat, l.lng));
+  }, [listings, inViewOnly, bounds]);
+  const inViewCount = useMemo(
+    () =>
+      bounds
+        ? listings.filter((l) => inBounds(bounds, l.lat, l.lng)).length
+        : listings.length,
+    [listings, bounds],
+  );
+
+  // Chip labels reflect the active value.
+  const minPrice = params.get("minPrice") || "",
+    maxPrice = params.get("maxPrice") || "",
+    from = params.get("from") || "",
+    to = params.get("to") || "",
+    roomType = params.get("roomType") || "",
+    bedrooms = params.get("bedrooms") || "",
+    amenities = (params.get("amenities") || "").split(",").filter(Boolean);
+  const priceLabel =
+    minPrice && maxPrice
+      ? `${money(+minPrice)} to ${money(+maxPrice)}`
+      : minPrice
+        ? `${money(+minPrice)}+`
+        : maxPrice
+          ? `Under ${money(+maxPrice)}`
+          : "Price";
+  const dateLabelText =
+    from && to
+      ? `${shortDate(from)} to ${shortDate(to)}`
+      : from
+        ? `From ${shortDate(from)}`
+        : to
+          ? `Until ${shortDate(to)}`
+          : "Dates";
+  const roomsLabel = [
+    bedrooms ? (bedrooms === "0" ? "Studio+" : `${bedrooms}+ bd`) : "",
+    roomType ? ROOM_LABELS[roomType as keyof typeof ROOM_LABELS] : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const amenityLabel =
+    amenities.length === 0
+      ? "Amenities"
+      : amenities.length === 1
+        ? amenities[0]
+        : `${amenities.length} amenities`;
+
   if (!campus)
     return (
       <div className="page-container">
         <ErrorBox message="Campus information is unavailable. Please reload this page." />
       </div>
     );
+
+  const hasQuery = !!params.get("query");
+  const filtered = filterCount > 0 || hasQuery;
+  const wide = panelWidth >= 680;
+
   return (
-    <div className="browse-page">
-      <section className="browse-top">
-        <div className="browse-title">
-          <div>
-            <div className="eyebrow">A place for your next chapter</div>
-            <h1>Find your place.</h1>
-            <p>Student subleases, close to campus.</p>
+    <div
+      className={`browse-page mobile-${mobileView} ${resizing ? "is-resizing" : ""}`}
+      style={{ "--panel-w": `${panelWidth}px` } as React.CSSProperties}
+    >
+      <aside className="browse-panel" aria-label="Listings">
+        <div className="panel-head">
+          <div className="head-row">
+            <Popover
+              width={300}
+              trigger={(props) => (
+                <button type="button" className="campus-switch" {...props}>
+                  <span className="campus-icon">
+                    <GraduationCap size={15} />
+                  </span>
+                  <span className="campus-text">
+                    <strong>Near {campus.shortName}</strong>
+                    <small>{campus.name}</small>
+                  </span>
+                  <ChevronDown size={15} className="chip-chevron" />
+                </button>
+              )}
+            >
+              {(close) => (
+                <div className="popover-list" role="listbox">
+                  {campuses.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="option"
+                      aria-selected={c.id === campus.id}
+                      className={c.id === campus.id ? "is-selected" : ""}
+                      onClick={() => {
+                        setParam("campusId", c.id);
+                        close();
+                      }}
+                    >
+                      <span>
+                        <strong>{c.shortName}</strong>
+                        <small>{c.name}</small>
+                      </span>
+                      {c.id === campus.id && <Check size={15} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Popover>
           </div>
-          <label className="campus-picker">
-            <span className="campus-icon">
-              <House size={21} />
-            </span>
-            <span>
-              <small>Your campus</small>
-              <select
-                aria-label="Your campus"
-                value={campus.id}
-                onChange={(e) => setParam("campusId", e.target.value)}
-              >
-                {campuses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.shortName} · {c.name}
-                  </option>
-                ))}
-              </select>
-            </span>
-            <ChevronDown size={16} />
-          </label>
-        </div>
-        <div className="browse-toolbar">
-          <form className="search-form" onSubmit={submitSearch}>
-            <Search size={19} />
+          <label className="search-field">
+            <Search size={16} />
             <input
               aria-label="Search listings"
-              placeholder="Search a neighborhood, street, or place"
+              placeholder="Search by street, building, or keyword"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
               <button
-                className="icon-button"
                 type="button"
+                className="icon-button clear"
+                aria-label="Clear search"
                 onClick={() => {
                   setSearch("");
                   setParam("query", "");
                 }}
-                aria-label="Clear search"
               >
-                <X size={17} />
+                <X size={15} />
               </button>
             )}
-            <button type="submit" className="search-submit" aria-label="Search">
-              <ArrowRight size={18} />
-            </button>
-          </form>
-          <button
-            className={`button secondary filter-button ${filterCount ? "has-filters" : ""}`}
-            onClick={() => {
-              setFilters(readFilters(params));
-              setFilterError("");
-              setFilterOpen(true);
-            }}
-          >
-            <SlidersHorizontal size={17} />
-            Filters
-            {filterCount > 0 && (
-              <span className="count-pill">{filterCount}</span>
+          </label>
+          <div className="chip-row" role="group" aria-label="Filters">
+            <Popover
+              width={300}
+              trigger={(props) => (
+                <button
+                  type="button"
+                  className={`chip ${from || to ? "is-active" : ""}`}
+                  {...props}
+                >
+                  <CalendarDays size={14} />
+                  {dateLabelText}
+                  <ChevronDown size={14} className="chip-chevron" />
+                </button>
+              )}
+            >
+              <div className="popover-body">
+                <div className="popover-title">When do you need it?</div>
+                <div className="field-row">
+                  <label className="field">
+                    <span className="field-label">Move in</span>
+                    <input
+                      type="date"
+                      value={from}
+                      onChange={(e) => setParam("from", e.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Move out</span>
+                    <input
+                      type="date"
+                      min={from || undefined}
+                      value={to}
+                      onChange={(e) => setParam("to", e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="popover-footer">
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => setMany({ from: "", to: "" })}
+                  >
+                    Clear dates
+                  </button>
+                </div>
+              </div>
+            </Popover>
+            <Popover
+              width={300}
+              trigger={(props) => (
+                <button
+                  type="button"
+                  className={`chip ${minPrice || maxPrice ? "is-active" : ""}`}
+                  {...props}
+                >
+                  <SlidersHorizontal size={14} />
+                  {priceLabel}
+                  <ChevronDown size={14} className="chip-chevron" />
+                </button>
+              )}
+            >
+              <div className="popover-body">
+                <div className="popover-title">Monthly rent</div>
+                <div className="field-row">
+                  <label className="field">
+                    <span className="field-label">Min</span>
+                    <div className="input-prefix">
+                      <span>$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="20000"
+                        placeholder="0"
+                        value={minPrice}
+                        onChange={(e) => setParam("minPrice", e.target.value)}
+                      />
+                    </div>
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Max</span>
+                    <div className="input-prefix">
+                      <span>$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="20000"
+                        placeholder="Any"
+                        value={maxPrice}
+                        onChange={(e) => setParam("maxPrice", e.target.value)}
+                      />
+                    </div>
+                  </label>
+                </div>
+                <div className="preset-list">
+                  {PRICE_PRESETS.map((p) => {
+                    const on = minPrice === p.min && maxPrice === p.max;
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        className={`option ${on ? "is-on" : ""}`}
+                        onClick={() =>
+                          setMany({ minPrice: p.min, maxPrice: p.max })
+                        }
+                      >
+                        {p.label}
+                        {on && <Check size={14} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="popover-footer">
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => setMany({ minPrice: "", maxPrice: "" })}
+                  >
+                    Clear price
+                  </button>
+                </div>
+              </div>
+            </Popover>
+            <Popover
+              width={300}
+              trigger={(props) => (
+                <button
+                  type="button"
+                  className={`chip ${bedrooms || roomType ? "is-active" : ""}`}
+                  {...props}
+                >
+                  <BedDouble size={14} />
+                  {roomsLabel || "Rooms"}
+                  <ChevronDown size={14} className="chip-chevron" />
+                </button>
+              )}
+            >
+              <div className="popover-body">
+                <div className="popover-title">Bedrooms</div>
+                <div className="segment-grid">
+                  {[
+                    ["", "Any"],
+                    ["0", "Studio"],
+                    ["1", "1+"],
+                    ["2", "2+"],
+                    ["3", "3+"],
+                    ["4", "4+"],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`segment ${bedrooms === value ? "is-on" : ""}`}
+                      aria-pressed={bedrooms === value}
+                      onClick={() => setParam("bedrooms", value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="popover-title">Type of place</div>
+                <div className="segment-grid">
+                  {[["", "Any"], ...Object.entries(ROOM_LABELS)].map(
+                    ([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`segment ${roomType === value ? "is-on" : ""}`}
+                        aria-pressed={roomType === value}
+                        onClick={() => setParam("roomType", value)}
+                      >
+                        {label.replace(" room", "").replace(" place", "")}
+                      </button>
+                    ),
+                  )}
+                </div>
+                <div className="popover-footer">
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => setMany({ bedrooms: "", roomType: "" })}
+                  >
+                    Clear rooms
+                  </button>
+                </div>
+              </div>
+            </Popover>
+            <Popover
+              width={320}
+              align="right"
+              trigger={(props) => (
+                <button
+                  type="button"
+                  className={`chip ${amenities.length ? "is-active" : ""}`}
+                  {...props}
+                >
+                  {amenityLabel}
+                  {amenities.length > 1 && (
+                    <span className="count-pill">{amenities.length}</span>
+                  )}
+                  <ChevronDown size={14} className="chip-chevron" />
+                </button>
+              )}
+            >
+              <div className="popover-body">
+                <div className="popover-title">Amenities</div>
+                <div className="check-grid">
+                  {AMENITIES.map((amenity) => (
+                    <label className="check-label" key={amenity}>
+                      <input
+                        type="checkbox"
+                        checked={amenities.includes(amenity)}
+                        onChange={(e) =>
+                          setParam(
+                            "amenities",
+                            (e.target.checked
+                              ? [...amenities, amenity]
+                              : amenities.filter((a) => a !== amenity)
+                            ).join(","),
+                          )
+                        }
+                      />
+                      {amenity}
+                    </label>
+                  ))}
+                </div>
+                <div className="popover-footer">
+                  <button
+                    type="button"
+                    className="text-button"
+                    onClick={() => setParam("amenities", "")}
+                  >
+                    Clear amenities
+                  </button>
+                </div>
+              </div>
+            </Popover>
+            {filtered && (
+              <button
+                type="button"
+                className="chip clear-chip"
+                onClick={clearFilters}
+              >
+                <X size={14} />
+                Clear
+              </button>
             )}
-          </button>
-          <div className="view-toggle" role="group" aria-label="Listing view">
-            <button
-              aria-label="Grid view"
-              aria-pressed={view === "grid"}
-              onClick={() => setView("grid")}
-            >
-              <LayoutGrid size={17} />
-              <span>Grid</span>
-            </button>
-            <button
-              aria-label="Map view"
-              aria-pressed={view === "map"}
-              onClick={() => setView("map")}
-            >
-              <MapIcon size={17} />
-              <span>Map</span>
-            </button>
           </div>
         </div>
-        {(filterCount > 0 || params.get("query")) && (
-          <div className="active-filters">
-            <span>{params.get("query") ? `“${params.get("query")}”` : ""}</span>
-            {filterCount > 0 && (
+        <div className="panel-scroll">
+          {!user && (
+            <Link to="/sign-in" className="signin-banner">
+              <LogIn size={14} />
               <span>
-                {filterCount} filter{filterCount !== 1 ? "s" : ""} applied
+                <strong>Sign in with your .edu</strong> to save places and
+                request handoffs.
               </span>
-            )}
-            <button onClick={clearFilters}>
-              Clear all <X size={13} />
-            </button>
-          </div>
-        )}
-      </section>
-      <div className={`browse-workspace ${view}`}>
-        <section className="results-panel" aria-label="Listing results">
+            </Link>
+          )}
           <div className="results-toolbar">
-            <span>
-              <strong>{loading ? "…" : data?.listings.length || 0}</strong>{" "}
-              places near {campus.shortName}
+            <span className="results-count">
+              <strong>{loading ? "…" : visible.length}</strong>{" "}
+              {visible.length === 1 ? "place" : "places"}
+              {!loading && bounds && inViewCount !== listings.length && (
+                <button
+                  type="button"
+                  className={`inview-toggle ${inViewOnly ? "is-on" : ""}`}
+                  aria-pressed={inViewOnly}
+                  onClick={() => setInViewOnly((v) => !v)}
+                >
+                  <Crosshair size={12} />
+                  {inViewOnly ? "Map area" : `${inViewCount} on the map`}
+                </button>
+              )}
             </span>
             <label className="sort-select">
               <span className="sr-only">Sort listings</span>
@@ -254,216 +615,133 @@ export default function Browse() {
                 value={params.get("sort") || "newest"}
                 onChange={(e) => setParam("sort", e.target.value)}
               >
-                <option value="newest">Newest first</option>
+                <option value="newest">Newest</option>
+                <option value="savings">Biggest savings</option>
                 <option value="price_asc">Price, low to high</option>
                 <option value="price_desc">Price, high to low</option>
               </select>
-              <ChevronDown size={14} />
             </label>
           </div>
           {loading ? (
             <div
-              className="listings-grid"
+              className={`listing-list ${wide ? "wide" : ""}`}
               aria-label="Loading listings"
               role="status"
             >
-              {[0, 1, 2, 3].map((i) => (
+              {[0, 1, 2, 3, 4].map((i) => (
                 <div className="skeleton-card" key={i}>
-                  <div />
-                  <span />
-                  <span />
-                  <span />
+                  <div className="skeleton" />
+                  <div>
+                    <span className="skeleton" />
+                    <span className="skeleton" />
+                    <span className="skeleton" />
+                  </div>
                 </div>
               ))}
             </div>
           ) : error ? (
-            <ErrorBox message={error} retry={refresh} />
-          ) : data?.listings.length ? (
-            <div className="listings-grid">
-              {data.listings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+            <div className="panel-pad">
+              <ErrorBox message={error} retry={refresh} />
+            </div>
+          ) : visible.length ? (
+            <div className={`listing-list enter-stagger ${wide ? "wide" : ""}`}>
+              {visible.map((listing) => (
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  campus={campus}
+                  variant="compact"
+                  active={listing.id === activeId}
+                  onHover={handleListActive}
+                  registerRef={registerRef}
+                />
               ))}
             </div>
           ) : (
             <EmptyState
-              icon={
-                filterCount || params.get("query") ? undefined : (
-                  <House size={29} strokeWidth={1.4} />
-                )
-              }
               title={
-                filterCount || params.get("query")
-                  ? "No places match just yet."
-                  : `Make the first move at ${campus.shortName}.`
+                inViewOnly && listings.length
+                  ? "Nothing in this part of the map."
+                  : filtered
+                    ? "No places match just yet."
+                    : `Be the first at ${campus.shortName}.`
               }
               description={
-                filterCount || params.get("query")
-                  ? "Try a wider budget, different dates, or fewer filters to find a place that fits."
-                  : `There aren’t any live listings here yet. Have a room or place opening up? Put it on the map.`
+                inViewOnly && listings.length
+                  ? "Pan the map back toward campus or show every place."
+                  : filtered
+                    ? "Try a wider budget, different dates, or fewer filters."
+                    : "There are no live listings here yet. Have a room opening up? Put it on the map."
               }
             >
-              {filterCount || params.get("query") ? (
+              {inViewOnly && listings.length ? (
+                <Button variant="secondary" onClick={() => setInViewOnly(false)}>
+                  Show all places
+                </Button>
+              ) : filtered ? (
                 <Button variant="secondary" onClick={clearFilters}>
                   Clear filters
                 </Button>
               ) : (
                 <Link to="/listings/new" className="button primary">
-                  <Plus size={17} />
+                  <Plus size={16} />
                   List your place
                 </Link>
               )}
             </EmptyState>
           )}
-          <div className="results-note">
-            <MapPin size={14} />
-            <span>
-              Explore {campus.shortName} and its surrounding neighborhoods.
-            </span>
-          </div>
-        </section>
-        {view === "map" && (
-          <aside className="browse-map" aria-label="Campus map">
-            <Suspense fallback={<Loading label="Loading map…" />}>
-              <Map
-                campus={campus}
-                listings={data?.listings || []}
-                onListing={navigateListing}
-              />
-            </Suspense>
-            <div className="map-campus-label">
-              <span className="blue-dot" />
-              {campus.name}
-            </div>
-          </aside>
-        )}
-      </div>
-      <Modal
-        title="Find your fit"
-        open={filterOpen}
-        onClose={() => setFilterOpen(false)}
+        </div>
+      </aside>
+      <div
+        className="panel-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the listing panel"
+        title="Drag to resize, double click to reset"
+        onPointerDown={startResize}
+        onDoubleClick={resetResize}
       >
-        <form onSubmit={applyFilters} className="filter-form">
-          <p className="muted">A few details to narrow things down.</p>
-          <div className="field-row">
-            <Field label="Minimum monthly rent">
-              <div className="input-prefix">
-                <span>$</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="20000"
-                  placeholder="No minimum"
-                  value={filters.minPrice}
-                  onChange={(e) =>
-                    setFilters({ ...filters, minPrice: e.target.value })
-                  }
-                />
-              </div>
-            </Field>
-            <Field label="Maximum monthly rent">
-              <div className="input-prefix">
-                <span>$</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="20000"
-                  placeholder="No maximum"
-                  value={filters.maxPrice}
-                  onChange={(e) =>
-                    setFilters({ ...filters, maxPrice: e.target.value })
-                  }
-                />
-              </div>
-            </Field>
-          </div>
-          <div className="field-row">
-            <Field label="Move-in">
-              <input
-                type="date"
-                value={filters.from}
-                onChange={(e) =>
-                  setFilters({ ...filters, from: e.target.value })
-                }
-              />
-            </Field>
-            <Field label="Move-out">
-              <input
-                type="date"
-                min={filters.from || undefined}
-                value={filters.to}
-                onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-              />
-            </Field>
-          </div>
-          <Field label="Type of place">
-            <select
-              value={filters.roomType}
-              onChange={(e) =>
-                setFilters({ ...filters, roomType: e.target.value })
-              }
-            >
-              <option value="">Any type</option>
-              {Object.entries(ROOM_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Bedrooms">
-            <select
-              value={filters.bedrooms}
-              onChange={(e) =>
-                setFilters({ ...filters, bedrooms: e.target.value })
-              }
-            >
-              <option value="">Any number</option>
-              <option value="0">Studio</option>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n} bedroom{n !== 1 ? "s" : ""}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <fieldset className="amenities-field">
-            <legend>Amenities</legend>
-            <div className="check-grid">
-              {AMENITIES.map((amenity) => (
-                <label className="check-label" key={amenity}>
-                  <input
-                    type="checkbox"
-                    checked={filters.amenities.includes(amenity)}
-                    onChange={(e) =>
-                      setFilters({
-                        ...filters,
-                        amenities: e.target.checked
-                          ? [...filters.amenities, amenity]
-                          : filters.amenities.filter((a) => a !== amenity),
-                      })
-                    }
-                  />
-                  {amenity}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          {filterError && <ErrorBox message={filterError} />}
-          <div className="modal-actions">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setFilters(readFilters(new URLSearchParams()))}
-            >
-              Reset
-            </Button>
-            <Button type="submit">
-              Show places
-              <ArrowRight size={17} />
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        <span />
+      </div>
+      <section className="browse-map" aria-label="Campus map">
+        <Suspense fallback={<Loading label="Loading map…" />}>
+          <Map
+            campus={campus}
+            listings={listings}
+            activeId={activeId}
+            onActive={handleMapActive}
+            onListing={navigateListing}
+            onBounds={setBounds}
+          />
+        </Suspense>
+      </section>
+      <div className="mobile-view-toggle t-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          className="t-tab"
+          aria-selected={mobileView === "list"}
+          onClick={() => setMobileView("list")}
+        >
+          <List size={15} />
+          List
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="t-tab"
+          aria-selected={mobileView === "map"}
+          onClick={() => setMobileView("map")}
+        >
+          <MapIcon size={15} />
+          Map
+        </button>
+        <span
+          className="t-tabs-pill"
+          aria-hidden="true"
+          data-pos={mobileView}
+        />
+      </div>
     </div>
   );
 }

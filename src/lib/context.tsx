@@ -80,7 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toast-region" aria-live="polite" aria-atomic="true">
         {toast && (
-          <div className={`toast ${toast.kind}`}>
+          <div className={`toast ${toast.kind} is-open`} key={toast.message}>
             {toast.kind === "success" ? (
               <CheckCircle2 size={20} />
             ) : (

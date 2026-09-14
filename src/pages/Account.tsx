@@ -1,4 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
@@ -14,11 +20,11 @@ import {
   MessageSquare,
   Plus,
   ShieldCheck,
-  UserRound,
   Image,
   CalendarDays,
   Pencil,
-  Send,
+  Eye,
+  RotateCcw,
 } from "lucide-react";
 import {
   api,
@@ -41,42 +47,180 @@ import {
   EmptyState,
   ErrorBox,
   Field,
-  Loading,
   Modal,
   PageHeading,
 } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
+
+type TabItem = { value: string; label: string; count?: number };
+
+/* Sliding tabs, transitions.dev 16-tabs-sliding. JS writes the active
+   tab's offsetLeft and offsetWidth onto the pill, CSS owns the tween. */
+function Tabs({
+  label,
+  tabs,
+  value,
+  onChange,
+}: {
+  label: string;
+  tabs: TabItem[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const pillRef = useRef<HTMLSpanElement>(null);
+  const previous = useRef<string | null>(null);
+  const signature = tabs.map((t) => `${t.value}:${t.count ?? ""}`).join(",");
+  useLayoutEffect(() => {
+    const bar = barRef.current,
+      pill = pillRef.current;
+    if (!bar || !pill) return;
+    function move(animate: boolean) {
+      const tab = bar!.querySelector<HTMLElement>('[aria-selected="true"]');
+      if (!tab || !pill) return;
+      if (!animate) {
+        const prior = pill.style.transition;
+        pill.style.transition = "none";
+        pill.style.transform = `translateX(${tab.offsetLeft}px)`;
+        pill.style.width = `${tab.offsetWidth}px`;
+        void pill.offsetWidth;
+        pill.style.transition = prior;
+      } else {
+        pill.style.transform = `translateX(${tab.offsetLeft}px)`;
+        pill.style.width = `${tab.offsetWidth}px`;
+      }
+    }
+    move(previous.current !== null && previous.current !== value);
+    previous.current = value;
+    const onResize = () => move(false);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [value, signature]);
+  return (
+    <div className="tab-bar" role="tablist" aria-label={label} ref={barRef}>
+      <span className="tab-pill" aria-hidden="true" ref={pillRef} />
+      {tabs.map((tab) => (
+        <button
+          key={tab.value}
+          type="button"
+          role="tab"
+          className="tab"
+          aria-selected={value === tab.value}
+          onClick={() => onChange(tab.value)}
+        >
+          {tab.label}
+          {tab.count !== undefined && (
+            <span className="count-pill">{tab.count}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <div className="card-skeleton">
+      <div className="skeleton" />
+      <div>
+        <div className="skeleton" />
+        <div className="skeleton" />
+        <div className="skeleton" />
+      </div>
+    </div>
+  );
+}
+
+function RowSkeleton() {
+  return (
+    <div className="row-skeleton">
+      <div className="skeleton" />
+      <div>
+        <div className="skeleton" />
+        <div className="skeleton" />
+        <div className="skeleton" />
+      </div>
+      <div>
+        <div className="skeleton" />
+        <div className="skeleton" />
+      </div>
+    </div>
+  );
+}
+
+function RequestSkeleton() {
+  return (
+    <div className="rq-skeleton">
+      <div>
+        <div className="skeleton" />
+        <div className="skeleton" />
+        <div className="skeleton" />
+      </div>
+      <div className="skeleton" />
+      <div className="skeleton" />
+    </div>
+  );
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("");
+}
+
+const LISTING_TONE: Record<Listing["status"], string> = {
+  active: "green",
+  draft: "amber",
+  handed_off: "blue",
+  archived: "",
+};
+const REQUEST_TONE: Record<HandoffRequest["status"], string> = {
+  pending: "amber",
+  accepted: "green",
+  declined: "red",
+  withdrawn: "",
+};
+
 export function Saved() {
+  const { user, campuses } = useApp();
+  const campus = campuses.find((c) => c.id === user?.campusId);
   const { data, loading, error, refresh, setData } = useResource<{
     listings: Listing[];
   }>("/saved");
+  const count = data?.listings.length || 0;
   return (
-    <div className="page-container">
+    <div className="page-container account-page">
       <PageHeading
-        eyebrow="Your shortlist"
-        title="Good places. Kept close."
-        description="Everything you’ve saved, ready when you are."
-      />
-      <div className="section-topline">
-        <span>
-          {data?.listings.length || 0} saved place
-          {data?.listings.length !== 1 ? "s" : ""}
-        </span>
-        <Link className="text-button" to="/browse">
-          Keep exploring
+        title="Saved places"
+        description={
+          loading
+            ? "Loading your shortlist."
+            : `${count} place${count === 1 ? "" : "s"} on your shortlist.`
+        }
+      >
+        <Link className="button secondary" to="/browse">
+          Browse places
           <ArrowRight size={16} />
         </Link>
-      </div>
+      </PageHeading>
       {loading ? (
-        <Loading label="Finding your saved places…" />
+        <div className="listings-grid" aria-hidden="true">
+          {Array.from({ length: 6 }, (_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
       ) : error ? (
         <ErrorBox message={error} retry={refresh} />
       ) : data?.listings.length ? (
-        <div className="listings-grid saved-grid">
+        <div className="listings-grid enter-stagger">
           {data.listings.map((l) => (
             <ListingCard
               key={l.id}
               listing={{ ...l, saved: true }}
+              campus={campus}
+              variant="grid"
               onSaveChange={(saved) => {
                 if (!saved)
                   setData((current) =>
@@ -107,6 +251,7 @@ export function Saved() {
     </div>
   );
 }
+
 export function MyListings() {
   const { data, loading, error, refresh } = useResource<{
       listings: Listing[];
@@ -121,6 +266,9 @@ export function MyListings() {
     [actionError, setActionError] = useState("");
   const listings =
     data?.listings.filter((l) => filter === "all" || l.status === filter) || [];
+  const countFor = (value: string) =>
+    data?.listings.filter((l) => value === "all" || l.status === value)
+      .length || 0;
   async function confirm() {
     if (!action) return;
     setBusy(true);
@@ -145,132 +293,142 @@ export function MyListings() {
       setBusy(false);
     }
   }
+  const total = data?.listings.length || 0;
   return (
-    <div className="page-container">
+    <div className="page-container account-page">
       <PageHeading
-        eyebrow="Your spaces"
-        title="Your place. The next chapter."
-        description="Keep your listings up to date and make room for a smooth handoff."
+        title="Your listings"
+        description={
+          loading
+            ? "Loading your listings."
+            : `${total} listing${total === 1 ? "" : "s"}, ${countFor("active")} live right now.`
+        }
       >
         <Link className="button primary" to="/listings/new">
           <Plus size={17} />
           New listing
         </Link>
       </PageHeading>
-      <div className="tabs" role="group" aria-label="Listing status">
-        {[
-          ["all", "All listings"],
-          ["active", "Live"],
-          ["draft", "Drafts"],
-          ["handed_off", "Handed off"],
-          ["archived", "Archived"],
-        ].map(([value, label]) => (
-          <button
-            aria-pressed={filter === value}
-            key={value}
-            onClick={() => setFilter(value)}
-          >
-            {label}
-            <span>
-              {data?.listings.filter(
-                (l) => value === "all" || l.status === value,
-              ).length || 0}
-            </span>
-          </button>
-        ))}
-      </div>
+      <Tabs
+        label="Listing status"
+        value={filter}
+        onChange={setFilter}
+        tabs={[
+          { value: "all", label: "All", count: countFor("all") },
+          { value: "active", label: "Live", count: countFor("active") },
+          { value: "draft", label: "Draft", count: countFor("draft") },
+          {
+            value: "handed_off",
+            label: "Handed off",
+            count: countFor("handed_off"),
+          },
+          {
+            value: "archived",
+            label: "Archived",
+            count: countFor("archived"),
+          },
+        ]}
+      />
       {loading ? (
-        <Loading label="Loading your listings…" />
+        <div className="mg-list" aria-hidden="true">
+          {Array.from({ length: 4 }, (_, i) => (
+            <RowSkeleton key={i} />
+          ))}
+        </div>
       ) : error ? (
         <ErrorBox message={error} retry={refresh} />
       ) : listings.length ? (
-        <div className="manage-listings">
+        <div className="mg-list enter-stagger">
           {listings.map((l) => (
-            <article className="manage-listing" key={l.id}>
+            <article className="mg-row" key={l.id}>
               <Link
-                className="manage-photo"
+                className="mg-thumb"
                 aria-label={`View ${l.title || "draft listing"}`}
                 to={`/listings/${l.id}`}
               >
                 {l.photos[0] ? (
-                  <img
-                    src={l.photos[0]}
-                    alt={l.title || "Your draft listing"}
-                  />
+                  <img src={l.photos[0]} alt="" loading="lazy" />
                 ) : (
-                  <div className="photo-placeholder">
-                    <Image size={27} />
-                  </div>
+                  <span className="thumb-placeholder">
+                    <Image size={18} strokeWidth={1.4} />
+                  </span>
                 )}
               </Link>
-              <div className="manage-info">
-                <div className="manage-meta">
-                  <span className={`status-badge ${l.status}`}>
+              <div className="mg-main">
+                <div className="mg-title">
+                  <h2>
+                    <Link to={`/listings/${l.id}`}>
+                      {l.title || "Untitled draft"}
+                    </Link>
+                  </h2>
+                  <span className={`pill ${LISTING_TONE[l.status]}`}>
                     {STATUS_LABELS[l.status]}
                   </span>
-                  <span>{ROOM_LABELS[l.roomType]}</span>
                 </div>
-                <h2>
-                  <Link to={`/listings/${l.id}`}>
-                    {l.title || "Untitled draft"}
-                  </Link>
-                </h2>
-                <p>{l.address || "Add an address to your draft"}</p>
-                <div className="manage-facts">
+                <div className="mg-facts">
                   <strong>
                     {money(l.price)}
-                    <span> / month</span>
+                    <span>/mo</span>
                   </strong>
+                  <span>{ROOM_LABELS[l.roomType]}</span>
+                  {l.address && <span>{l.address}</span>}
                   {l.availableFrom && l.availableTo && (
                     <span>
-                      <CalendarDays size={14} />
+                      <CalendarDays size={13} />
                       {dateLabel(l.availableFrom)} to {dateLabel(l.availableTo)}
                     </span>
                   )}
                 </div>
+                <p className="mg-updated">
+                  Updated {dateLabel(l.updatedAt, true)}
+                </p>
               </div>
-              <div className="manage-actions">
+              <div className="mg-actions">
                 <Link
-                  className="button secondary"
+                  className="button small secondary"
                   to={`/listings/${l.id}/edit`}
                 >
-                  <Pencil size={15} />
-                  {l.status === "draft" ? "Finish listing" : "Edit listing"}
+                  <Pencil size={14} />
+                  {l.status === "draft" ? "Finish" : "Edit"}
+                </Link>
+                <Link className="button small ghost" to={`/listings/${l.id}`}>
+                  <Eye size={14} />
+                  View
                 </Link>
                 {l.status === "active" ? (
                   <>
-                    <Link className="button ghost" to="/requests">
-                      View requests
-                      <ArrowUpRight size={15} />
+                    <Link className="button small ghost" to="/requests">
+                      Requests
+                      <ArrowUpRight size={14} />
                     </Link>
                     <button
-                      className="text-button"
+                      className="button small ghost"
                       onClick={() => {
                         setAction({ listing: l, status: "handed_off" });
                         setActionError("");
                       }}
                     >
-                      <CheckCircle2 size={15} />
-                      Mark handed off
+                      <CheckCircle2 size={14} />
+                      Handed off
                     </button>
                   </>
                 ) : (
                   l.status !== "draft" && (
                     <button
-                      className="button ghost"
+                      className="button small ghost"
                       onClick={() => {
                         setAction({ listing: l, status: "active" });
                         setActionError("");
                       }}
                     >
-                      Relist
-                      <ArrowUpRight size={15} />
+                      <RotateCcw size={14} />
+                      Publish
                     </button>
                   )
                 )}
                 {l.status !== "archived" && (
                   <button
-                    className="archive-button"
+                    className="button small ghost quiet"
                     onClick={() => {
                       setAction({ listing: l, status: "archived" });
                       setActionError("");
@@ -345,6 +503,7 @@ export function MyListings() {
     </div>
   );
 }
+
 export function Requests() {
   const { data, loading, error, refresh } = useResource<{
       incoming: HandoffRequest[];
@@ -396,125 +555,110 @@ export function Requests() {
     }
   }
   return (
-    <div className="page-container requests-page">
+    <div className="page-container account-page requests-page">
       <PageHeading
-        eyebrow="Make a connection"
-        title="Good handoffs start here."
-        description="A first message, a few details, and a step closer to your next place."
+        title="Requests"
+        description={
+          loading
+            ? "Loading your requests."
+            : pendingCount > 0
+              ? `${items.length} request${items.length === 1 ? "" : "s"}, ${pendingCount} awaiting ${tab === "incoming" ? "your reply" : "a reply"}.`
+              : `${items.length} request${items.length === 1 ? "" : "s"} in this view.`
+        }
       />
-      <div className="tabs" role="group" aria-label="Request direction">
-        <button
-          aria-pressed={tab === "incoming"}
-          onClick={() => setParams({ tab: "incoming" })}
-        >
-          <Inbox size={17} />
-          Received<span>{data?.incoming.length || 0}</span>
-        </button>
-        <button
-          aria-pressed={tab === "outgoing"}
-          onClick={() => setParams({ tab: "outgoing" })}
-        >
-          <Send size={16} />
-          Sent<span>{data?.outgoing.length || 0}</span>
-        </button>
-      </div>
-      {!loading && items.length > 0 && (
-        <div className="requests-summary">
-          <span>
-            {items.length} request{items.length === 1 ? "" : "s"}
-          </span>
-          {pendingCount > 0 && (
-            <span>
-              <span className="blue-dot" />
-              {pendingCount} awaiting{" "}
-              {tab === "incoming" ? "your reply" : "a reply"}
-            </span>
-          )}
-        </div>
-      )}
+      <Tabs
+        label="Request direction"
+        value={tab}
+        onChange={(value) => setParams({ tab: value })}
+        tabs={[
+          {
+            value: "incoming",
+            label: "Received",
+            count: data?.incoming.length || 0,
+          },
+          {
+            value: "outgoing",
+            label: "Sent",
+            count: data?.outgoing.length || 0,
+          },
+        ]}
+      />
       {loading ? (
-        <Loading label="Catching up on your requests…" />
+        <div className="rq-list" aria-hidden="true">
+          {Array.from({ length: 3 }, (_, i) => (
+            <RequestSkeleton key={i} />
+          ))}
+        </div>
       ) : error ? (
         <ErrorBox message={error} retry={refresh} />
       ) : items.length ? (
-        <div className="request-list">
+        <div className="rq-list enter-stagger">
           {items.map((r) => (
-            <article className="request-item" key={r.id}>
-              <div className="request-item-top">
-                <div className="request-person">
-                  <span className="avatar">
-                    {(tab === "incoming" ? r.requesterName : r.ownerName)
-                      .split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")}
-                  </span>
-                  <div>
-                    <h2>
-                      {tab === "incoming" ? r.requesterName : r.ownerName}
-                    </h2>
-                    <span>
-                      {tab === "incoming"
-                        ? "Interested in your place"
-                        : "Your request"}{" "}
-                      · {dateLabel(r.createdAt, true)}
+            <article className="rq-card" key={r.id}>
+              <div className="rq-head">
+                <Link className="rq-thumb" to={`/listings/${r.listingId}`}>
+                  {r.listingPhoto ? (
+                    <img src={r.listingPhoto} alt="" loading="lazy" />
+                  ) : (
+                    <span className="thumb-placeholder">
+                      <House size={16} strokeWidth={1.4} />
                     </span>
-                  </div>
+                  )}
+                </Link>
+                <div className="rq-head-text">
+                  <h2>
+                    <Link to={`/listings/${r.listingId}`}>
+                      {r.listingTitle}
+                    </Link>
+                  </h2>
+                  <p>
+                    <span className="avatar tiny">
+                      {initials(
+                        tab === "incoming" ? r.requesterName : r.ownerName,
+                      )}
+                    </span>
+                    {tab === "incoming" ? r.requesterName : r.ownerName}
+                    <em>· {dateLabel(r.createdAt, true)}</em>
+                  </p>
                 </div>
-                <span className={`status-badge ${r.status}`}>
-                  {r.status === "pending" && <Clock size={12} />}{" "}
+                <span className={`pill ${REQUEST_TONE[r.status]}`}>
+                  {r.status === "pending" && <Clock size={11} />}
                   {STATUS_LABELS[r.status]}
                 </span>
               </div>
-              <Link
-                className="request-listing-link"
-                to={`/listings/${r.listingId}`}
-              >
-                {r.listingPhoto ? (
-                  <img src={r.listingPhoto} alt="" />
-                ) : (
-                  <span className="small-photo-placeholder">
-                    <House size={18} />
-                  </span>
-                )}
-                <span>{r.listingTitle}</span>
-                <ArrowUpRight size={16} />
-              </Link>
-              <div className="request-message">
+              <blockquote className="rq-quote">
                 <span className="eyebrow">
                   {tab === "incoming" ? "Their message" : "Your message"}
                 </span>
                 <p>{r.message}</p>
-              </div>
+              </blockquote>
               {r.status === "accepted" && r.contact ? (
-                <div className="contact-reveal">
+                <div className="rq-contact">
+                  <CheckCircle2 size={18} />
                   <div>
-                    <CheckCircle2 size={20} />
-                    <span>
-                      <strong>
-                        You’re connected with {r.contact.name.split(" ")[0]}.
-                      </strong>
-                      <small>
-                        Arrange a visit and talk through the lease together.
-                      </small>
-                    </span>
+                    <strong>
+                      You’re connected with {r.contact.name.split(" ")[0]}.
+                    </strong>
+                    <small>
+                      Arrange a visit and talk through the lease together.
+                    </small>
                   </div>
                   <a
                     href={`mailto:${r.contact.email}`}
-                    className="button primary"
+                    className="button small secondary"
                   >
-                    <Mail size={16} />
+                    <Mail size={14} />
                     <span>{r.contact.email}</span>
-                    <ArrowUpRight size={15} />
                   </a>
                 </div>
               ) : r.status === "pending" ? (
-                <div className="request-item-actions">
+                <div className="rq-actions">
                   {tab === "incoming" ? (
                     <>
                       <p>Your emails are shared when you accept.</p>
                       <Button
                         variant="secondary"
+                        className="small"
                         onClick={() => {
                           setAction({ request: r, status: "declined" });
                           setActionError("");
@@ -523,41 +667,45 @@ export function Requests() {
                         Decline
                       </Button>
                       <Button
+                        className="small"
                         onClick={() => {
                           setAction({ request: r, status: "accepted" });
                           setActionError("");
                         }}
                       >
-                        <Check size={16} />
-                        Accept request
+                        <Check size={15} />
+                        Accept
                       </Button>
                     </>
                   ) : (
                     <>
                       <p>
-                        <Clock size={15} />
+                        <Clock size={14} />
                         Waiting for {r.ownerName.split(" ")[0]} to respond.
                       </p>
                       <Button
-                        variant="ghost"
+                        variant="secondary"
+                        className="small"
                         onClick={() => {
                           setAction({ request: r, status: "withdrawn" });
                           setActionError("");
                         }}
                       >
-                        Withdraw request
+                        Withdraw
                       </Button>
                     </>
                   )}
                 </div>
               ) : (
-                <p className="request-closed">
-                  {r.status === "declined"
-                    ? "This request was declined."
-                    : r.status === "withdrawn"
-                      ? "This request was withdrawn."
-                      : "The connection is accepted. Refresh to load contact details."}
-                </p>
+                <div className="rq-actions">
+                  <p>
+                    {r.status === "declined"
+                      ? "This request was declined."
+                      : r.status === "withdrawn"
+                        ? "This request was withdrawn."
+                        : "The connection is accepted. Refresh to load contact details."}
+                  </p>
+                </div>
               )}
             </article>
           ))}
@@ -630,6 +778,7 @@ export function Requests() {
     </div>
   );
 }
+
 export function Profile() {
   const { user, setUser, campuses, notify } = useApp();
   const [name, setName] = useState(user?.name || ""),
@@ -659,77 +808,67 @@ export function Profile() {
     }
   }
   return (
-    <div className="page-container profile-page">
+    <div className="page-container account-page profile-page">
       <PageHeading
-        eyebrow="Your account"
-        title="A little about you."
-        description="Make a good first introduction to your campus community."
+        title="Profile"
+        description="How you appear to students on your listings and requests."
       />
-      <div className="profile-layout">
-        <aside className="profile-identity">
-          <span className="avatar profile-avatar">
-            {user?.name
-              .split(" ")
-              .map((n) => n[0])
-              .slice(0, 2)
-              .join("")}
-          </span>
+      <div className="pf-layout enter-stagger">
+        <aside className="pf-identity">
+          <span className="avatar pf-avatar">{initials(user?.name || "")}</span>
           <h2>{user?.name}</h2>
-          <p>{campus?.name}</p>
+          <p className="pf-email">{user?.email}</p>
+          <p className="pf-campus">{campus?.name}</p>
           {user?.verified && (
-            <span className="verified-badge">
-              <ShieldCheck size={15} />
+            <span className="pill green pf-verified">
+              <ShieldCheck size={13} />
               Student email verified
             </span>
           )}
-          <div className="profile-privacy">
-            <ShieldCheck size={20} />
-            <p>
-              Your email stays private until you accept a request or your own
-              request is accepted.
-            </p>
-          </div>
+          <p className="field-hint pf-note">
+            Your email stays private until you accept a request or your own
+            request is accepted.
+          </p>
         </aside>
-        <form className="profile-form" onSubmit={submit}>
+        <form className="pf-card" onSubmit={submit}>
           <h2>Profile details</h2>
-          <Field
-            label="Your name"
-            hint="This is the name students see on your listings and requests."
-          >
-            <input
-              required
-              minLength={2}
-              maxLength={80}
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </Field>
-          <Field
-            label="About you"
-            hint="Optional. A few words about your studies or what you’re looking for."
-          >
-            <textarea
-              maxLength={1000}
-              rows={4}
-              placeholder="I’m studying…"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-            />
-          </Field>
-          <div className="profile-readonly">
-            <div>
-              <span>Student email</span>
-              <strong>{user?.email}</strong>
-              <ShieldCheck size={17} />
-            </div>
-            <div>
-              <span>Campus</span>
-              <strong>{campus?.name}</strong>
+          <div className="stack">
+            <Field
+              label="Your name"
+              hint="This is the name students see on your listings and requests."
+            >
+              <input
+                required
+                minLength={2}
+                maxLength={80}
+                autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </Field>
+            <Field
+              label="About you"
+              hint="Optional. A few words about your studies or what you’re looking for."
+            >
+              <textarea
+                maxLength={1000}
+                rows={4}
+                placeholder="I’m studying…"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+              />
+            </Field>
+            <div className="field-row">
+              <Field label="Student email" hint="Verified, and never public.">
+                <input value={user?.email || ""} readOnly disabled />
+              </Field>
+              <Field label="Campus" hint="Set from your student email domain.">
+                <input value={campus?.name || ""} readOnly disabled />
+              </Field>
             </div>
           </div>
           {error && <ErrorBox message={error} />}
-          <div className="profile-actions">
+          <div className="pf-actions">
             <Link className="text-button" to="/forgot-password">
               Change password
               <ArrowUpRight size={15} />

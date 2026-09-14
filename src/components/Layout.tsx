@@ -39,10 +39,30 @@ export function Brand() {
     </a>
   );
 }
+/** Embedded mode, used by the homepage to show the real app inside a frame. */
+export const isEmbed = () =>
+  new URLSearchParams(window.location.search).get("embed") === "1";
+
 export function Layout() {
   const { user, setUser, loading, error, retry, notify } = useApp(),
     navigate = useNavigate(),
     location = useLocation();
+  const embed = isEmbed();
+  useEffect(() => {
+    document.documentElement.classList.toggle("is-embed", embed);
+    if (!embed) return;
+    // Inside the homepage frame every navigation opens the full app instead.
+    const onClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement).closest("a[href]");
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") || "";
+      if (!href.startsWith("/")) return;
+      e.preventDefault();
+      window.open(new URL(href, window.location.origin).toString(), "_blank", "noopener");
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [embed]);
   const [menu, setMenu] = useState(false),
     [loggingOut, setLoggingOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

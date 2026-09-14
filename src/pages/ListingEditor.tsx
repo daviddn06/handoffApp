@@ -4,22 +4,27 @@ import {
   useEffect,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
 } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  Bath,
+  BedDouble,
+  CalendarRange,
   Check,
   ChevronLeft,
   ChevronRight,
+  Image as ImageIcon,
   ImagePlus,
   MapPin,
   Save,
+  Star,
   Upload,
   X,
   Eye,
-  House,
 } from "lucide-react";
 import { AMENITIES, ROOM_LABELS, type Listing } from "../types";
 import {
@@ -49,6 +54,7 @@ type Draft = {
   lng: number;
   price: string;
   deposit: string;
+  originalPrice: string;
   bedrooms: string;
   bathrooms: string;
   roomType: Listing["roomType"];
@@ -58,6 +64,24 @@ type Draft = {
   photos: string[];
 };
 const STEPS = ["The basics", "The details", "Photos", "Review"];
+const STEP_NOTES = [
+  "Location and type",
+  "Rent and availability",
+  "Show the space",
+  "Publish when ready",
+];
+const STEP_TITLES = [
+  "Start with the place",
+  "The details that matter",
+  "Give them a look around",
+  "One last look",
+];
+const STEP_SUBTITLES = [
+  "Where is it, and what are you offering?",
+  "Set expectations clearly, so the next conversation is easy.",
+  "Add bright, recent photos that show the actual space.",
+  "Check everything before your listing goes live.",
+];
 export default function ListingEditor() {
   const { id } = useParams(),
     { user, campuses, notify } = useApp(),
@@ -74,6 +98,7 @@ export default function ListingEditor() {
       lng: campus?.lng || -118.2851,
       price: "",
       deposit: "0",
+      originalPrice: "",
       bedrooms: "1",
       bathrooms: "1",
       roomType: "private",
@@ -87,10 +112,22 @@ export default function ListingEditor() {
     [dirty, setDirty] = useState(false),
     [saving, setSaving] = useState(false),
     [uploading, setUploading] = useState(false),
+    [pending, setPending] = useState(0),
+    [dragOver, setDragOver] = useState(false),
     [formError, setFormError] = useState(""),
     [showPublish, setShowPublish] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null),
-    topRef = useRef<HTMLDivElement>(null);
+    topRef = useRef<HTMLDivElement>(null),
+    fieldsRef = useRef<HTMLDivElement>(null);
+  // Error shake, transitions.dev 12-error-state-shake.
+  function fail(message: string) {
+    setFormError(message);
+    const el = fieldsRef.current;
+    if (!el) return;
+    el.classList.remove("is-shaking");
+    void el.offsetWidth;
+    el.classList.add("is-shaking");
+  }
   useEffect(() => {
     if (data?.listing) {
       const l = data.listing;
@@ -102,6 +139,7 @@ export default function ListingEditor() {
         lng: l.lng,
         price: String(l.price),
         deposit: String(l.deposit),
+        originalPrice: l.originalPrice ? String(l.originalPrice) : "",
         bedrooms: String(l.bedrooms),
         bathrooms: String(l.bathrooms),
         roomType: l.roomType,
@@ -156,6 +194,11 @@ export default function ListingEditor() {
       if (Number(draft.deposit) < 0 || Number(draft.deposit) > 50000)
         return "Enter a deposit between $0 and $50,000.";
       if (
+        draft.originalPrice &&
+        (Number(draft.originalPrice) < 1 || Number(draft.originalPrice) > 50000)
+      )
+        return "Enter what you pay now, between $1 and $50,000, or leave it blank.";
+      if (
         !draft.availableFrom ||
         !draft.availableTo ||
         draft.availableTo <= draft.availableFrom
@@ -174,7 +217,7 @@ export default function ListingEditor() {
     e.preventDefault();
     const err = validatePart(step);
     if (err) {
-      setFormError(err);
+      fail(err);
       return;
     }
     setStep((s) => Math.min(s + 1, 3));
@@ -185,11 +228,11 @@ export default function ListingEditor() {
     if (!files?.length) return;
     setFormError("");
     if (files.length + draft.photos.length > 8) {
-      setFormError("Choose up to 8 photos in total.");
+      fail("Choose up to 8 photos in total.");
       return;
     }
     if (Array.from(files).some((f) => f.size > 8 * 1024 * 1024)) {
-      setFormError("Each photo needs to be under 8 MB.");
+      fail("Each photo needs to be under 8 MB.");
       return;
     }
     if (
@@ -197,10 +240,11 @@ export default function ListingEditor() {
         (f) => !["image/jpeg", "image/png", "image/webp"].includes(f.type),
       )
     ) {
-      setFormError("Use JPG, PNG, or WebP photos.");
+      fail("Use JPG, PNG, or WebP photos.");
       return;
     }
     setUploading(true);
+    setPending(files.length);
     const form = new FormData();
     for (const file of Array.from(files)) form.append("photos", file);
     try {
@@ -214,11 +258,18 @@ export default function ListingEditor() {
         `${result.photos.length} photo${result.photos.length === 1 ? "" : "s"} uploaded.`,
       );
     } catch (e) {
-      setFormError(errorMessage(e));
+      fail(errorMessage(e));
     } finally {
       setUploading(false);
+      setPending(0);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+  function onDrop(e: DragEvent<HTMLElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    if (uploading || draft.photos.length >= 8) return;
+    upload(e.dataTransfer.files);
   }
   async function save(status: "draft" | "active") {
     setFormError("");
@@ -227,7 +278,7 @@ export default function ListingEditor() {
         const err = validatePart(i);
         if (err) {
           setStep(i);
-          setFormError(err);
+          fail(err);
           setShowPublish(false);
           return;
         }
@@ -239,6 +290,7 @@ export default function ListingEditor() {
         ...draft,
         price: Number(draft.price) || 0,
         deposit: Number(draft.deposit) || 0,
+        originalPrice: draft.originalPrice ? Number(draft.originalPrice) : null,
         bedrooms: Number(draft.bedrooms),
         bathrooms: Number(draft.bathrooms),
         status,
@@ -258,7 +310,7 @@ export default function ListingEditor() {
         status === "active" ? `/listings/${result.listing.id}` : "/my-listings",
       );
     } catch (e) {
-      setFormError(errorMessage(e));
+      fail(errorMessage(e));
       setShowPublish(false);
     } finally {
       setSaving(false);
@@ -278,23 +330,28 @@ export default function ListingEditor() {
         <ErrorBox message="You can only edit your own listings." />
       </div>
     );
+  const live = data?.listing.status === "active";
   return (
     <div className="page-container editor-page" ref={topRef}>
       <BackLink to="/my-listings">My listings</BackLink>
       <PageHeading
-        eyebrow={campus?.name}
-        title={id ? "Make it feel like your place." : "Pass your place on."}
-        description="A few thoughtful details help the right student find you."
-      />
+        title={id ? "Edit listing" : "List your place"}
+        description={`Four short steps. Students at ${campus?.shortName || "your campus"} see it once you publish.`}
+      >
+        <span className={`pill ${live ? "green" : "blue"}`}>
+          {live ? "Live" : "Draft"}
+        </span>
+      </PageHeading>
       <div className="editor-layout">
-        <aside className="editor-sidebar">
-          <ol className="editor-steps">
+        <aside className="editor-rail">
+          <ol className="step-rail">
             {STEPS.map((label, i) => (
               <li
-                className={`${i === step ? "current" : ""} ${i < step ? "complete" : ""}`}
                 key={label}
+                className={`step-item ${i === step ? "is-current" : ""} ${i < step ? "is-done" : ""}`}
               >
                 <button
+                  type="button"
                   onClick={() => {
                     if (i < step) {
                       setStep(i);
@@ -304,32 +361,38 @@ export default function ListingEditor() {
                   disabled={i > step}
                   aria-current={i === step ? "step" : undefined}
                 >
-                  <span>{i < step ? <Check size={15} /> : i + 1}</span>
-                  <div>
-                    {label}
-                    <small>
-                      {
-                        [
-                          "Location and type",
-                          "Rent and availability",
-                          "Show the space",
-                          "Ready for your next student",
-                        ][i]
-                      }
-                    </small>
-                  </div>
+                  <span className="step-dot">
+                    {i < step ? (
+                      <span
+                        className="step-check"
+                        data-state="in"
+                        aria-hidden="true"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="15"
+                          height="15"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 12.5 10 17.5 19 7" />
+                        </svg>
+                      </span>
+                    ) : (
+                      i + 1
+                    )}
+                  </span>
+                  <span className="step-text">
+                    <strong>{label}</strong>
+                    <small>{STEP_NOTES[i]}</small>
+                  </span>
                 </button>
               </li>
             ))}
           </ol>
-          <div className="editor-tip">
-            <House size={20} />
-            <strong>A good listing feels honest.</strong>
-            <p>
-              Clear photos, accurate dates, and the details you’d want to know
-              yourself.
-            </p>
-          </div>
           <p className="draft-note">
             {dirty
               ? "You have unsaved changes."
@@ -338,6 +401,7 @@ export default function ListingEditor() {
         </aside>
         <section className="editor-content">
           <form
+            id="listing-form"
             onSubmit={
               step === 3
                 ? (e) => {
@@ -347,483 +411,618 @@ export default function ListingEditor() {
                 : next
             }
           >
-            <div className="editor-section-heading">
-              <span>Step {step + 1} of 4</span>
-              <h2>
-                {
-                  [
-                    "Let’s start with the place.",
-                    "The details that matter.",
-                    "Give them a look around.",
-                    "Looking good. One last look.",
-                  ][step]
-                }
-              </h2>
-              <p>
-                {
-                  [
-                    "Where is it, and what will they call home?",
-                    "Set expectations clearly, so the next conversation is easy.",
-                    "Add bright, recent photos that show the actual space.",
-                    "Make sure everything is accurate before your listing goes live.",
-                  ][step]
-                }
-              </p>
+            <div className="editor-section-head">
+              <div>
+                <h2>{STEP_TITLES[step]}</h2>
+                <p>{STEP_SUBTITLES[step]}</p>
+              </div>
+              <span className="step-count">Step {step + 1} of 4</span>
             </div>
-            {step === 0 && (
-              <div className="stack">
-                <Field
-                  label="Listing title"
-                  hint="Keep it specific. A feature, neighborhood, or building name works well."
-                >
-                  <input
-                    autoFocus
-                    required
-                    minLength={8}
-                    maxLength={100}
-                    value={draft.title}
-                    onChange={(e) => update("title", e.target.value)}
-                    placeholder="Sunny private room near campus"
-                  />
-                </Field>
-                <fieldset className="room-type-field">
-                  <legend>What are you offering?</legend>
-                  <div className="room-options">
-                    {Object.entries(ROOM_LABELS).map(([value, label]) => (
-                      <label
-                        key={value}
-                        className={draft.roomType === value ? "selected" : ""}
-                      >
-                        <input
-                          type="radio"
-                          name="roomType"
-                          value={value}
-                          checked={draft.roomType === value}
-                          onChange={() =>
-                            update("roomType", value as Listing["roomType"])
-                          }
-                        />
-                        <span>{label}</span>
-                        <small>
-                          {value === "private"
-                            ? "A bedroom to yourself"
-                            : value === "shared"
-                              ? "A room with a roommate"
-                              : "The whole home"}
-                        </small>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-                <Field
-                  label="Street address or building"
-                  hint="This is visible on your listing. Leave out your unit number."
-                >
-                  <input
-                    required
-                    minLength={5}
-                    maxLength={200}
-                    autoComplete="street-address"
-                    value={draft.address}
-                    onChange={(e) => update("address", e.target.value)}
-                    placeholder="123 West 30th Street, Los Angeles"
-                  />
-                </Field>
-                <div className="field">
-                  <div className="field-label">Put it on the map</div>
-                  <p className="field-hint">
-                    Place the pin at your building, so students can understand
-                    the location.
-                  </p>
-                  {campus && (
-                    <div className="editor-map">
-                      <Suspense fallback={<Loading label="Loading map…" />}>
-                        <Map
-                          campus={campus}
-                          pin={
-                            pinPlaced
-                              ? { lat: draft.lat, lng: draft.lng }
-                              : undefined
-                          }
-                          onPin={(point) => {
-                            setDraft((d) => ({ ...d, ...point }));
-                            setPinPlaced(true);
-                            setDirty(true);
-                            setFormError("");
-                          }}
-                        />
-                      </Suspense>
-                    </div>
-                  )}
-                  <div className={`pin-status ${pinPlaced ? "placed" : ""}`}>
-                    <MapPin size={15} />
-                    {pinPlaced
-                      ? "Location pin placed"
-                      : "Choose your building on the map"}
-                  </div>
-                  <details className="coordinate-fields">
-                    <summary>Enter coordinates instead</summary>
-                    <div className="field-row">
-                      <Field label="Latitude">
-                        <input
-                          type="number"
-                          step="any"
-                          min="-90"
-                          max="90"
-                          value={draft.lat}
-                          onChange={(e) => {
-                            update("lat", Number(e.target.value));
-                            setPinPlaced(true);
-                          }}
-                        />
-                      </Field>
-                      <Field label="Longitude">
-                        <input
-                          type="number"
-                          step="any"
-                          min="-180"
-                          max="180"
-                          value={draft.lng}
-                          onChange={(e) => {
-                            update("lng", Number(e.target.value));
-                            setPinPlaced(true);
-                          }}
-                        />
-                      </Field>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            )}
-            {step === 1 && (
-              <div className="stack">
-                <div className="field-row">
-                  <Field label="Monthly rent">
-                    <div className="input-prefix">
-                      <span>$</span>
-                      <input
-                        type="number"
-                        required
-                        min="1"
-                        max="20000"
-                        step="1"
-                        value={draft.price}
-                        onChange={(e) => update("price", e.target.value)}
-                        placeholder="1,200"
-                      />
-                    </div>
-                  </Field>
+            <div
+              className="editor-fields"
+              ref={fieldsRef}
+              onAnimationEnd={() =>
+                fieldsRef.current?.classList.remove("is-shaking")
+              }
+            >
+              {step === 0 && (
+                <div className="stack">
                   <Field
-                    label="Security deposit"
-                    hint="Enter 0 if there’s no deposit."
+                    label="Listing title"
+                    hint="Keep it specific. A feature, neighborhood, or building name works well."
                   >
-                    <div className="input-prefix">
-                      <span>$</span>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        max="50000"
-                        step="1"
-                        value={draft.deposit}
-                        onChange={(e) => update("deposit", e.target.value)}
-                      />
-                    </div>
-                  </Field>
-                </div>
-                <div className="field-row">
-                  <Field label="Available from">
                     <input
-                      type="date"
+                      autoFocus
                       required
-                      value={draft.availableFrom}
-                      onChange={(e) => update("availableFrom", e.target.value)}
+                      minLength={8}
+                      maxLength={100}
+                      value={draft.title}
+                      onChange={(e) => update("title", e.target.value)}
+                      placeholder="Sunny private room near campus"
                     />
                   </Field>
-                  <Field label="Available until">
-                    <input
-                      type="date"
-                      required
-                      min={draft.availableFrom || undefined}
-                      value={draft.availableTo}
-                      onChange={(e) => update("availableTo", e.target.value)}
-                    />
-                  </Field>
-                </div>
-                <div className="field-row">
-                  <Field label="Bedrooms in the home">
-                    <select
-                      value={draft.bedrooms}
-                      onChange={(e) => update("bedrooms", e.target.value)}
-                    >
-                      {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n === 0 ? "Studio" : n}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Bathrooms in the home">
-                    <select
-                      value={draft.bathrooms}
-                      onChange={(e) => update("bathrooms", e.target.value)}
-                    >
-                      {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6].map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-                <Field
-                  label="Tell them about the place"
-                  hint="Mention roommates, utilities, lease requirements, and what makes the space work for a student."
-                >
-                  <textarea
-                    required
-                    minLength={40}
-                    maxLength={5000}
-                    rows={6}
-                    value={draft.description}
-                    onChange={(e) => update("description", e.target.value)}
-                    placeholder="The room gets morning light and comes furnished. You’d be living with…"
-                  />
-                </Field>
-                <fieldset className="amenities-field">
-                  <legend>What’s included?</legend>
-                  <div className="check-grid">
-                    {AMENITIES.map((a) => (
-                      <label key={a} className="check-label">
-                        <input
-                          type="checkbox"
-                          checked={draft.amenities.includes(a)}
-                          onChange={(e) =>
-                            update(
-                              "amenities",
-                              e.target.checked
-                                ? [...draft.amenities, a]
-                                : draft.amenities.filter((v) => v !== a),
-                            )
-                          }
-                        />
-                        {a}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              </div>
-            )}
-            {step === 2 && (
-              <div className="stack">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  tabIndex={-1}
-                  onChange={(e) => upload(e.target.files)}
-                />
-                <button
-                  className="photo-dropzone"
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading || draft.photos.length >= 8}
-                >
-                  {uploading ? (
-                    <Loading label="Uploading your photos…" />
-                  ) : (
-                    <>
-                      <span className="upload-symbol">
-                        <ImagePlus size={28} />
-                      </span>
-                      <strong>
-                        {draft.photos.length >= 8
-                          ? "All 8 photo spots filled"
-                          : "Add photos of your place"}
-                      </strong>
-                      <span>JPG, PNG, or WebP. Up to 8 photos, 8 MB each.</span>
-                      <span className="button secondary">
-                        <Upload size={16} />
-                        Choose photos
-                      </span>
-                    </>
-                  )}
-                </button>
-                {draft.photos.length > 0 && (
-                  <>
-                    <div className="photo-upload-heading">
-                      <strong>{draft.photos.length} of 8 photos</strong>
-                      <span>The first photo is your cover.</span>
-                    </div>
-                    <div className="uploaded-photos">
-                      {draft.photos.map((url, i) => (
-                        <div key={url} className="uploaded-photo">
-                          <img src={url} alt={`Listing photo ${i + 1}`} />
-                          {i === 0 && (
-                            <span className="cover-label">Cover photo</span>
-                          )}
-                          <button
-                            type="button"
-                            className="photo-remove"
-                            aria-label={`Remove photo ${i + 1}`}
-                            onClick={() =>
-                              update(
-                                "photos",
-                                draft.photos.filter((p) => p !== url),
-                              )
+                  <fieldset className="room-type-field">
+                    <legend>What are you offering?</legend>
+                    <div className="room-options">
+                      {Object.entries(ROOM_LABELS).map(([value, label]) => (
+                        <label
+                          key={value}
+                          className={draft.roomType === value ? "selected" : ""}
+                        >
+                          <input
+                            type="radio"
+                            name="roomType"
+                            value={value}
+                            checked={draft.roomType === value}
+                            onChange={() =>
+                              update("roomType", value as Listing["roomType"])
                             }
+                          />
+                          <span>{label}</span>
+                          <small>
+                            {value === "private"
+                              ? "A bedroom to yourself"
+                              : value === "shared"
+                                ? "A room with a roommate"
+                                : "The whole home"}
+                          </small>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <Field
+                    label="Street address or building"
+                    hint="This is visible on your listing. Leave out your unit number."
+                  >
+                    <input
+                      required
+                      minLength={5}
+                      maxLength={200}
+                      autoComplete="street-address"
+                      value={draft.address}
+                      onChange={(e) => update("address", e.target.value)}
+                      placeholder="123 West 30th Street, Los Angeles"
+                    />
+                  </Field>
+                  <div className="field">
+                    <div className="field-label">Put it on the map</div>
+                    <p className="field-hint">
+                      Place the pin at your building, so students can understand
+                      the location.
+                    </p>
+                    {campus && (
+                      <div className="editor-map">
+                        <Suspense fallback={<Loading label="Loading map…" />}>
+                          <Map
+                            compact
+                            campus={campus}
+                            pin={
+                              pinPlaced
+                                ? { lat: draft.lat, lng: draft.lng }
+                                : undefined
+                            }
+                            onPin={(point) => {
+                              setDraft((d) => ({ ...d, ...point }));
+                              setPinPlaced(true);
+                              setDirty(true);
+                              setFormError("");
+                            }}
+                          />
+                        </Suspense>
+                      </div>
+                    )}
+                    <div className={`pin-status ${pinPlaced ? "placed" : ""}`}>
+                      <MapPin size={14} />
+                      {pinPlaced
+                        ? "Location pin placed"
+                        : "Choose your building on the map"}
+                    </div>
+                    <details className="coordinate-fields">
+                      <summary>Enter coordinates instead</summary>
+                      <div className="field-row">
+                        <Field label="Latitude">
+                          <input
+                            type="number"
+                            step="any"
+                            min="-90"
+                            max="90"
+                            value={draft.lat}
+                            onChange={(e) => {
+                              update("lat", Number(e.target.value));
+                              setPinPlaced(true);
+                            }}
+                          />
+                        </Field>
+                        <Field label="Longitude">
+                          <input
+                            type="number"
+                            step="any"
+                            min="-180"
+                            max="180"
+                            value={draft.lng}
+                            onChange={(e) => {
+                              update("lng", Number(e.target.value));
+                              setPinPlaced(true);
+                            }}
+                          />
+                        </Field>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              )}
+              {step === 1 && (
+                <div className="stack">
+                  <div className="field-row">
+                    <Field label="Monthly rent">
+                      <div className="input-prefix">
+                        <span>$</span>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          max="20000"
+                          step="1"
+                          value={draft.price}
+                          onChange={(e) => update("price", e.target.value)}
+                          placeholder="1,200"
+                        />
+                      </div>
+                    </Field>
+                    <Field
+                      label="Security deposit"
+                      hint="Enter 0 if there’s no deposit."
+                    >
+                      <div className="input-prefix">
+                        <span>$</span>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          max="50000"
+                          step="1"
+                          value={draft.deposit}
+                          onChange={(e) => update("deposit", e.target.value)}
+                        />
+                      </div>
+                    </Field>
+                  </div>
+                  <div className="savings-field">
+                    <Field
+                      label="What you pay now (optional)"
+                      hint="Your current monthly rent on the original lease. Students love seeing a deal, and this is what makes Handoff a win for both sides."
+                    >
+                      <div className="input-prefix">
+                        <span>$</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="50000"
+                          step="1"
+                          value={draft.originalPrice}
+                          onChange={(e) =>
+                            update("originalPrice", e.target.value)
+                          }
+                          placeholder="Same as rent"
+                        />
+                      </div>
+                    </Field>
+                    {Number(draft.originalPrice) > Number(draft.price) &&
+                      Number(draft.price) > 0 && (
+                        <div className="savings-callout">
+                          <strong>
+                            Subleasers save{" "}
+                            {money(
+                              Number(draft.originalPrice) - Number(draft.price),
+                            )}{" "}
+                            a month
+                          </strong>
+                          <span>
+                            That is{" "}
+                            {Math.round(
+                              ((Number(draft.originalPrice) -
+                                Number(draft.price)) /
+                                Number(draft.originalPrice)) *
+                                100,
+                            )}
+                            % below your lease. Listings with savings are
+                            highlighted on the map and sort to the top.
+                          </span>
+                        </div>
+                      )}
+                  </div>
+                  <div className="field-row">
+                    <Field label="Available from">
+                      <input
+                        type="date"
+                        required
+                        value={draft.availableFrom}
+                        onChange={(e) =>
+                          update("availableFrom", e.target.value)
+                        }
+                      />
+                    </Field>
+                    <Field label="Available until">
+                      <input
+                        type="date"
+                        required
+                        min={draft.availableFrom || undefined}
+                        value={draft.availableTo}
+                        onChange={(e) => update("availableTo", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                  <div className="field-row">
+                    <Field label="Bedrooms in the home">
+                      <select
+                        value={draft.bedrooms}
+                        onChange={(e) => update("bedrooms", e.target.value)}
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                          <option key={n} value={n}>
+                            {n === 0 ? "Studio" : n}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Bathrooms in the home">
+                      <select
+                        value={draft.bathrooms}
+                        onChange={(e) => update("bathrooms", e.target.value)}
+                      >
+                        {[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field
+                    label="Tell them about the place"
+                    hint="Mention roommates, utilities, lease requirements, and what makes the space work for a student."
+                  >
+                    <textarea
+                      required
+                      minLength={40}
+                      maxLength={5000}
+                      rows={6}
+                      value={draft.description}
+                      onChange={(e) => update("description", e.target.value)}
+                      placeholder="The room gets morning light and comes furnished. You’d be living with…"
+                    />
+                  </Field>
+                  <fieldset className="amenities-field">
+                    <legend>What’s included?</legend>
+                    <div className="amenity-chips">
+                      {AMENITIES.map((a) => {
+                        const on = draft.amenities.includes(a);
+                        return (
+                          <label
+                            key={a}
+                            className={`chip amenity-chip ${on ? "is-active" : ""}`}
                           >
-                            <X size={15} />
-                          </button>
-                          <div className="photo-reorder">
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={on}
+                              onChange={(e) =>
+                                update(
+                                  "amenities",
+                                  e.target.checked
+                                    ? [...draft.amenities, a]
+                                    : draft.amenities.filter((v) => v !== a),
+                                )
+                              }
+                            />
+                            <Check size={14} aria-hidden="true" />
+                            {a}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                </div>
+              )}
+              {step === 2 && (
+                <div className="stack">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    tabIndex={-1}
+                    onChange={(e) => upload(e.target.files)}
+                  />
+                  <button
+                    className={`photo-dropzone ${dragOver ? "is-dragover" : ""}`}
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading || draft.photos.length >= 8}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={onDrop}
+                  >
+                    <span className="upload-symbol">
+                      <ImagePlus size={24} />
+                    </span>
+                    <strong>
+                      {draft.photos.length >= 8
+                        ? "All 8 photo spots filled"
+                        : "Drag photos here, or choose files"}
+                    </strong>
+                    <span className="dropzone-hint">
+                      JPG, PNG, or WebP. Up to 8 photos, 8 MB each.
+                    </span>
+                    <span className="button secondary small">
+                      <Upload size={15} />
+                      Choose photos
+                    </span>
+                  </button>
+                  {(draft.photos.length > 0 || uploading) && (
+                    <div className="photo-manager">
+                      <div className="photo-upload-heading">
+                        <strong>{draft.photos.length} of 8 photos</strong>
+                        <span>The first photo is the cover.</span>
+                      </div>
+                      <div className="uploaded-photos">
+                        {draft.photos.map((url, i) => (
+                          <div key={url} className="uploaded-photo">
+                            <img src={url} alt={`Listing photo ${i + 1}`} />
+                            {i === 0 && <span className="cover-label">Cover</span>}
+                            <div className="photo-tools">
+                              <button
+                                type="button"
+                                className="photo-tool"
+                                disabled={i === 0}
+                                aria-label={`Move photo ${i + 1} earlier`}
+                                onClick={() => {
+                                  const p = [...draft.photos];
+                                  [p[i - 1], p[i]] = [p[i], p[i - 1]];
+                                  update("photos", p);
+                                }}
+                              >
+                                <ChevronLeft size={16} />
+                              </button>
+                              {i > 0 && (
+                                <button
+                                  type="button"
+                                  className="photo-tool cover-tool"
+                                  aria-label={`Make photo ${i + 1} the cover`}
+                                  onClick={() => {
+                                    const p = draft.photos.filter(
+                                      (p) => p !== url,
+                                    );
+                                    update("photos", [url, ...p]);
+                                  }}
+                                >
+                                  <Star size={14} />
+                                  Make cover
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="photo-tool"
+                                disabled={i === draft.photos.length - 1}
+                                aria-label={`Move photo ${i + 1} later`}
+                                onClick={() => {
+                                  const p = [...draft.photos];
+                                  [p[i + 1], p[i]] = [p[i], p[i + 1]];
+                                  update("photos", p);
+                                }}
+                              >
+                                <ChevronRight size={16} />
+                              </button>
+                            </div>
                             <button
                               type="button"
-                              disabled={i === 0}
-                              aria-label={`Move photo ${i + 1} earlier`}
-                              onClick={() => {
-                                const p = [...draft.photos];
-                                [p[i - 1], p[i]] = [p[i], p[i - 1]];
-                                update("photos", p);
-                              }}
+                              className="photo-remove"
+                              aria-label={`Remove photo ${i + 1}`}
+                              onClick={() =>
+                                update(
+                                  "photos",
+                                  draft.photos.filter((p) => p !== url),
+                                )
+                              }
                             >
-                              <ChevronLeft size={17} />
-                            </button>
-                            <button
-                              type="button"
-                              disabled={i === draft.photos.length - 1}
-                              aria-label={`Move photo ${i + 1} later`}
-                              onClick={() => {
-                                const p = [...draft.photos];
-                                [p[i + 1], p[i]] = [p[i], p[i + 1]];
-                                update("photos", p);
-                              }}
-                            >
-                              <ChevronRight size={17} />
+                              <X size={15} />
                             </button>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                        {uploading &&
+                          Array.from({ length: pending || 1 }).map((_, i) => (
+                            <div
+                              key={`pending-${i}`}
+                              className="uploaded-photo is-pending"
+                            >
+                              <div className="skeleton" />
+                            </div>
+                          ))}
+                      </div>
+                      {uploading && (
+                        <p className="upload-status" role="status">
+                          Uploading your photos…
+                        </p>
+                      )}
                     </div>
-                  </>
-                )}
-              </div>
-            )}
-            {step === 3 && (
-              <div className="review-listing">
-                {draft.photos[0] && (
-                  <img
-                    className="review-cover"
-                    src={draft.photos[0]}
-                    alt="Listing cover"
-                  />
-                )}
-                <div className="review-meta">
-                  <span className="eyebrow">
-                    {ROOM_LABELS[draft.roomType]} · {campus?.shortName}
-                  </span>
-                  <h3>{draft.title}</h3>
-                  <p>
-                    <MapPin size={15} />
-                    {draft.address}
-                  </p>
-                </div>
-                <dl className="review-facts">
-                  <div>
-                    <dt>Monthly rent</dt>
-                    <dd>{money(Number(draft.price))}</dd>
-                  </div>
-                  <div>
-                    <dt>Deposit</dt>
-                    <dd>{money(Number(draft.deposit))}</dd>
-                  </div>
-                  <div>
-                    <dt>Available</dt>
-                    <dd>
-                      {dateLabel(draft.availableFrom, true)} to{" "}
-                      {dateLabel(draft.availableTo, true)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>The space</dt>
-                    <dd>
-                      {draft.bedrooms === "0"
-                        ? "Studio"
-                        : `${draft.bedrooms} bed`}{" "}
-                      · {draft.bathrooms} bath
-                    </dd>
-                  </div>
-                </dl>
-                <p className="preserve-lines">{draft.description}</p>
-                {draft.amenities.length > 0 && (
-                  <div className="review-amenities">
-                    {draft.amenities.map((a) => (
-                      <span key={a}>
-                        <Check size={13} />
-                        {a}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="review-reminder">
-                  <Check size={18} />
-                  <p>
-                    By publishing, you confirm that this listing is accurate and
-                    that you’re allowed to offer this space for sublease.
-                  </p>
-                </div>
-              </div>
-            )}
-            {formError && <ErrorBox message={formError} />}
-            <div className="editor-actions">
-              {step > 0 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setStep((s) => s - 1);
-                    setFormError("");
-                  }}
-                >
-                  <ArrowLeft size={16} />
-                  Back
-                </Button>
-              ) : (
-                <Link className="button ghost" to="/my-listings">
-                  Cancel
-                </Link>
-              )}
-              <div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => save("draft")}
-                  busy={saving}
-                  disabled={uploading}
-                >
-                  <Save size={16} />
-                  Save draft
-                </Button>
-                <Button type="submit" disabled={uploading || saving}>
-                  {step === 3 ? (
-                    <>
-                      <Eye size={16} />
-                      {id && data?.listing.status === "active"
-                        ? "Save & publish"
-                        : "Publish listing"}
-                    </>
-                  ) : (
-                    <>
-                      Continue
-                      <ArrowRight size={16} />
-                    </>
                   )}
-                </Button>
-              </div>
+                </div>
+              )}
+              {step === 3 && (
+                <div className="review-listing">
+                  <article className="listing-card compact review-card">
+                    <div className="card-photo">
+                      {draft.photos[0] ? (
+                        <img src={draft.photos[0]} alt="" />
+                      ) : (
+                        <div className="photo-placeholder">
+                          <ImageIcon size={18} strokeWidth={1.5} />
+                          No photo
+                        </div>
+                      )}
+                    </div>
+                    <div className="card-body">
+                      <div className="card-topline">
+                        <div className="card-price">
+                          <strong>{money(Number(draft.price))}</strong>
+                          <span>/mo</span>
+                        </div>
+                        <span className="pill blue">
+                          {ROOM_LABELS[draft.roomType]}
+                        </span>
+                      </div>
+                      <div className="card-title">{draft.title}</div>
+                      <div className="card-address">
+                        <MapPin size={13} />
+                        <span>{draft.address}</span>
+                      </div>
+                      <div className="card-details">
+                        <span>
+                          <BedDouble size={13} />
+                          {draft.bedrooms === "0"
+                            ? "Studio"
+                            : `${draft.bedrooms} bd`}
+                        </span>
+                        <span>
+                          <Bath size={13} />
+                          {draft.bathrooms} ba
+                        </span>
+                        <span>
+                          <CalendarRange size={13} />
+                          {dateLabel(draft.availableFrom)} to{" "}
+                          {dateLabel(draft.availableTo)}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                  <dl className="review-facts">
+                    <div>
+                      <dt>Monthly rent</dt>
+                      <dd>{money(Number(draft.price))}</dd>
+                    </div>
+                    <div>
+                      <dt>Deposit</dt>
+                      <dd>{money(Number(draft.deposit))}</dd>
+                    </div>
+                    {Number(draft.originalPrice) > 0 && (
+                      <div>
+                        <dt>Original lease</dt>
+                        <dd>{money(Number(draft.originalPrice))} a month</dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt>Available</dt>
+                      <dd>
+                        {dateLabel(draft.availableFrom, true)} to{" "}
+                        {dateLabel(draft.availableTo, true)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>The space</dt>
+                      <dd>
+                        {draft.bedrooms === "0"
+                          ? "Studio"
+                          : `${draft.bedrooms} bed`}{" "}
+                        · {draft.bathrooms} bath
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Campus</dt>
+                      <dd>{campus?.name}</dd>
+                    </div>
+                    <div>
+                      <dt>Photos</dt>
+                      <dd>
+                        {draft.photos.length} uploaded
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="review-block">
+                    <h3>Description</h3>
+                    <p className="preserve-lines">{draft.description}</p>
+                  </div>
+                  {draft.amenities.length > 0 && (
+                    <div className="review-block">
+                      <h3>Included</h3>
+                      <div className="review-amenities">
+                        {draft.amenities.map((a) => (
+                          <span key={a} className="pill">
+                            <Check size={12} />
+                            {a}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="review-reminder">
+                    <Check size={16} />
+                    <p>
+                      By publishing, you confirm that this listing is accurate
+                      and that you’re allowed to offer this space for sublease.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {formError && <ErrorBox message={formError} />}
             </div>
           </form>
         </section>
+      </div>
+      <div className="editor-bar">
+        <div className="editor-bar-inner">
+          {step > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setStep((s) => s - 1);
+                setFormError("");
+              }}
+            >
+              <ArrowLeft size={16} />
+              Back
+            </Button>
+          ) : (
+            <Link className="button ghost" to="/my-listings">
+              Cancel
+            </Link>
+          )}
+          <div className="editor-bar-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => save("draft")}
+              busy={saving}
+              disabled={uploading}
+            >
+              <Save size={16} />
+              Save draft
+            </Button>
+            <Button
+              type="submit"
+              form="listing-form"
+              disabled={uploading || saving}
+            >
+              {step === 3 ? (
+                <>
+                  <Eye size={16} />
+                  {id && data?.listing.status === "active"
+                    ? "Save & publish"
+                    : "Publish"}
+                </>
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
       <Modal
         open={showPublish}

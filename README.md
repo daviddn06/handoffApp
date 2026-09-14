@@ -10,7 +10,7 @@ The app never creates sample inventory in production. Verification and password 
 
 ## Product
 
-Campus discovery with dates, budget, room type, amenities and map. Verified student accounts. Listing photos, drafts, publishing and archiving. Saved listings. Handoff requests with acceptance, decline and withdrawal. Contact details revealed only to accepted request participants. Reports saved for operator review. Account verification and recovery links expire and are single use.
+Campus discovery with dates, budget, room type, amenities and map. Listers can share what they pay on the original lease, so every listing below it shows the monthly savings and can be sorted by biggest savings. Verified student accounts. Listing photos, drafts, publishing and archiving. Saved listings. Handoff requests with acceptance, decline and withdrawal. Contact details revealed only to accepted request participants. Reports saved for operator review. Account verification and recovery links expire and are single use.
 
 ## Deployment
 
@@ -27,6 +27,14 @@ Application releases live at `/opt/handoff/releases`, selected through `/opt/han
 The original Vercel app's configured Supabase hostname did not resolve during this rebuild. No old user accounts or listings have been imported. Preserve the old source and project until the original database is recovered or explicitly retired.
 
 See `API.md`, `server/README.md`, and the migration record in the Handoff zone deliverables for verification and rollout details.
+
+## Demo data
+
+`HANDOFF_DATA_DIR=./data npm run seed:demo` fills the local database with seven verified demo students, about thirty listings around USC, UCLA and LMU with generated photos, saved places and handoff requests in every status. It refuses to run against production paths. Credentials and details are in `scripts/README.md`. Production is never seeded.
+
+## Styles
+
+Plain CSS under `src/styles/`, imported in order by `src/styles/index.css`. `motion.css` holds the transitions.dev motion tokens, `base.css` the design tokens and shared primitives (buttons, chips, pills, fields, modal, toast, header, page containers), and one file per page area (`browse.css`, `auth.css`, `detail.css`, `editor.css`, `account.css`). `docs/ui-brief.md` is the design contract for anyone touching the UI. The map is MapLibre GL with the OpenFreeMap Positron style (no API key, Carto basemaps now watermark without one), a USC DPS patrol zone overlay from `src/lib/dps.ts`, lightweight pixel distance clustering, a preview card, a resizable listing panel, and a map key. `/browse?embed=1` hides the app chrome so the homepage can frame the real app.
 
 ## Homepage
 

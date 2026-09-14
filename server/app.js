@@ -106,7 +106,7 @@ export function createApp({
       "X-Frame-Options": "DENY",
       "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
       "Content-Security-Policy":
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:; child-src blob:; font-src 'self'; object-src 'none'; frame-ancestors 'self' https://handofflease.com https://www.handofflease.com; base-uri 'self'; form-action 'self'",
     });
     if (useSecureCookies)
       res.set("Strict-Transport-Security", "max-age=31536000");
@@ -435,6 +435,7 @@ export function createApp({
     lng: row.lng,
     price: row.price,
     deposit: row.deposit,
+    originalPrice: row.original_price ?? null,
     bedrooms: row.bedrooms,
     bathrooms: row.bathrooms,
     roomType: row.room_type,
@@ -547,6 +548,8 @@ export function createApp({
       newest: "l.created_at DESC",
       price_asc: "l.price ASC,l.created_at DESC",
       price_desc: "l.price DESC,l.created_at DESC",
+      savings:
+        "CASE WHEN l.original_price IS NOT NULL AND l.original_price>l.price THEN l.original_price-l.price ELSE 0 END DESC,l.created_at DESC",
     }[query.sort];
     const rows = db
       .prepare(
@@ -584,7 +587,7 @@ export function createApp({
       const id = randomUUID();
       const timestamp = iso();
       db.prepare(
-        `INSERT INTO listings(id,owner_id,campus_id,title,description,address,lat,lng,price,deposit,bedrooms,bathrooms,room_type,available_from,available_to,amenities,photos,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO listings(id,owner_id,campus_id,title,description,address,lat,lng,price,deposit,original_price,bedrooms,bathrooms,room_type,available_from,available_to,amenities,photos,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       ).run(
         id,
         req.user.id,
@@ -596,6 +599,7 @@ export function createApp({
         input.lng,
         input.price,
         input.deposit,
+        input.originalPrice,
         input.bedrooms,
         input.bathrooms,
         input.roomType,
@@ -631,6 +635,7 @@ export function createApp({
         lng: old.lng,
         price: old.price,
         deposit: old.deposit,
+        originalPrice: old.originalPrice,
         bedrooms: old.bedrooms,
         bathrooms: old.bathrooms,
         roomType: old.roomType,
@@ -650,7 +655,7 @@ export function createApp({
       validatePhotos(input.photos, req.user.id);
       db.transaction(() => {
         db.prepare(
-          `UPDATE listings SET title=?,description=?,address=?,lat=?,lng=?,price=?,deposit=?,bedrooms=?,bathrooms=?,room_type=?,available_from=?,available_to=?,amenities=?,photos=?,status=?,updated_at=? WHERE id=? AND owner_id=?`,
+          `UPDATE listings SET title=?,description=?,address=?,lat=?,lng=?,price=?,deposit=?,original_price=?,bedrooms=?,bathrooms=?,room_type=?,available_from=?,available_to=?,amenities=?,photos=?,status=?,updated_at=? WHERE id=? AND owner_id=?`,
         ).run(
           input.title,
           input.description,
@@ -659,6 +664,7 @@ export function createApp({
           input.lng,
           input.price,
           input.deposit,
+          input.originalPrice,
           input.bedrooms,
           input.bathrooms,
           input.roomType,

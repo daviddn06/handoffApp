@@ -27,6 +27,7 @@ const validListing = (photos = [], overrides = {}) => ({
   roomType: "private",
   availableFrom: "2099-01-01",
   availableTo: "2099-06-30",
+  originalPrice: null,
   amenities: ["Furnished", "Laundry"],
   photos,
   status: "active",
@@ -643,6 +644,34 @@ test("search filters cover dates, reject injection, and prevent requests for exp
     ).status,
     400,
   );
+  const cheaper = await env.publish(owner, {
+    title: "Below lease room",
+    price: 900,
+    originalPrice: 1200,
+  });
+  assert.equal(cheaper.originalPrice, 1200);
+  const bySavings = await env.client().call("/api/listings?sort=savings");
+  assert.equal(bySavings.status, 200);
+  assert.equal(bySavings.body.listings[0].id, cheaper.id);
+  assert.equal(bySavings.body.listings[1].originalPrice, null);
+  assert.equal(
+    (
+      await owner.call("/api/listings", {
+        method: "POST",
+        body: validListing([], { originalPrice: 99999 }),
+      })
+    ).status,
+    400,
+  );
+  assert.equal(
+    (
+      await owner.call(`/api/listings/${cheaper.id}`, {
+        method: "PATCH",
+        body: { status: "archived" },
+      })
+    ).status,
+    200,
+  );
   assert.equal(
     (await env.client().call("/api/listings?from=2099-02-30")).status,
     400,
@@ -908,7 +937,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
   assert.equal(login.headers.get("referrer-policy"), "no-referrer");
   assert.match(
     login.headers.get("content-security-policy"),
-    /frame-ancestors 'none'/,
+    /frame-ancestors 'self' https:\/\/handofflease\.com https:\/\/www\.handofflease\.com/,
   );
   assert.equal(login.headers.get("cache-control"), "no-store");
   const reopened = createApp({
@@ -928,7 +957,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 2);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 3);
   assert.throws(
     () =>
       createApp({
@@ -1221,7 +1250,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   t.after(() => rm(dataDir, { recursive: true, force: true }));
   const initial = createApp({ dataDir, mailTransport: null, origin: ORIGIN });
   initial.locals.db.exec(
-    "ALTER TABLE listings DROP COLUMN moderation_locked; PRAGMA user_version=1;",
+    "ALTER TABLE listings DROP COLUMN moderation_locked; ALTER TABLE listings DROP COLUMN original_price; PRAGMA user_version=1;",
   );
   initial.locals.db
     .prepare(
@@ -1241,14 +1270,16 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      2,
+      3,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
       "Preserved Student",
     );
-    const files = await readdir(join(dataDir, "backups"));
-    assert.equal(files.length, 1);
+    const files = (await readdir(join(dataDir, "backups"))).sort();
+    assert.equal(files.length, 2);
+    assert.match(files[0], /^before-schema-2-/);
+    assert.match(files[1], /^before-schema-3-/);
     const backup = new Database(join(dataDir, "backups", files[0]), {
       readonly: true,
     });

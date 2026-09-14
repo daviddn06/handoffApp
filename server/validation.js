@@ -46,6 +46,7 @@ export const listingSchema = z
     lng: z.number().finite().min(-180).max(180),
     price: z.number().int().min(0).max(50000).default(0),
     deposit: z.number().int().min(0).max(100000).default(0),
+    originalPrice: z.number().int().min(0).max(50000).nullable().default(null),
     bedrooms: z.number().int().min(0).max(20).default(1),
     bathrooms: z.number().min(0).max(20).multipleOf(0.5).default(1),
     roomType: z.enum(["private", "shared", "entire"]).default("private"),
@@ -95,7 +96,9 @@ export const listingQuerySchema = z
     roomType: z.enum(["private", "shared", "entire"]).optional(),
     bedrooms: z.coerce.number().int().min(0).max(20).optional(),
     amenities: text(1000).optional(),
-    sort: z.enum(["newest", "price_asc", "price_desc"]).default("newest"),
+    sort: z
+      .enum(["newest", "price_asc", "price_desc", "savings"])
+      .default("newest"),
   })
   .strict()
   .refine(

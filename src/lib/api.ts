@@ -82,3 +82,10 @@ export function safeNext(value: string | null) {
     ? value
     : "/browse";
 }
+/** Monthly savings against the original lease, or null when not shared or not lower. */
+export function savings(listing: { price: number; originalPrice?: number | null }) {
+  const original = listing.originalPrice;
+  if (!original || original <= listing.price) return null;
+  const amount = original - listing.price;
+  return { amount, percent: Math.round((amount / original) * 100), original };
+}

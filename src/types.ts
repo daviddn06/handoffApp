@@ -26,6 +26,8 @@ export type Listing = {
   lng: number;
   price: number;
   deposit: number;
+  /** What the lister pays on the original lease, when shared. */
+  originalPrice: number | null;
   bedrooms: number;
   bathrooms: number;
   roomType: "private" | "shared" | "entire";

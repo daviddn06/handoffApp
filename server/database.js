@@ -13,7 +13,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 2) {
+  if (version > 3) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -70,6 +70,7 @@ export function openDatabase(dataDir) {
         amenities TEXT NOT NULL DEFAULT '[]', photos TEXT NOT NULL DEFAULT '[]',
         status TEXT NOT NULL CHECK(status IN ('draft','active','handed_off','archived')),
         moderation_locked INTEGER NOT NULL DEFAULT 0,
+        original_price INTEGER,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE INDEX listings_discovery ON listings(status, campus_id, available_to);
@@ -92,7 +93,7 @@ export function openDatabase(dataDir) {
         id TEXT PRIMARY KEY, listing_id TEXT NOT NULL REFERENCES listings(id), reporter_id TEXT NOT NULL REFERENCES users(id),
         reason TEXT NOT NULL, details TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL
       );
-      PRAGMA user_version = 2;
+      PRAGMA user_version = 3;
     `);
     })();
   if (version === 1) {
@@ -107,6 +108,23 @@ export function openDatabase(dataDir) {
         "ALTER TABLE listings ADD COLUMN moderation_locked INTEGER NOT NULL DEFAULT 0",
       );
       db.pragma("user_version = 2");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 2) {
+    const backupDir = join(dataDir, "backups");
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const backup = join(backupDir, `before-schema-3-${Date.now()}.sqlite`);
+    db.prepare("VACUUM INTO ?").run(backup);
+    chmodSync(backup, 0o600);
+    db.transaction(() => {
+      // What the lister currently pays, so students can see the savings.
+      const columns = db
+        .prepare("PRAGMA table_info(listings)")
+        .all()
+        .map((column) => column.name);
+      if (!columns.includes("original_price"))
+        db.exec("ALTER TABLE listings ADD COLUMN original_price INTEGER");
+      db.pragma("user_version = 3");
     })();
   }
   return db;

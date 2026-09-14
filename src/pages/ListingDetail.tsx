@@ -1,24 +1,34 @@
-import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowRight,
+  ArrowUpRight,
   Bath,
   BedDouble,
   CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
+  DoorOpen,
   Flag,
+  Footprints,
   Grid2X2,
   Image,
-  MapPin,
-  ShieldCheck,
   Mail,
+  MapPin,
   MessageSquare,
-  ArrowUpRight,
+  ShieldCheck,
+  Sofa,
+  Wallet,
 } from "lucide-react";
 import {
-  AMENITIES,
   ROOM_LABELS,
   STATUS_LABELS,
   type HandoffRequest,
@@ -31,19 +41,50 @@ import {
   json,
   money,
   useResource,
+  savings,
 } from "../lib/api";
 import { useApp } from "../lib/context";
-import {
-  BackLink,
-  Button,
-  ErrorBox,
-  Field,
-  Loading,
-  Modal,
-  Notice,
-} from "../components/ui";
+import { BackLink, Button, ErrorBox, Field, Loading, Modal } from "../components/ui";
 import { SaveButton } from "../components/ListingCard";
+import { distanceLabel, milesBetween } from "../lib/dps";
 const Map = lazy(() => import("../components/Map"));
+
+function DetailSkeleton() {
+  return (
+    <div className="page-container detail-page" aria-busy="true">
+      <div className="detail-top">
+        <span className="skeleton sk-line sk-back" />
+      </div>
+      <div className="gallery gallery-skeleton">
+        <span className="skeleton sk-photo" />
+        <span className="skeleton sk-photo" />
+        <span className="skeleton sk-photo" />
+        <span className="skeleton sk-photo" />
+        <span className="skeleton sk-photo" />
+      </div>
+      <div className="detail-layout">
+        <div className="detail-main">
+          <div className="sk-block">
+            <span className="skeleton sk-line" style={{ width: "30%" }} />
+            <span className="skeleton sk-line sk-title" />
+            <span className="skeleton sk-line" style={{ width: "45%" }} />
+          </div>
+          <span className="skeleton sk-strip" />
+          <div className="sk-block">
+            <span className="skeleton sk-line" style={{ width: "92%" }} />
+            <span className="skeleton sk-line" style={{ width: "85%" }} />
+            <span className="skeleton sk-line" style={{ width: "60%" }} />
+          </div>
+          <span className="skeleton sk-map" />
+        </div>
+        <aside className="detail-aside">
+          <span className="skeleton sk-card" />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 export default function ListingDetail() {
   const { id } = useParams(),
     { user, campuses, notify } = useApp();
@@ -55,6 +96,7 @@ export default function ListingDetail() {
     outgoing: HandoffRequest[];
   }>(user ? "/requests" : null);
   const [photo, setPhoto] = useState<number | null>(null),
+    [requestOpen, setRequestOpen] = useState(false),
     [reportOpen, setReportOpen] = useState(false),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
@@ -69,6 +111,7 @@ export default function ListingDetail() {
     setMessage("");
     setCreatedRequest(null);
     setRequestError("");
+    setRequestOpen(false);
     setReportOpen(false);
     setReportError("");
   }, [id]);
@@ -128,7 +171,7 @@ export default function ListingDetail() {
       setReportBusy(false);
     }
   }
-  if (loading) return <Loading label="Opening this place…" />;
+  if (loading) return <DetailSkeleton />;
   if (error || !listing)
     return (
       <div className="page-container narrow">
@@ -139,120 +182,186 @@ export default function ListingDetail() {
         />
       </div>
     );
+  const photos = listing.photos;
+  const miles = campus ? milesBetween(campus, listing) : null;
+  const beds =
+    listing.bedrooms === 0
+      ? "Studio"
+      : `${listing.bedrooms} bedroom${listing.bedrooms === 1 ? "" : "s"}`;
+  const furnished = listing.amenities.some((a) => /furnish/i.test(a));
+  const facts: Array<{ icon: ReactNode; label: string }> = [
+    { icon: <BedDouble size={16} />, label: beds },
+    {
+      icon: <Bath size={16} />,
+      label: `${listing.bathrooms} bath${listing.bathrooms === 1 ? "" : "s"}`,
+    },
+    { icon: <DoorOpen size={16} />, label: ROOM_LABELS[listing.roomType] },
+    {
+      icon: <CalendarDays size={16} />,
+      label: `${dateLabel(listing.availableFrom)} to ${dateLabel(listing.availableTo)}`,
+    },
+    {
+      icon: <Wallet size={16} />,
+      label: listing.deposit
+        ? `${money(listing.deposit)} deposit`
+        : "No deposit",
+    },
+  ];
+  if (furnished)
+    facts.splice(3, 0, { icon: <Sofa size={16} />, label: "Furnished" });
+  const save = savings(listing);
+  const initials =
+    listing.ownerName
+      ?.split(" ")
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("") || "S";
+  const signInTo = `/sign-in?next=${encodeURIComponent("/listings/" + id)}`;
+
+  function primaryAction(size: "large" | "small") {
+    if (!listing) return null;
+    const cls = `button primary full-width${size === "large" ? " large" : ""}`;
+    if (own)
+      return (
+        <Link className={cls} to="/requests">
+          View requests
+          <ArrowRight size={17} />
+        </Link>
+      );
+    if (request)
+      return (
+        <Link className={cls} to="/requests?tab=outgoing">
+          Go to requests
+          <ArrowRight size={17} />
+        </Link>
+      );
+    if (!user)
+      return (
+        <Link className={cls} to={signInTo}>
+          Sign in to request
+          <ArrowRight size={17} />
+        </Link>
+      );
+    return (
+      <button className={cls} onClick={() => setRequestOpen(true)}>
+        <MessageSquare size={17} />
+        Request handoff
+      </button>
+    );
+  }
+
   return (
     <div className="page-container detail-page">
-      <div className="detail-topline">
+      <div className="detail-top">
         <BackLink />
         <div className="detail-top-actions">
           {listing.status !== "active" && (
-            <span className={`status-badge ${listing.status}`}>
+            <span className={`pill ${listing.status === "handed_off" ? "blue" : "amber"}`}>
               {STATUS_LABELS[listing.status]}
             </span>
           )}
-          {!own && (
-            <SaveButton
-              key={`${listing.id}-${listing.saved}`}
-              listing={listing}
-              large
-            />
-          )}
           {own && (
             <Link
-              className="button secondary"
+              className="button secondary small"
               to={`/listings/${listing.id}/edit`}
             >
               Edit listing
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={15} />
             </Link>
           )}
         </div>
       </div>
-      <div
-        className={`photo-gallery photos-${Math.min(listing.photos.length, 3)}`}
-      >
-        {listing.photos.length ? (
-          listing.photos.slice(0, 3).map((url, i) => (
+
+      <div className={`gallery count-${Math.min(photos.length, 5)}`}>
+        {photos.length ? (
+          photos.map((url, i) => (
             <button
               key={url}
               onClick={() => setPhoto(i)}
-              className={`gallery-photo photo-${i}`}
-              aria-label={`View photo ${i + 1} of ${listing.photos.length}`}
+              className="gallery-photo"
+              aria-label={`View photo ${i + 1} of ${photos.length}`}
             >
-              <img src={url} alt={`${listing.title}, photo ${i + 1}`} />
+              <img
+                src={url}
+                alt={`${listing.title}, photo ${i + 1}`}
+                loading={i > 1 ? "lazy" : undefined}
+              />
             </button>
           ))
         ) : (
           <div className="gallery-empty">
-            <Image size={35} />
+            <Image size={26} strokeWidth={1.4} />
             <span>No photos added yet</span>
           </div>
         )}
-        {listing.photos.length > 1 && (
+        {photos.length > 1 && (
           <button
-            className="button secondary all-photos"
+            className="button secondary small all-photos"
             onClick={() => setPhoto(0)}
           >
-            <Grid2X2 size={16} />
-            All {listing.photos.length} photos
+            <Grid2X2 size={15} />
+            Show all {photos.length} photos
           </button>
         )}
       </div>
+
       <div className="detail-layout">
-        <div className="detail-content">
-          <div className="detail-heading">
+        <div className="detail-main enter-stagger">
+          <header className="detail-head">
             <div className="eyebrow">
               {ROOM_LABELS[listing.roomType]} · {campus?.shortName}
             </div>
             <h1>{listing.title}</h1>
-            <p>
-              <MapPin size={17} />
-              {listing.address}
+            <p className="detail-address">
+              <MapPin size={15} />
+              <span>{listing.address}</span>
             </p>
-          </div>
-          <div className="property-facts">
-            <span>
-              <BedDouble size={22} />
-              {listing.bedrooms === 0
-                ? "Studio"
-                : `${listing.bedrooms} bedroom${listing.bedrooms === 1 ? "" : "s"}`}
-            </span>
-            <span>
-              <Bath size={22} />
-              {listing.bathrooms} bathroom{listing.bathrooms === 1 ? "" : "s"}
-            </span>
-            <span>
-              <CalendarDays size={22} />
-              {dateLabel(listing.availableFrom)} to{" "}
-              {dateLabel(listing.availableTo, true)}
-            </span>
-          </div>
+            {miles !== null && campus && (
+              <p className="detail-distance">
+                <Footprints size={15} />
+                {distanceLabel(miles)} to {campus.shortName}
+              </p>
+            )}
+          </header>
+
+          <ul className="fact-strip">
+            {facts.map((f) => (
+              <li key={f.label}>
+                {f.icon}
+                <span>{f.label}</span>
+              </li>
+            ))}
+          </ul>
+
           <section className="detail-section">
-            <h2>A little about the place</h2>
+            <h2>About the place</h2>
             <p className="preserve-lines">
               {listing.description ||
                 "The student hasn’t added a description yet."}
             </p>
           </section>
+
           {listing.amenities.length > 0 && (
             <section className="detail-section">
               <h2>What comes with it</h2>
-              <div className="amenity-list">
+              <ul className="amenity-grid">
                 {listing.amenities.map((a) => (
-                  <div key={a}>
-                    <Check size={18} />
-                    {AMENITIES.includes(a) ? a : a}
-                  </div>
+                  <li key={a}>
+                    <Check size={14} />
+                    {a}
+                  </li>
                 ))}
-              </div>
+              </ul>
             </section>
           )}
+
           <section className="detail-section">
-            <h2>Your neighborhood</h2>
-            <p>{listing.address}</p>
+            <h2>The neighborhood</h2>
             {campus && (
               <div className="detail-map">
                 <Suspense fallback={<Loading label="Loading location…" />}>
                   <Map
+                    compact
                     campus={campus}
                     pin={{ lat: listing.lat, lng: listing.lng }}
                   />
@@ -264,24 +373,20 @@ export default function ListingDetail() {
               a visit before committing.
             </p>
           </section>
-          <section className="owner-section">
-            <span className="avatar large">
-              {listing.ownerName
-                ?.split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("") || "S"}
-            </span>
-            <div>
-              <h2>Listed by {listing.ownerName || "a student"}</h2>
-              <p>
-                <ShieldCheck size={15} />
-                {campus?.shortName} student
-              </p>
+
+          <section className="host-card">
+            <span className="avatar large">{initials}</span>
+            <div className="host-text">
+              <strong>Listed by {listing.ownerName || "a student"}</strong>
+              <span className="host-verified">
+                <ShieldCheck size={14} />
+                Verified {campus?.shortName} student
+              </span>
             </div>
           </section>
+
           <div className="detail-guidance">
-            <ShieldCheck size={22} />
+            <ShieldCheck size={18} />
             <div>
               <strong>A thoughtful handoff starts with a conversation.</strong>
               <p>
@@ -291,171 +396,172 @@ export default function ListingDetail() {
               </p>
             </div>
           </div>
+
           {!own && (
             <button className="report-link" onClick={() => setReportOpen(true)}>
-              <Flag size={15} />
+              <Flag size={14} />
               Report this listing
             </button>
           )}
         </div>
-        <aside className="request-sidebar">
+
+        <aside className="detail-aside">
           <div className="request-card">
-            <div className="detail-price">
+            <div className="request-price">
               <strong>{money(listing.price)}</strong>
               <span>/ month</span>
+              {save && <s className="request-original">{money(save.original)}</s>}
             </div>
-            <div className="cost-row">
-              <span>Security deposit</span>
-              <strong>
-                {listing.deposit ? money(listing.deposit) : "None listed"}
-              </strong>
-            </div>
-            <div className="availability-box">
-              <CalendarDays size={18} />
+            {save && (
+              <div className="savings-box">
+                <strong>You save {money(save.amount)} a month</strong>
+                <span>
+                  {save.percent}% below the original lease of{" "}
+                  {money(save.original)}. Both sides win, the lister covers
+                  their rent and you pay less.
+                </span>
+              </div>
+            )}
+            <div className="request-dates">
+              <CalendarDays size={16} />
               <div>
-                <span>Available</span>
+                <small>Available</small>
                 <strong>
                   {dateLabel(listing.availableFrom, true)} to{" "}
                   {dateLabel(listing.availableTo, true)}
                 </strong>
               </div>
             </div>
+            <div className="request-line">
+              <span>Security deposit</span>
+              <strong>
+                {listing.deposit ? money(listing.deposit) : "None listed"}
+              </strong>
+            </div>
             {own ? (
               <>
-                <p className="request-description">
-                  This is your listing. Manage its availability and incoming
+                <p className="request-note">
+                  This is your listing. Manage availability and incoming
                   requests from your dashboard.
                 </p>
-                <Link className="button primary full-width" to="/requests">
-                  View requests
-                  <ArrowRight size={17} />
-                </Link>
-                <Link className="button secondary full-width" to="/my-listings">
-                  Manage listing
-                </Link>
+                <div className="request-actions">
+                  {primaryAction("large")}
+                  <Link className="button secondary full-width" to="/my-listings">
+                    Manage listing
+                  </Link>
+                </div>
               </>
             ) : request ? (
-              <div className="request-confirmation">
-                <div className="confirmation-icon">
-                  <Check size={23} />
-                </div>
-                <h2>
-                  {request.status === "accepted"
-                    ? "You’re connected."
-                    : "Your request is in."}
-                </h2>
-                <p>
-                  {request.status === "accepted"
-                    ? `${listing.ownerName.split(" ")[0]} accepted your request. Get in touch to talk through the details.`
-                    : "The student will review your message. Check Requests for updates."}
-                </p>
-                {request.contact && (
-                  <a
-                    className="button primary full-width"
-                    href={`mailto:${request.contact.email}`}
-                  >
-                    <Mail size={17} />
-                    Email {request.contact.name.split(" ")[0]}
-                  </a>
-                )}
-                <Link
-                  className={`button ${request.contact ? "secondary" : "primary"} full-width`}
-                  to="/requests?tab=outgoing"
-                >
-                  Go to requests
-                  <ArrowRight size={17} />
-                </Link>
-              </div>
-            ) : user ? (
-              <form onSubmit={sendRequest}>
-                <h2 className="request-title">
-                  Could this be your next place?
-                </h2>
-                <p className="request-description">
-                  Introduce yourself and share your dates. Your email is shared
-                  only if they accept.
-                </p>
-                <Field label="Your message">
-                  <textarea
-                    required
-                    minLength={20}
-                    maxLength={2000}
-                    rows={5}
-                    placeholder="Hi! I’m looking for a place for the spring semester…"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                  />
-                  <span className="field-hint">
-                    At least 20 characters. Keep contact details out of this
-                    message.
+              <>
+                <div className="request-status">
+                  <span className="pill green">
+                    <Check size={12} />
+                    {request.status === "accepted" ? "Accepted" : "Request sent"}
                   </span>
-                </Field>
-                {requestError && <ErrorBox message={requestError} />}
-                <Button className="full-width" type="submit" busy={busy}>
-                  <MessageSquare size={17} />
-                  Send a request
-                </Button>
-                <p className="request-fineprint">
-                  No payment or commitment required.
-                </p>
-              </form>
+                  <p>
+                    {request.status === "accepted"
+                      ? `${listing.ownerName.split(" ")[0]} accepted your request. Get in touch to talk through the details.`
+                      : "The student will review your message. Check Requests for updates."}
+                  </p>
+                </div>
+                <div className="request-actions">
+                  {request.contact && (
+                    <a
+                      className="button primary full-width large"
+                      href={`mailto:${request.contact.email}`}
+                    >
+                      <Mail size={17} />
+                      Email {request.contact.name.split(" ")[0]}
+                    </a>
+                  )}
+                  {request.contact ? (
+                    <Link
+                      className="button secondary full-width"
+                      to="/requests?tab=outgoing"
+                    >
+                      Go to requests
+                      <ArrowRight size={16} />
+                    </Link>
+                  ) : (
+                    primaryAction("large")
+                  )}
+                  <SaveButton
+                    key={`${listing.id}-${listing.saved}`}
+                    listing={listing}
+                    large
+                    size="large"
+                  />
+                </div>
+              </>
             ) : (
               <>
-                <h2 className="request-title">
-                  Could this be your next place?
-                </h2>
-                <p className="request-description">
-                  Sign in with your student account to ask about the place and
-                  connect.
+                <p className="request-note">
+                  {user
+                    ? "Introduce yourself and share your dates. Your email is shared only if they accept."
+                    : "Sign in with your student account to ask about the place and connect."}
                 </p>
-                <Link
-                  className="button primary full-width"
-                  to={`/sign-in?next=${encodeURIComponent("/listings/" + id)}`}
-                >
-                  Sign in to connect
-                  <ArrowRight size={17} />
-                </Link>
+                <div className="request-actions">
+                  {primaryAction("large")}
+                  <SaveButton
+                    key={`${listing.id}-${listing.saved}`}
+                    listing={listing}
+                    large
+                    size="large"
+                  />
+                </div>
                 <p className="request-fineprint">
                   No payment or commitment required.
                 </p>
               </>
             )}
+            {listing.status !== "active" && (
+              <p className="request-status-note">
+                This listing is {STATUS_LABELS[listing.status].toLowerCase()}.
+              </p>
+            )}
           </div>
         </aside>
       </div>
+
+      <div className="detail-bar">
+        <div className="request-price">
+          <strong>{money(listing.price)}</strong>
+          <span>/ mo</span>
+          {save && <em className="savings-tag">Save {money(save.amount)}</em>}
+        </div>
+        <div className="detail-bar-actions">{primaryAction("small")}</div>
+      </div>
+
       <Modal
         open={photo !== null}
         onClose={() => setPhoto(null)}
-        title={`Photos · ${(photo || 0) + 1} of ${listing.photos.length}`}
+        title={`Photos · ${(photo || 0) + 1} of ${photos.length}`}
         wide
       >
         {photo !== null && (
           <div className="photo-viewer">
             <img
-              src={listing.photos[photo]}
+              src={photos[photo]}
               alt={`${listing.title}, photo ${photo + 1}`}
             />
-            {listing.photos.length > 1 && (
+            {photos.length > 1 && (
               <div className="photo-controls">
                 <button
-                  className="button secondary"
+                  className="icon-button"
                   aria-label="Previous photo"
                   onClick={() =>
-                    setPhoto(
-                      (photo - 1 + listing.photos.length) %
-                        listing.photos.length,
-                    )
+                    setPhoto((photo - 1 + photos.length) % photos.length)
                   }
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <span>
-                  {photo + 1} / {listing.photos.length}
+                  {photo + 1} / {photos.length}
                 </span>
                 <button
-                  className="button secondary"
+                  className="icon-button"
                   aria-label="Next photo"
-                  onClick={() => setPhoto((photo + 1) % listing.photos.length)}
+                  onClick={() => setPhoto((photo + 1) % photos.length)}
                 >
                   <ChevronRight size={20} />
                 </button>
@@ -464,6 +570,78 @@ export default function ListingDetail() {
           </div>
         )}
       </Modal>
+
+      <Modal
+        open={requestOpen}
+        onClose={() => setRequestOpen(false)}
+        title={createdRequest ? "Request sent" : "Request this handoff"}
+      >
+        {createdRequest ? (
+          <div className="request-sent">
+            <span className="t-success-check" data-state="in" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" width="46" height="46">
+                <path
+                  d="M14 24.5 21 31.5 34 17.5"
+                  stroke="currentColor"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <h3>Your request is in.</h3>
+            <p className="muted">
+              {listing.ownerName.split(" ")[0]} will review your message. You
+              can follow it in Requests.
+            </p>
+            <div className="modal-actions">
+              <Link
+                className="button secondary"
+                to="/requests?tab=outgoing"
+                onClick={() => setRequestOpen(false)}
+              >
+                Go to requests
+              </Link>
+              <Button variant="primary" onClick={() => setRequestOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form className="request-form" onSubmit={sendRequest}>
+            <p className="muted">
+              Introduce yourself and share your dates. Your email is shared only
+              if they accept.
+            </p>
+            <Field label="Your message">
+              <textarea
+                required
+                minLength={20}
+                maxLength={2000}
+                rows={5}
+                placeholder="Hi! I’m looking for a place for the spring semester…"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+              <span className="field-hint">
+                At least 20 characters. Keep contact details out of this
+                message.
+              </span>
+            </Field>
+            {requestError && <ErrorBox message={requestError} />}
+            <div className="modal-actions">
+              <span className="request-fineprint">
+                No payment or commitment required.
+              </span>
+              <Button type="submit" busy={busy}>
+                <MessageSquare size={17} />
+                Send request
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       <Modal
         open={reportOpen}
         onClose={() => setReportOpen(false)}
@@ -474,10 +652,7 @@ export default function ListingDetail() {
             <p className="muted">
               Sign in to submit a report so we can follow up if needed.
             </p>
-            <Link
-              className="button primary full-width"
-              to={`/sign-in?next=${encodeURIComponent("/listings/" + id)}`}
-            >
+            <Link className="button primary full-width" to={signInTo}>
               Sign in
               <ArrowRight size={17} />
             </Link>

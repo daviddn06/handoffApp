@@ -15,11 +15,11 @@ POST /api/auth/forgot {email} -> {message:string}
 POST /api/auth/reset {token,password} -> {message:string}
 PATCH /api/profile {name,bio} -> {user:User}
 
-Listing {id,ownerId,ownerName,campusId,title,description,address,lat,lng,price,deposit,bedrooms,bathrooms,roomType:'private'|'shared'|'entire',availableFrom,availableTo,amenities:string[],photos:string[],status:'draft'|'active'|'handed_off'|'archived',createdAt,updatedAt,saved?:boolean}
-GET /api/listings?campusId=&query=&minPrice=&maxPrice=&from=&to=&roomType=&bedrooms=&amenities=&sort=newest|price_asc|price_desc -> {listings:Listing[]}. Active public listings only, no private contact data. Dates must cover the requested stay.
+Listing {id,ownerId,ownerName,campusId,title,description,address,lat,lng,price,deposit,originalPrice:number|null,bedrooms,bathrooms,roomType:'private'|'shared'|'entire',availableFrom,availableTo,amenities:string[],photos:string[],status:'draft'|'active'|'handed_off'|'archived',createdAt,updatedAt,saved?:boolean}
+GET /api/listings?campusId=&query=&minPrice=&maxPrice=&from=&to=&roomType=&bedrooms=&amenities=&sort=newest|price_asc|price_desc|savings -> {listings:Listing[]}. Active public listings only, no private contact data. Dates must cover the requested stay.
 GET /api/listings/:id -> {listing:Listing}. Public active or owner only.
 GET /api/my-listings -> {listings:Listing[]}
-POST /api/listings {title,description,address,lat,lng,price,deposit,bedrooms,bathrooms,roomType,availableFrom,availableTo,amenities,photos,status:'draft'|'active'} -> {listing:Listing}
+POST /api/listings {title,description,address,lat,lng,price,deposit,originalPrice?,bedrooms,bathrooms,roomType,availableFrom,availableTo,amenities,photos,status:'draft'|'active'} -> {listing:Listing}
 PATCH /api/listings/:id same partial fields incl status -> {listing:Listing}. Owner only.
 POST /api/uploads multipart field photos up to 8 files -> {photos:string[]}. Auth required, raster validated/reencoded, maximum 8 MB each, stored on VPS.
 GET /api/saved -> {listings:Listing[]}
