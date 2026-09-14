@@ -1,0 +1,21 @@
+handofflease.com, www.handofflease.com {
+    encode zstd gzip
+    @legacyBrowse path /listings
+    redir @legacyBrowse https://app.handofflease.com/browse temporary
+    @legacyRequests path /dashboard/requests
+    redir @legacyRequests https://app.handofflease.com/requests temporary
+    @legacySaved path /dashboard/saved
+    redir @legacySaved https://app.handofflease.com/saved temporary
+    @legacyDashboard path /dashboard /dashboard/listings
+    redir @legacyDashboard https://app.handofflease.com/my-listings temporary
+    @appRoutes path /browse /listings/* /saved /requests /my-listings /profile /sign-in /sign-up /verify /forgot-password /reset-password
+    redir @appRoutes https://app.handofflease.com{uri} temporary
+    root * /opt/handoff-marketing
+    try_files {path} /index.html
+    file_server
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+}

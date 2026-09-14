@@ -1,0 +1,1121 @@
+import express from "express";
+import multer from "multer";
+import sharp from "sharp";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { z } from "zod";
+import { CAMPUSES, configuredMailTransport } from "./config.js";
+import { openDatabase } from "./database.js";
+import {
+  hashToken,
+  randomToken,
+  hashPassword,
+  checkPassword,
+  cookies,
+  HttpError,
+  rateLimiter,
+} from "./security.js";
+import {
+  parse,
+  email,
+  token,
+  password,
+  signupSchema,
+  loginSchema,
+  profileSchema,
+  createListingSchema,
+  patchListingSchema,
+  listingQuerySchema,
+  listingSchema,
+  requestSchema,
+  requestUpdateSchema,
+  reportSchema,
+  today,
+  validateListing,
+} from "./validation.js";
+
+const SESSION_AGE = 30 * 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+const GENERIC_EMAIL_MESSAGE =
+  "If this email is eligible, you will receive a link shortly. Check your spam folder too.";
+const listingFields = "l.*, u.name AS owner_name";
+const listingJoin = "listings l JOIN users u ON u.id=l.owner_id";
+const iso = () => new Date().toISOString();
+const escapeHtml = (value) =>
+  String(value).replace(
+    /[&<>"']/g,
+    (character) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        character
+      ],
+  );
+
+export function createApp({
+  dataDir = process.env.HANDOFF_DATA_DIR || resolve("data"),
+  mailTransport,
+  origin = process.env.HANDOFF_ORIGIN || "https://app.handofflease.com",
+  secureCookies,
+  mailFrom = process.env.MAIL_FROM || "Handoff <hello@handofflease.com>",
+  staticDir = resolve(dirname(fileURLToPath(import.meta.url)), "../dist"),
+} = {}) {
+  const parsedOrigin = new URL(origin);
+  if (
+    !["https:", "http:"].includes(parsedOrigin.protocol) ||
+    parsedOrigin.origin !== origin
+  )
+    throw new Error(
+      "HANDOFF_ORIGIN must be an origin without a trailing slash or path.",
+    );
+  if (
+    parsedOrigin.protocol !== "https:" &&
+    !["localhost", "127.0.0.1", "[::1]"].includes(parsedOrigin.hostname)
+  )
+    throw new Error("Public Handoff deployments require HTTPS.");
+  const useSecureCookies = secureCookies ?? parsedOrigin.protocol === "https:";
+  if (!useSecureCookies && parsedOrigin.protocol === "https:")
+    throw new Error("HTTPS deployments require secure cookies.");
+  const transport =
+    mailTransport === undefined ? configuredMailTransport() : mailTransport;
+  const emailReady = Boolean(
+    transport && typeof transport.sendMail === "function",
+  );
+  const db = openDatabase(resolve(dataDir));
+  const uploadDir = join(resolve(dataDir), "uploads");
+  const app = express();
+  const limit = rateLimiter(db);
+  const cookieName = useSecureCookies
+    ? "__Host-handoff_session"
+    : "handoff_session";
+  app.disable("x-powered-by");
+  app.set("trust proxy", "loopback");
+  app.locals.db = db;
+  app.locals.close = () => {
+    if (db.open) {
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      db.close();
+    }
+  };
+  app.locals.emailReady = emailReady;
+  app.use((req, res, next) => {
+    res.set({
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+      "X-Frame-Options": "DENY",
+      "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+      "Content-Security-Policy":
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    });
+    if (useSecureCookies)
+      res.set("Strict-Transport-Security", "max-age=31536000");
+    if (req.path.startsWith("/api/")) res.set("Cache-Control", "no-store");
+    next();
+  });
+  app.use("/api", (req, res, next) => {
+    if (
+      !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+      req.get("Origin") !== origin
+    )
+      return next(
+        new HttpError(
+          403,
+          "This request must come from Handoff. Refresh the page and try again.",
+        ),
+      );
+    next();
+  });
+  app.use(express.json({ limit: "96kb", strict: true }));
+  app.use((req, res, next) => {
+    const sessionToken = cookies(req.get("Cookie"))[cookieName];
+    if (sessionToken && /^[A-Za-z0-9_-]{43}$/.test(sessionToken)) {
+      req.user = db
+        .prepare(
+          "SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?",
+        )
+        .get(hashToken(sessionToken), Date.now());
+      req.sessionHash = hashToken(sessionToken);
+    }
+    next();
+  });
+  const requireUser = (req, res, next) =>
+    req.user?.verified_at
+      ? next()
+      : next(
+          new HttpError(
+            401,
+            "Sign in with your verified student account to continue.",
+          ),
+        );
+  const requireMail = (req, res, next) =>
+    emailReady
+      ? next()
+      : next(
+          new HttpError(
+            503,
+            "Student email delivery is not available yet. Please try again later.",
+          ),
+        );
+  const accountIdentity = (req) =>
+    typeof req.body?.email === "string"
+      ? req.body.email.trim().toLowerCase()
+      : req.ip;
+  const serializeUser = (user) => ({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    campusId: user.campus_id,
+    verified: Boolean(user.verified_at),
+    bio: user.bio,
+  });
+  const setSession = (res, userId) => {
+    const value = randomToken();
+    db.prepare(
+      "INSERT INTO sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)",
+    ).run(hashToken(value), userId, Date.now(), Date.now() + SESSION_AGE);
+    res.cookie(cookieName, value, {
+      httpOnly: true,
+      secure: useSecureCookies,
+      sameSite: "lax",
+      path: "/",
+      maxAge: SESSION_AGE,
+    });
+  };
+  const clearSession = (res) =>
+    res.clearCookie(cookieName, {
+      httpOnly: true,
+      secure: useSecureCookies,
+      sameSite: "lax",
+      path: "/",
+    });
+  const invalidateTokens = (userId, kind) =>
+    db
+      .prepare(
+        "UPDATE auth_tokens SET consumed_at=? WHERE user_id=? AND kind=? AND consumed_at IS NULL",
+      )
+      .run(Date.now(), userId, kind);
+  const validToken = (value, kind) => {
+    const found = db
+      .prepare(
+        "SELECT * FROM auth_tokens WHERE token_hash=? AND kind=? AND consumed_at IS NULL AND expires_at>?",
+      )
+      .get(hashToken(value), kind, Date.now());
+    if (!found)
+      throw new HttpError(
+        400,
+        "This link has expired or already been used. Request a new one.",
+      );
+    return found;
+  };
+  const sendMail = async (to, subject, text, html) => {
+    if (!emailReady) throw new Error("Email delivery is not configured.");
+    const delivery = await transport.sendMail({
+      from: mailFrom,
+      to,
+      subject,
+      text,
+      html,
+    });
+    if (delivery?.rejected?.length)
+      throw new Error("Email provider rejected recipient.");
+  };
+  const sendToken = async (user, kind) => {
+    const value = randomToken();
+    const key = hashToken(value);
+    const expiry = kind === "verify" ? 24 * HOUR : HOUR;
+    // Persist before delivery. A failed send invalidates only this token, preserving earlier valid links.
+    db.prepare(
+      "INSERT INTO auth_tokens(token_hash,user_id,kind,expires_at,created_at) VALUES(?,?,?,?,?)",
+    ).run(key, user.id, kind, Date.now() + expiry, Date.now());
+    const link = `${origin}/${kind === "verify" ? "verify" : "reset-password"}?token=${encodeURIComponent(value)}`;
+    const action =
+      kind === "verify" ? "Verify your student email" : "Reset your password";
+    const expiryText = kind === "verify" ? "24 hours" : "1 hour";
+    try {
+      await sendMail(
+        user.email,
+        `${action} for Handoff`,
+        `${action}\n\n${link}\n\nThis link expires in ${expiryText} and works once. If you did not request this, ignore this email.`,
+        `<p>${escapeHtml(action)}</p><p><a href="${link}">${escapeHtml(action)}</a></p><p>This link expires in ${expiryText} and works once. If you did not request this, ignore this email.</p>`,
+      );
+    } catch {
+      db.prepare("UPDATE auth_tokens SET consumed_at=? WHERE token_hash=?").run(
+        Date.now(),
+        key,
+      );
+      throw new HttpError(
+        503,
+        "We could not deliver your email. Please try again shortly.",
+      );
+    }
+  };
+
+  app.get("/api/health", (req, res) => {
+    db.prepare("SELECT 1").get();
+    res.json({ ok: true, version: "1.0.0" });
+  });
+  app.get("/api/config", (req, res) =>
+    res.json({ emailReady, campuses: CAMPUSES }),
+  );
+  app.get("/api/session", (req, res) =>
+    res.json({ user: req.user ? serializeUser(req.user) : null }),
+  );
+  app.post(
+    "/api/auth/signup",
+    limit("signup-ip", 10, HOUR),
+    requireMail,
+    async (req, res) => {
+      const input = parse(signupSchema, req.body);
+      const passwordHash = await hashPassword(input.password);
+      const user = db.transaction(() => {
+        let existing = db
+          .prepare("SELECT * FROM users WHERE email=?")
+          .get(input.email);
+        if (existing?.verified_at) return existing;
+        const timestamp = iso();
+        if (existing) {
+          // A legitimate signup must never activate a password chosen by a prior unverified registrant.
+          db.prepare(
+            "UPDATE users SET name=?,campus_id=?,password_hash=?,updated_at=? WHERE id=? AND verified_at IS NULL",
+          ).run(
+            input.name,
+            input.campusId,
+            passwordHash,
+            timestamp,
+            existing.id,
+          );
+          invalidateTokens(existing.id, "verify");
+        } else {
+          const id = randomUUID();
+          db.prepare(
+            "INSERT INTO users(id,name,email,campus_id,password_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+          ).run(
+            id,
+            input.name,
+            input.email,
+            input.campusId,
+            passwordHash,
+            timestamp,
+            timestamp,
+          );
+        }
+        return db.prepare("SELECT * FROM users WHERE email=?").get(input.email);
+      })();
+      if (!user.verified_at) await sendToken(user, "verify");
+      res.status(202).json({ message: GENERIC_EMAIL_MESSAGE });
+    },
+  );
+  app.post(
+    "/api/auth/login",
+    limit("login-ip", 40, 15 * 60 * 1000),
+    limit("login-email", 12, 15 * 60 * 1000, accountIdentity),
+    async (req, res) => {
+      const input = parse(loginSchema, req.body);
+      const user = db
+        .prepare("SELECT * FROM users WHERE email=?")
+        .get(input.email);
+      const matches = await checkPassword(input.password, user?.password_hash);
+      const currentUser =
+        user && db.prepare("SELECT * FROM users WHERE id=?").get(user.id);
+      // A reset may complete while scrypt yields. Never create a session using stale credentials.
+      if (
+        !matches ||
+        !currentUser ||
+        currentUser.password_hash !== user.password_hash
+      )
+        throw new HttpError(401, "Email or password is incorrect.");
+      if (!currentUser.verified_at)
+        throw new HttpError(
+          403,
+          "Verify your university email before signing in. You can request a new verification link.",
+        );
+      if (req.sessionHash)
+        db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
+          req.sessionHash,
+        );
+      setSession(res, currentUser.id);
+      res.json({ user: serializeUser(currentUser) });
+    },
+  );
+  app.post("/api/auth/logout", (req, res) => {
+    if (req.sessionHash)
+      db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
+        req.sessionHash,
+      );
+    clearSession(res);
+    res.json({ ok: true });
+  });
+  app.post("/api/auth/verify", limit("verify-ip", 30, HOUR), (req, res) => {
+    const input = parse(z.object({ token }).strict(), req.body);
+    const user = db.transaction(() => {
+      const found = validToken(input.token, "verify");
+      db.prepare(
+        "UPDATE users SET verified_at=COALESCE(verified_at,?),updated_at=? WHERE id=?",
+      ).run(iso(), iso(), found.user_id);
+      invalidateTokens(found.user_id, "verify");
+      if (req.sessionHash)
+        db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
+          req.sessionHash,
+        );
+      setSession(res, found.user_id);
+      return db.prepare("SELECT * FROM users WHERE id=?").get(found.user_id);
+    })();
+    res.json({ user: serializeUser(user) });
+  });
+  for (const [route, kind] of [
+    ["resend", "verify"],
+    ["forgot", "reset"],
+  ]) {
+    app.post(
+      `/api/auth/${route}`,
+      limit(`${route}-ip`, 12, HOUR),
+      limit(`${route}-email`, 4, HOUR, accountIdentity),
+      requireMail,
+      async (req, res) => {
+        const input = parse(z.object({ email }).strict(), req.body);
+        const user = db
+          .prepare("SELECT * FROM users WHERE email=?")
+          .get(input.email);
+        if (
+          user &&
+          (kind === "verify" ? !user.verified_at : Boolean(user.verified_at))
+        )
+          await sendToken(user, kind);
+        res.status(202).json({ message: GENERIC_EMAIL_MESSAGE });
+      },
+    );
+  }
+  app.post("/api/auth/reset", limit("reset-ip", 20, HOUR), async (req, res) => {
+    const input = parse(z.object({ token, password }).strict(), req.body);
+    validToken(input.token, "reset");
+    const passwordHash = await hashPassword(input.password);
+    db.transaction(() => {
+      const found = validToken(input.token, "reset");
+      db.prepare(
+        "UPDATE users SET password_hash=?,updated_at=? WHERE id=?",
+      ).run(passwordHash, iso(), found.user_id);
+      invalidateTokens(found.user_id, "reset");
+      db.prepare("DELETE FROM sessions WHERE user_id=?").run(found.user_id);
+    })();
+    clearSession(res);
+    res.json({
+      message: "Your password has been reset. Sign in with your new password.",
+    });
+  });
+  app.patch(
+    "/api/profile",
+    requireUser,
+    limit("profile", 30, HOUR, (req) => req.user.id),
+    (req, res) => {
+      const input = parse(profileSchema, req.body);
+      db.prepare("UPDATE users SET name=?,bio=?,updated_at=? WHERE id=?").run(
+        input.name,
+        input.bio,
+        iso(),
+        req.user.id,
+      );
+      res.json({
+        user: serializeUser(
+          db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id),
+        ),
+      });
+    },
+  );
+
+  const serializeListing = (row, userId) => ({
+    id: row.id,
+    ownerId: row.owner_id,
+    ownerName: row.owner_name,
+    campusId: row.campus_id,
+    title: row.title,
+    description: row.description,
+    address: row.address,
+    lat: row.lat,
+    lng: row.lng,
+    price: row.price,
+    deposit: row.deposit,
+    bedrooms: row.bedrooms,
+    bathrooms: row.bathrooms,
+    roomType: row.room_type,
+    availableFrom: row.available_from,
+    availableTo: row.available_to,
+    amenities: JSON.parse(row.amenities),
+    photos: JSON.parse(row.photos),
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    saved: userId
+      ? Boolean(
+          db
+            .prepare(
+              "SELECT 1 FROM saved_listings WHERE user_id=? AND listing_id=?",
+            )
+            .get(userId, row.id),
+        )
+      : false,
+  });
+  const getListing = (id) =>
+    db
+      .prepare(`SELECT ${listingFields} FROM ${listingJoin} WHERE l.id=?`)
+      .get(id);
+  const isPublic = (row) =>
+    row?.status === "active" && row.available_to >= today();
+  const assertPublic = (row) => {
+    if (!isPublic(row))
+      throw new HttpError(404, "This listing is no longer available.");
+  };
+  const assertOwner = (row, user) => {
+    if (!row || row.owner_id !== user.id)
+      throw new HttpError(404, "Listing not found.");
+  };
+  const validatePhotos = (photos, userId) => {
+    for (const photo of photos) {
+      const upload = db
+        .prepare("SELECT * FROM uploads WHERE filename=? AND owner_id=?")
+        .get(photo.slice("/uploads/".length), userId);
+      if (!upload || !existsSync(join(uploadDir, upload.filename)))
+        throw new HttpError(
+          400,
+          "A photo is missing or belongs to another account. Upload your own photos.",
+        );
+    }
+  };
+  app.get("/api/listings", (req, res) => {
+    const query = parse(
+      listingQuerySchema,
+      Object.fromEntries(
+        Object.entries(req.query).filter(([, value]) => value !== ""),
+      ),
+    );
+    const clauses = ["l.status='active'", "l.available_to>=?"];
+    const parameters = [today()];
+    if (query.campusId) {
+      clauses.push("l.campus_id=?");
+      parameters.push(query.campusId);
+    }
+    if (query.query) {
+      clauses.push(
+        "(l.title LIKE ? ESCAPE '\\' OR l.description LIKE ? ESCAPE '\\' OR l.address LIKE ? ESCAPE '\\')",
+      );
+      const term = `%${query.query.replace(/[\\%_]/g, "\\$&")}%`;
+      parameters.push(term, term, term);
+    }
+    if (query.minPrice !== undefined) {
+      clauses.push("l.price>=?");
+      parameters.push(query.minPrice);
+    }
+    if (query.maxPrice !== undefined) {
+      clauses.push("l.price<=?");
+      parameters.push(query.maxPrice);
+    }
+    if (query.from) {
+      clauses.push("l.available_from<=?", "l.available_to>=?");
+      parameters.push(query.from, query.from);
+    }
+    if (query.to) {
+      clauses.push("l.available_to>=?", "l.available_from<=?");
+      parameters.push(query.to, query.to);
+    }
+    if (query.roomType) {
+      clauses.push("l.room_type=?");
+      parameters.push(query.roomType);
+    }
+    if (query.bedrooms !== undefined) {
+      clauses.push("l.bedrooms>=?");
+      parameters.push(query.bedrooms);
+    }
+    if (query.amenities) {
+      const amenities = [
+        ...new Set(
+          query.amenities
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+        ),
+      ];
+      if (amenities.length > 20)
+        throw new HttpError(400, "Choose up to 20 amenities.");
+      for (const amenity of amenities) {
+        clauses.push(
+          "EXISTS(SELECT 1 FROM json_each(l.amenities) WHERE value=?)",
+        );
+        parameters.push(amenity);
+      }
+    }
+    const order = {
+      newest: "l.created_at DESC",
+      price_asc: "l.price ASC,l.created_at DESC",
+      price_desc: "l.price DESC,l.created_at DESC",
+    }[query.sort];
+    const rows = db
+      .prepare(
+        `SELECT ${listingFields} FROM ${listingJoin} WHERE ${clauses.join(" AND ")} ORDER BY ${order} LIMIT 500`,
+      )
+      .all(...parameters);
+    res.json({
+      listings: rows.map((row) => serializeListing(row, req.user?.id)),
+    });
+  });
+  app.get("/api/my-listings", requireUser, (req, res) => {
+    const rows = db
+      .prepare(
+        `SELECT ${listingFields} FROM ${listingJoin} WHERE l.owner_id=? ORDER BY l.updated_at DESC`,
+      )
+      .all(req.user.id);
+    res.json({
+      listings: rows.map((row) => serializeListing(row, req.user.id)),
+    });
+  });
+  app.get("/api/listings/:id", (req, res) => {
+    const row = getListing(req.params.id);
+    if (!row || (!isPublic(row) && row.owner_id !== req.user?.id))
+      throw new HttpError(404, "This listing is no longer available.");
+    res.json({ listing: serializeListing(row, req.user?.id) });
+  });
+  app.post(
+    "/api/listings",
+    requireUser,
+    limit("listing-create", 20, HOUR, (req) => req.user.id),
+    (req, res) => {
+      const input = parse(createListingSchema, req.body);
+      validateListing(input);
+      validatePhotos(input.photos, req.user.id);
+      const id = randomUUID();
+      const timestamp = iso();
+      db.prepare(
+        `INSERT INTO listings(id,owner_id,campus_id,title,description,address,lat,lng,price,deposit,bedrooms,bathrooms,room_type,available_from,available_to,amenities,photos,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ).run(
+        id,
+        req.user.id,
+        req.user.campus_id,
+        input.title,
+        input.description,
+        input.address,
+        input.lat,
+        input.lng,
+        input.price,
+        input.deposit,
+        input.bedrooms,
+        input.bathrooms,
+        input.roomType,
+        input.availableFrom,
+        input.availableTo,
+        JSON.stringify(input.amenities),
+        JSON.stringify(input.photos),
+        input.status,
+        timestamp,
+        timestamp,
+      );
+      res
+        .status(201)
+        .json({ listing: serializeListing(getListing(id), req.user.id) });
+    },
+  );
+  app.patch(
+    "/api/listings/:id",
+    requireUser,
+    limit("listing-update", 60, HOUR, (req) => req.user.id),
+    (req, res) => {
+      const row = getListing(req.params.id);
+      assertOwner(row, req.user);
+      const patch = parse(patchListingSchema, req.body);
+      if (!Object.keys(patch).length)
+        throw new HttpError(400, "Choose a change to save.");
+      const old = serializeListing(row, req.user.id);
+      const input = parse(listingSchema, {
+        title: old.title,
+        description: old.description,
+        address: old.address,
+        lat: old.lat,
+        lng: old.lng,
+        price: old.price,
+        deposit: old.deposit,
+        bedrooms: old.bedrooms,
+        bathrooms: old.bathrooms,
+        roomType: old.roomType,
+        availableFrom: old.availableFrom,
+        availableTo: old.availableTo,
+        amenities: old.amenities,
+        photos: old.photos,
+        status: old.status,
+        ...patch,
+      });
+      if (row.moderation_locked && input.status === "active")
+        throw new HttpError(
+          403,
+          "Handoff has paused this listing after review. Contact support before publishing it again.",
+        );
+      validateListing(input);
+      validatePhotos(input.photos, req.user.id);
+      db.transaction(() => {
+        db.prepare(
+          `UPDATE listings SET title=?,description=?,address=?,lat=?,lng=?,price=?,deposit=?,bedrooms=?,bathrooms=?,room_type=?,available_from=?,available_to=?,amenities=?,photos=?,status=?,updated_at=? WHERE id=? AND owner_id=?`,
+        ).run(
+          input.title,
+          input.description,
+          input.address,
+          input.lat,
+          input.lng,
+          input.price,
+          input.deposit,
+          input.bedrooms,
+          input.bathrooms,
+          input.roomType,
+          input.availableFrom,
+          input.availableTo,
+          JSON.stringify(input.amenities),
+          JSON.stringify(input.photos),
+          input.status,
+          iso(),
+          row.id,
+          req.user.id,
+        );
+        if (input.status !== "active" && input.status !== "draft") {
+          db.prepare(
+            "UPDATE handoff_requests SET status='declined',updated_at=? WHERE listing_id=? AND status='pending'",
+          ).run(iso(), row.id);
+        }
+      })();
+      res.json({ listing: serializeListing(getListing(row.id), req.user.id) });
+    },
+  );
+
+  const uploadAccounts = new Set();
+  let uploadsInFlight = 0;
+  const admitUpload = (req, res, next) => {
+    if (uploadsInFlight >= 2 || uploadAccounts.has(req.user.id)) {
+      res.set("Retry-After", "5");
+      return next(
+        new HttpError(
+          429,
+          "Photos are still uploading. Wait a moment and try again.",
+        ),
+      );
+    }
+    uploadsInFlight++;
+    uploadAccounts.add(req.user.id);
+    let released = false;
+    req.releaseUpload = () => {
+      if (released) return;
+      released = true;
+      uploadsInFlight--;
+      uploadAccounts.delete(req.user.id);
+    };
+    // Once decoding starts, its finally block retains the slot even if the browser disconnects.
+    req.once("aborted", () => {
+      if (!req.uploadProcessing) req.releaseUpload();
+    });
+    res.once("finish", req.releaseUpload);
+    res.once("close", () => {
+      if (!req.uploadProcessing) req.releaseUpload();
+    });
+    next();
+  };
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { files: 8, fileSize: 8 * 1024 * 1024, fields: 0, parts: 8 },
+    fileFilter: (req, file, cb) => cb(null, true),
+  });
+  app.post(
+    "/api/uploads",
+    requireUser,
+    limit("upload-hour", 20, HOUR, (req) => req.user.id),
+    limit("upload-day", 80, 24 * HOUR, (req) => req.user.id),
+    admitUpload,
+    upload.array("photos", 8),
+    async (req, res) => {
+      req.uploadProcessing = true;
+      try {
+        if (!req.files?.length)
+          throw new HttpError(400, "Choose at least one image.");
+        const totalStored = db
+          .prepare(
+            "SELECT COALESCE(SUM(bytes),0) AS bytes FROM uploads WHERE owner_id=?",
+          )
+          .get(req.user.id).bytes;
+        if (totalStored > 250 * 1024 * 1024)
+          throw new HttpError(
+            413,
+            "Your photo storage is full. Contact Handoff for help.",
+          );
+        const images = [];
+        for (const file of req.files) {
+          let buffer;
+          try {
+            const decoder = sharp(file.buffer, {
+              limitInputPixels: 24_000_000,
+              animated: false,
+              failOn: "warning",
+            });
+            const metadata = await decoder.metadata();
+            if (
+              !["jpeg", "png", "webp", "heif", "avif"].includes(
+                metadata.format,
+              ) ||
+              (metadata.pages && metadata.pages > 1)
+            )
+              throw new Error("Unsupported image.");
+            if (
+              !metadata.width ||
+              !metadata.height ||
+              metadata.width < 100 ||
+              metadata.height < 100
+            )
+              throw new Error("Image too small.");
+            buffer = await decoder
+              .rotate()
+              .resize({
+                width: 1800,
+                height: 1800,
+                fit: "inside",
+                withoutEnlargement: true,
+              })
+              .webp({ quality: 84 })
+              .toBuffer();
+          } catch {
+            throw new HttpError(
+              400,
+              "Use a valid JPG, PNG, WebP, or supported HEIC image between 100 by 100 pixels and 24 megapixels.",
+            );
+          }
+          images.push({ id: randomUUID(), buffer });
+        }
+        const photos = images.map((item) => `/uploads/${item.id}.webp`);
+        db.transaction(() => {
+          const used = db
+            .prepare(
+              "SELECT COALESCE(SUM(bytes),0) AS bytes FROM uploads WHERE owner_id=?",
+            )
+            .get(req.user.id).bytes;
+          if (
+            used + images.reduce((sum, item) => sum + item.buffer.length, 0) >
+            250 * 1024 * 1024
+          )
+            throw new HttpError(
+              413,
+              "Your photo storage is full. Contact Handoff for help.",
+            );
+          for (const item of images)
+            db.prepare(
+              "INSERT INTO uploads(id,owner_id,filename,bytes,created_at) VALUES(?,?,?,?,?)",
+            ).run(
+              item.id,
+              req.user.id,
+              `${item.id}.webp`,
+              item.buffer.length,
+              iso(),
+            );
+        })();
+        // Reserve the quota before filesystem writes, so rejected uploads cannot accumulate untracked files.
+        for (const item of images) {
+          await writeFile(join(uploadDir, `${item.id}.webp`), item.buffer, {
+            flag: "wx",
+            mode: 0o600,
+          });
+        }
+        res.status(201).json({ photos });
+      } finally {
+        req.releaseUpload();
+      }
+    },
+  );
+  app.get("/uploads/:filename", (req, res) => {
+    if (!/^[a-f0-9-]{36}\.webp$/.test(req.params.filename))
+      throw new HttpError(404, "Photo not found.");
+    const found = db
+      .prepare("SELECT * FROM uploads WHERE filename=?")
+      .get(req.params.filename);
+    if (!found) throw new HttpError(404, "Photo not found.");
+    const publicPhoto = db
+      .prepare(
+        "SELECT 1 FROM listings l, json_each(l.photos) p WHERE p.value=? AND l.status='active' AND l.available_to>=? LIMIT 1",
+      )
+      .get(`/uploads/${found.filename}`, today());
+    const participant =
+      req.user &&
+      db
+        .prepare(
+          "SELECT 1 FROM handoff_requests r JOIN listings l ON l.id=r.listing_id, json_each(l.photos) p WHERE p.value=? AND r.requester_id=? AND r.status='accepted' LIMIT 1",
+        )
+        .get(`/uploads/${found.filename}`, req.user.id);
+    if (found.owner_id !== req.user?.id && !publicPhoto && !participant)
+      throw new HttpError(404, "Photo not found.");
+    res.set(
+      "Cache-Control",
+      publicPhoto ? "public, max-age=3600" : "private, no-store",
+    );
+    res.type("image/webp").sendFile(join(uploadDir, found.filename));
+  });
+
+  app.get("/api/saved", requireUser, (req, res) => {
+    const rows = db
+      .prepare(
+        `SELECT ${listingFields} FROM ${listingJoin} JOIN saved_listings s ON s.listing_id=l.id WHERE s.user_id=? AND l.status='active' AND l.available_to>=? ORDER BY s.created_at DESC`,
+      )
+      .all(req.user.id, today());
+    res.json({
+      listings: rows.map((row) => serializeListing(row, req.user.id)),
+    });
+  });
+  app.post(
+    "/api/saved/:listingId",
+    requireUser,
+    limit("saved", 120, HOUR, (req) => req.user.id),
+    (req, res) => {
+      assertPublic(getListing(req.params.listingId));
+      db.prepare(
+        "INSERT OR IGNORE INTO saved_listings(user_id,listing_id,created_at) VALUES(?,?,?)",
+      ).run(req.user.id, req.params.listingId, iso());
+      res.json({ saved: true });
+    },
+  );
+  app.delete("/api/saved/:listingId", requireUser, (req, res) => {
+    db.prepare(
+      "DELETE FROM saved_listings WHERE user_id=? AND listing_id=?",
+    ).run(req.user.id, req.params.listingId);
+    res.json({ saved: false });
+  });
+
+  // This query intentionally excludes email. Contacts are fetched only after authorization and acceptance.
+  const requestSelect = `SELECT r.*,l.title AS listing_title,l.photos AS listing_photos,l.owner_id,l.status AS listing_status,l.available_to,requester.name AS requester_name,owner.name AS owner_name FROM handoff_requests r JOIN listings l ON l.id=r.listing_id JOIN users requester ON requester.id=r.requester_id JOIN users owner ON owner.id=l.owner_id`;
+  const getRequest = (id) =>
+    db.prepare(`${requestSelect} WHERE r.id=?`).get(id);
+  const serializeRequest = (row, viewerId) => {
+    if (![row.owner_id, row.requester_id].includes(viewerId))
+      throw new HttpError(404, "Request not found.");
+    const result = {
+      id: row.id,
+      listingId: row.listing_id,
+      listingTitle: row.listing_title,
+      listingPhoto: JSON.parse(row.listing_photos)[0] || "",
+      requesterId: row.requester_id,
+      requesterName: row.requester_name,
+      ownerId: row.owner_id,
+      ownerName: row.owner_name,
+      message: row.message,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+    if (row.status === "accepted") {
+      const person = db
+        .prepare("SELECT name,email FROM users WHERE id=?")
+        .get(viewerId === row.owner_id ? row.requester_id : row.owner_id);
+      result.contact = { name: person.name, email: person.email };
+    }
+    return result;
+  };
+  const notifyRequest = async (row, event, actorId) => {
+    const recipientId =
+      event === "created"
+        ? row.owner_id
+        : actorId === row.owner_id
+          ? row.requester_id
+          : row.owner_id;
+    const recipient = db
+      .prepare("SELECT email FROM users WHERE id=?")
+      .get(recipientId);
+    const title =
+      event === "created"
+        ? "A student is interested in your place"
+        : `Your Handoff request was ${event}`;
+    const link = `${origin}/requests`;
+    try {
+      await sendMail(
+        recipient.email,
+        title,
+        `${title}\n\n${row.listing_title}\n\nOpen Handoff to see the request and next steps: ${link}`,
+        `<p>${escapeHtml(title)}</p><p>${escapeHtml(row.listing_title)}</p><p><a href="${link}">View request and next steps</a></p>`,
+      );
+      return { emailSent: true };
+    } catch {
+      // Durable requests remain visible in the app even when SMTP is unavailable.
+      return { emailSent: false };
+    }
+  };
+  app.get("/api/requests", requireUser, (req, res) => {
+    const rows = db
+      .prepare(
+        `${requestSelect} WHERE l.owner_id=? OR r.requester_id=? ORDER BY r.updated_at DESC`,
+      )
+      .all(req.user.id, req.user.id);
+    res.json({
+      incoming: rows
+        .filter((row) => row.owner_id === req.user.id)
+        .map((row) => serializeRequest(row, req.user.id)),
+      outgoing: rows
+        .filter((row) => row.requester_id === req.user.id)
+        .map((row) => serializeRequest(row, req.user.id)),
+    });
+  });
+  app.post(
+    "/api/requests",
+    requireUser,
+    limit("request-create", 15, HOUR, (req) => req.user.id),
+    async (req, res) => {
+      const input = parse(requestSchema, req.body);
+      const listing = getListing(input.listingId);
+      assertPublic(listing);
+      if (listing.owner_id === req.user.id)
+        throw new HttpError(400, "You cannot request your own listing.");
+      const id = randomUUID();
+      const timestamp = iso();
+      try {
+        db.prepare(
+          "INSERT INTO handoff_requests(id,listing_id,requester_id,message,status,created_at,updated_at) VALUES(?,?,?,?,'pending',?,?)",
+        ).run(id, listing.id, req.user.id, input.message, timestamp, timestamp);
+      } catch (error) {
+        if (error.code === "SQLITE_CONSTRAINT_UNIQUE")
+          throw new HttpError(
+            409,
+            "You already have an active request for this listing.",
+          );
+        throw error;
+      }
+      const row = getRequest(id);
+      const notification = await notifyRequest(row, "created", req.user.id);
+      res
+        .status(201)
+        .json({ request: serializeRequest(row, req.user.id), notification });
+    },
+  );
+  app.patch(
+    "/api/requests/:id",
+    requireUser,
+    limit("request-update", 60, HOUR, (req) => req.user.id),
+    async (req, res) => {
+      const input = parse(requestUpdateSchema, req.body);
+      const updated = db.transaction(() => {
+        const row = getRequest(req.params.id);
+        if (!row || ![row.owner_id, row.requester_id].includes(req.user.id))
+          throw new HttpError(404, "Request not found.");
+        if (row.status !== "pending")
+          throw new HttpError(409, "This request has already been resolved.");
+        if (
+          input.status === "withdrawn"
+            ? req.user.id !== row.requester_id
+            : req.user.id !== row.owner_id
+        )
+          throw new HttpError(
+            403,
+            "You cannot make this change to the request.",
+          );
+        if (
+          input.status === "accepted" &&
+          (row.listing_status !== "active" || row.available_to < today())
+        )
+          throw new HttpError(
+            409,
+            "This listing is no longer available. Update the listing before accepting.",
+          );
+        db.prepare(
+          "UPDATE handoff_requests SET status=?,updated_at=? WHERE id=?",
+        ).run(input.status, iso(), row.id);
+        return getRequest(row.id);
+      })();
+      const notification = await notifyRequest(
+        updated,
+        input.status,
+        req.user.id,
+      );
+      res.json({
+        request: serializeRequest(updated, req.user.id),
+        notification,
+      });
+    },
+  );
+  app.post(
+    "/api/reports",
+    requireUser,
+    limit("reports", 10, 24 * HOUR, (req) => req.user.id),
+    (req, res) => {
+      const input = parse(reportSchema, req.body);
+      assertPublic(getListing(input.listingId));
+      const recent = db
+        .prepare(
+          "SELECT 1 FROM reports WHERE listing_id=? AND reporter_id=? AND created_at>?",
+        )
+        .get(
+          input.listingId,
+          req.user.id,
+          new Date(Date.now() - 24 * HOUR).toISOString(),
+        );
+      if (recent)
+        throw new HttpError(
+          409,
+          "You have already reported this listing. Our team can review your report.",
+        );
+      db.prepare(
+        "INSERT INTO reports(id,listing_id,reporter_id,reason,details,created_at) VALUES(?,?,?,?,?,?)",
+      ).run(
+        randomUUID(),
+        input.listingId,
+        req.user.id,
+        input.reason,
+        input.details,
+        iso(),
+      );
+      res.status(201).json({ ok: true });
+    },
+  );
+
+  app.use("/api", (req, res, next) =>
+    next(new HttpError(404, "Endpoint not found.")),
+  );
+  if (existsSync(join(staticDir, "index.html"))) {
+    app.use(
+      express.static(staticDir, {
+        index: false,
+        maxAge: "1h",
+        dotfiles: "deny",
+        setHeaders: (res, path) => {
+          if (path.includes("/assets/"))
+            res.set("Cache-Control", "public, max-age=31536000, immutable");
+        },
+      }),
+    );
+    app.get("/{*path}", (req, res) => {
+      if (req.path.startsWith("/uploads/") || /\.[a-z0-9]+$/i.test(req.path))
+        return res.status(404).send("Not found");
+      res
+        .set("Cache-Control", "no-cache")
+        .sendFile(join(staticDir, "index.html"));
+    });
+  }
+  app.use((err, req, res, next) => {
+    if (req.aborted) return;
+    if (res.headersSent) return next(err);
+    if (err instanceof multer.MulterError)
+      return res
+        .status(400)
+        .json({
+          error:
+            err.code === "LIMIT_FILE_SIZE"
+              ? "Each photo must be 8 MB or smaller."
+              : "Upload up to eight photos using the photos field.",
+        });
+    if (err instanceof HttpError)
+      return res.status(err.status).json({ error: err.message });
+    if (err.type === "entity.too.large")
+      return res.status(413).json({ error: "This request is too large." });
+    if (err instanceof SyntaxError && err.status === 400)
+      return res.status(400).json({ error: "Invalid JSON request." });
+    if (err.code === "ENOENT")
+      return res.status(404).json({ error: "File not found." });
+    console.error("Handoff request failed", {
+      code: err.code || "internal",
+      method: req.method,
+      path: req.route?.path || "unknown",
+    });
+    res
+      .status(500)
+      .json({
+        error: "Handoff could not complete this action. Please try again.",
+      });
+  });
+  // Bound expired authentication housekeeping; live sessions and unconsumed links are never removed.
+  db.prepare("DELETE FROM sessions WHERE expires_at<=?").run(Date.now());
+  db.prepare("DELETE FROM rate_limits WHERE expires_at<=?").run(Date.now());
+  return app;
+}

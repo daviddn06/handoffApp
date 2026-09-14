@@ -1,0 +1,36 @@
+# Handoff server operations
+
+Run `node --env-file-if-exists=.env server/index.js`. The server binds only to `127.0.0.1`, defaults to port 4742, and serves the built frontend from `dist/`.
+
+Production configuration lives in the service environment. See `../.env.example`. `HANDOFF_ORIGIN` must exactly match the public HTTPS origin without a trailing slash. Development permits HTTP only for localhost or 127.0.0.1. Cookie security follows the configured origin, and every API mutation requires its exact Origin header. Caddy must preserve the Host and provide the client forwarding header. Express trusts only loopback proxies.
+
+`HANDOFF_DATA_DIR` contains `handoff.sqlite`, its SQLite WAL files, and `uploads/`. It must be writable by the dedicated service user and live outside release directories. Never expose this directory through a generic static file server. The app authorizes uploaded photo access. Uploads admit at most two requests globally and one per account before buffering, limit images to 24 megapixels and 8 MB each, and enforce a 250 MB encoded-photo quota per account. No production seed data or automatic verification bypass exists.
+
+SMTP must be configured for account signup, verification resend, and password recovery. Port 587 requires STARTTLS; port 465 uses `SMTP_SECURE=true`. `MAIL_FROM` must be a sender authorized by the provider. A configured provider sets `emailReady=true`; successful configuration alone does not prove delivery. A provider failure returns a 503 for auth mail and does not claim to have sent a message. Notifications for requests are sent after the request is saved. Their response contains `notification.emailSent`; false means the request remains visible in the app but email could not be delivered.
+
+## Reports and moderation
+
+These commands require shell access as the Handoff service user and the existing `HANDOFF_DATA_DIR`. There is no public admin endpoint. Reports may contain private student details, so keep operator output within authorized operations.
+
+```bash
+sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js reports
+sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js reports all
+sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js archive-listing LISTING_UUID
+sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js resolve-report REPORT_UUID
+```
+
+Review the report, archive the listing if needed, then mark the report resolved. Archiving retains the listing and its report history, removes it from discovery, and declines pending requests. Accepted contacts stay available to the involved students. An operator archive also sets a moderation lock that the owner cannot remove. After review, `unlock-listing LISTING_UUID` removes the lock while leaving the listing archived for its owner to republish.
+
+## Backup and recovery
+
+Use SQLite's backup API rather than copying the main database file while it is live. Run before deploying any schema migration. Copy uploads into the same dated backup set. New schema versions must add an explicit migration with backup and rollback instructions; startup creates schema version 2 for fresh databases. Version 1 upgrades to version 2 only after a consistent SQLite backup is written under `HANDOFF_DATA_DIR/backups/`. Unknown newer schemas and unversioned populated databases are refused.
+
+```bash
+sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js backup /var/lib/handoff-backups/2026-09-14/handoff.sqlite
+```
+
+Restore only with the Handoff service stopped. Preserve the entire original data directory as a dated recovery copy, then restore the consistent database and matching uploads with owner `handoff` and private filesystem permissions. Start the matching application release and verify `/api/health`, account login, listing retrieval, and images.
+
+## Verification
+
+`npm test` starts real ephemeral HTTP servers with isolated temporary databases. Its injected mail transport captures links within tests only. Tests exercise verification, reset token replay/expiry, session invalidation, account/campus validation, cross-origin blocking, rate limits, two-student requests and contact visibility, listing ownership, image validation, listing expiry/filter semantics, failed SMTP, moderation persistence, and database reopen. They make no external email or network calls.

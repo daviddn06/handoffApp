@@ -1,0 +1,10 @@
+app.handofflease.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:4742
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
+    }
+}

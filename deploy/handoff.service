@@ -1,0 +1,26 @@
+[Unit]
+Description=Handoff student sublease app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=handoff
+Group=handoff
+WorkingDirectory=/opt/handoff/current
+EnvironmentFile=/etc/handoff/app.env
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/handoff
+RestrictSUIDSGID=true
+LimitNOFILE=4096
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target
