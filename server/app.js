@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -113,6 +113,24 @@ export function createApp({
     if (req.path.startsWith("/api/")) res.set("Cache-Control", "no-store");
     next();
   });
+  // The homepage on the root domain asks who is signed in so its header can
+  // show the student instead of a sign in link. Read only, session cookie is
+  // same site, and only the two root origins are allowed.
+  const homepageOrigins = new Set([
+    "https://handofflease.com",
+    "https://www.handofflease.com",
+  ]);
+  app.get("/api/session", (req, res, next) => {
+    const from = req.get("Origin");
+    if (from && homepageOrigins.has(from)) {
+      res.set({
+        "Access-Control-Allow-Origin": from,
+        "Access-Control-Allow-Credentials": "true",
+        Vary: "Origin",
+      });
+    }
+    next();
+  });
   app.use("/api", (req, res, next) => {
     if (
       !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
@@ -139,15 +157,23 @@ export function createApp({
     }
     next();
   });
+  // Any signed in student, verified or not. Browsing, saving, drafts, profile.
   const requireUser = (req, res, next) =>
-    req.user?.verified_at
+    req.user
       ? next()
-      : next(
-          new HttpError(
-            401,
-            "Sign in with your verified student account to continue.",
-          ),
-        );
+      : next(new HttpError(401, "Sign in with your student account to continue."));
+  // Verified students only. Publishing, requesting a handoff, reporting.
+  const requireVerified = (req, res, next) =>
+    !req.user
+      ? next(new HttpError(401, "Sign in with your student account to continue."))
+      : req.user.verified_at
+        ? next()
+        : next(
+            new HttpError(
+              403,
+              "Verify your student email to do this. Check your inbox for the link, or resend it from your profile.",
+            ),
+          );
   const requireMail = (req, res, next) =>
     emailReady
       ? next()
@@ -220,30 +246,67 @@ export function createApp({
     if (delivery?.rejected?.length)
       throw new Error("Email provider rejected recipient.");
   };
+  const emailShell = (title, bodyHtml) => `<!doctype html><html lang="en"><body style="margin:0;background:#f6f8fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1b2330;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f8fa;padding:32px 16px;"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:480px;background:#ffffff;border-radius:16px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.06);">
+<tr><td style="padding:28px 32px 0;font-size:22px;font-weight:700;letter-spacing:-0.03em;color:#1b2330;">Handoff</td></tr>
+<tr><td style="padding:20px 32px 0;font-size:20px;font-weight:600;letter-spacing:-0.02em;line-height:1.3;">${escapeHtml(title)}</td></tr>
+${bodyHtml}
+<tr><td style="padding:24px 32px 28px;font-size:12px;line-height:1.6;color:#667281;border-top:1px solid #e6e9ee;">Handoff is the student to student sublease marketplace. If you did not ask for this email, you can ignore it and nothing will change.</td></tr>
+</table>
+<div style="max-width:480px;padding:16px 8px 0;font-size:11px;color:#8a94a1;">Sent by Handoff, handofflease.com</div>
+</td></tr></table></body></html>`;
+  const otpHash = (userId, code) => hashToken(`otp:${userId}:${code}`);
   const sendToken = async (user, kind) => {
     const value = randomToken();
     const key = hashToken(value);
     const expiry = kind === "verify" ? 24 * HOUR : HOUR;
+    const code =
+      kind === "verify" ? String(randomInt(0, 1_000_000)).padStart(6, "0") : null;
     // Persist before delivery. A failed send invalidates only this token, preserving earlier valid links.
-    db.prepare(
-      "INSERT INTO auth_tokens(token_hash,user_id,kind,expires_at,created_at) VALUES(?,?,?,?,?)",
-    ).run(key, user.id, kind, Date.now() + expiry, Date.now());
+    db.transaction(() => {
+      db.prepare(
+        "INSERT INTO auth_tokens(token_hash,user_id,kind,expires_at,created_at) VALUES(?,?,?,?,?)",
+      ).run(key, user.id, kind, Date.now() + expiry, Date.now());
+      if (code) {
+        // One live code at a time. The code shares the verify kind and expires in 15 minutes.
+        db.prepare(
+          "UPDATE auth_tokens SET consumed_at=? WHERE user_id=? AND kind='verify' AND consumed_at IS NULL AND token_hash LIKE 'otp%'",
+        ).run(Date.now(), user.id);
+        db.prepare(
+          "INSERT INTO auth_tokens(token_hash,user_id,kind,expires_at,created_at) VALUES(?,?,?,?,?)",
+        ).run(`otp${otpHash(user.id, code)}`, user.id, "verify", Date.now() + 15 * 60 * 1000, Date.now());
+      }
+    })();
     const link = `${origin}/${kind === "verify" ? "verify" : "reset-password"}?token=${encodeURIComponent(value)}`;
     const action =
       kind === "verify" ? "Verify your student email" : "Reset your password";
     const expiryText = kind === "verify" ? "24 hours" : "1 hour";
+    const firstName = escapeHtml((user.name || "").split(" ")[0] || "there");
+    const text =
+      kind === "verify"
+        ? `Hi ${firstName},\n\nYour Handoff verification code is ${code}. Enter it in the app, or open this link:\n\n${link}\n\nThe code works for 15 minutes and the link for 24 hours. Each works once. If you did not sign up for Handoff, ignore this email.`
+        : `${action}\n\n${link}\n\nThis link expires in ${expiryText} and works once. If you did not request this, ignore this email.`;
+    const button = `<tr><td style="padding:20px 32px 0;"><a href="${link}" style="display:inline-block;background:#3b78d7;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 22px;border-radius:10px;">${escapeHtml(action)}</a></td></tr>`;
+    const html =
+      kind === "verify"
+        ? emailShell(`Hi ${firstName}, confirm it is really you.`, `
+<tr><td style="padding:10px 32px 0;font-size:15px;line-height:1.6;color:#3a4553;">Enter this code in Handoff to verify your student email. It works for 15 minutes.</td></tr>
+<tr><td style="padding:18px 32px 0;"><div style="display:inline-block;font-size:34px;font-weight:700;letter-spacing:0.28em;padding:14px 22px 14px 26px;border-radius:12px;background:#edf3fd;color:#24519b;font-variant-numeric:tabular-nums;">${code}</div></td></tr>
+<tr><td style="padding:22px 32px 0;font-size:14px;line-height:1.6;color:#3a4553;">Prefer one tap? Use the button instead. The link works once and expires in 24 hours.</td></tr>
+${button}
+<tr><td style="padding:22px 32px 0;font-size:13px;line-height:1.6;color:#667281;">You can keep browsing without verifying. Verification is needed to publish a listing or request a handoff, which keeps every conversation student to student.</td></tr>
+<tr><td style="padding:12px 32px 0;font-size:12px;line-height:1.6;color:#8a94a1;word-break:break-all;">Or paste this address into your browser<br>${escapeHtml(link)}</td></tr>`)
+        : emailShell(action, `
+<tr><td style="padding:10px 32px 0;font-size:15px;line-height:1.6;color:#3a4553;">Choose a new password with the button below. The link works once and expires in ${expiryText}.</td></tr>
+${button}
+<tr><td style="padding:22px 32px 0;font-size:12px;line-height:1.6;color:#8a94a1;word-break:break-all;">Or paste this address into your browser<br>${escapeHtml(link)}</td></tr>`);
     try {
-      await sendMail(
-        user.email,
-        `${action} for Handoff`,
-        `${action}\n\n${link}\n\nThis link expires in ${expiryText} and works once. If you did not request this, ignore this email.`,
-        `<p>${escapeHtml(action)}</p><p><a href="${link}">${escapeHtml(action)}</a></p><p>This link expires in ${expiryText} and works once. If you did not request this, ignore this email.</p>`,
-      );
+      await sendMail(user.email, `${action} for Handoff`, text, html);
     } catch {
-      db.prepare("UPDATE auth_tokens SET consumed_at=? WHERE token_hash=?").run(
-        Date.now(),
-        key,
-      );
+      db.prepare(
+        "UPDATE auth_tokens SET consumed_at=? WHERE token_hash=? OR (user_id=? AND kind='verify' AND token_hash LIKE 'otp%' AND consumed_at IS NULL)",
+      ).run(Date.now(), key, user.id);
       throw new HttpError(
         503,
         "We could not deliver your email. Please try again shortly.",
@@ -286,6 +349,7 @@ export function createApp({
             existing.id,
           );
           invalidateTokens(existing.id, "verify");
+          db.prepare("DELETE FROM sessions WHERE user_id=?").run(existing.id);
         } else {
           const id = randomUUID();
           db.prepare(
@@ -302,8 +366,18 @@ export function createApp({
         }
         return db.prepare("SELECT * FROM users WHERE email=?").get(input.email);
       })();
-      if (!user.verified_at) await sendToken(user, "verify");
-      res.status(202).json({ message: GENERIC_EMAIL_MESSAGE });
+      if (user.verified_at) {
+        // Never reveal that an account exists. The UI points them to sign in.
+        res.status(202).json({ message: GENERIC_EMAIL_MESSAGE, user: null });
+        return;
+      }
+      await sendToken(user, "verify");
+      if (req.sessionHash)
+        db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
+          req.sessionHash,
+        );
+      setSession(res, user.id);
+      res.status(201).json({ message: GENERIC_EMAIL_MESSAGE, user: serializeUser(user) });
     },
   );
   app.post(
@@ -325,11 +399,6 @@ export function createApp({
         currentUser.password_hash !== user.password_hash
       )
         throw new HttpError(401, "Email or password is incorrect.");
-      if (!currentUser.verified_at)
-        throw new HttpError(
-          403,
-          "Verify your university email before signing in. You can request a new verification link.",
-        );
       if (req.sessionHash)
         db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
           req.sessionHash,
@@ -354,15 +423,50 @@ export function createApp({
         "UPDATE users SET verified_at=COALESCE(verified_at,?),updated_at=? WHERE id=?",
       ).run(iso(), iso(), found.user_id);
       invalidateTokens(found.user_id, "verify");
-      if (req.sessionHash)
-        db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
-          req.sessionHash,
-        );
+      // Any session opened before verification, including a stranger's, ends here.
+      db.prepare("DELETE FROM sessions WHERE user_id=?").run(found.user_id);
       setSession(res, found.user_id);
       return db.prepare("SELECT * FROM users WHERE id=?").get(found.user_id);
     })();
     res.json({ user: serializeUser(user) });
   });
+  app.post(
+    "/api/auth/verify-code",
+    limit("verify-code-ip", 30, HOUR),
+    limit("verify-code-user", 8, 15 * 60 * 1000, (req) => req.user?.id || req.ip),
+    (req, res) => {
+      if (!req.user)
+        throw new HttpError(401, "Sign in first, then enter your code.");
+      const input = parse(
+        z.object({ code: z.string().regex(/^\d{6}$/) }).strict(),
+        req.body,
+      );
+      if (req.user.verified_at) {
+        res.json({ user: serializeUser(req.user) });
+        return;
+      }
+      const user = db.transaction(() => {
+        const found = db
+          .prepare(
+            "SELECT * FROM auth_tokens WHERE token_hash=? AND kind='verify' AND consumed_at IS NULL AND expires_at>?",
+          )
+          .get(`otp${otpHash(req.user.id, input.code)}`, Date.now());
+        if (!found)
+          throw new HttpError(
+            400,
+            "That code is not right or has expired. Request a new one.",
+          );
+        db.prepare(
+          "UPDATE users SET verified_at=COALESCE(verified_at,?),updated_at=? WHERE id=?",
+        ).run(iso(), iso(), req.user.id);
+        invalidateTokens(req.user.id, "verify");
+        db.prepare("DELETE FROM sessions WHERE user_id=?").run(req.user.id);
+        setSession(res, req.user.id);
+        return db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id);
+      })();
+      res.json({ user: serializeUser(user) });
+    },
+  );
   for (const [route, kind] of [
     ["resend", "verify"],
     ["forgot", "reset"],
@@ -582,6 +686,11 @@ export function createApp({
     limit("listing-create", 20, HOUR, (req) => req.user.id),
     (req, res) => {
       const input = parse(createListingSchema, req.body);
+      if (input.status === "active" && !req.user.verified_at)
+        throw new HttpError(
+          403,
+          "Verify your student email to publish. Your draft is safe until then.",
+        );
       validateListing(input);
       validatePhotos(input.photos, req.user.id);
       const id = randomUUID();
@@ -646,6 +755,15 @@ export function createApp({
         status: old.status,
         ...patch,
       });
+      if (
+        input.status === "active" &&
+        row.status !== "active" &&
+        !req.user.verified_at
+      )
+        throw new HttpError(
+          403,
+          "Verify your student email to publish. Your draft is safe until then.",
+        );
       if (row.moderation_locked && input.status === "active")
         throw new HttpError(
           403,
@@ -957,7 +1075,7 @@ export function createApp({
   });
   app.post(
     "/api/requests",
-    requireUser,
+    requireVerified,
     limit("request-create", 15, HOUR, (req) => req.user.id),
     async (req, res) => {
       const input = parse(requestSchema, req.body);
@@ -988,7 +1106,7 @@ export function createApp({
   );
   app.patch(
     "/api/requests/:id",
-    requireUser,
+    requireVerified,
     limit("request-update", 60, HOUR, (req) => req.user.id),
     async (req, res) => {
       const input = parse(requestUpdateSchema, req.body);
@@ -1033,7 +1151,7 @@ export function createApp({
   );
   app.post(
     "/api/reports",
-    requireUser,
+    requireVerified,
     limit("reports", 10, 24 * HOUR, (req) => req.user.id),
     (req, res) => {
       const input = parse(reportSchema, req.body);

@@ -68,11 +68,24 @@ export function Notice({ children }: { children: ReactNode }) {
     </div>
   );
 }
-export function Loading({ label = "Loading your space…" }: { label?: string }) {
+export function Loading({
+  label = "Loading your space…",
+  bar = true,
+}: {
+  label?: string;
+  bar?: boolean;
+}) {
   return (
-    <div className="loading" role="status">
-      <LoaderCircle className="spin" size={24} />
-      <span>{label}</span>
+    <div className="loading" role="status" aria-live="polite">
+      {bar && <span className="route-progress" aria-hidden="true" />}
+      <span className="loading-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="t-shimmer" data-text={label}>
+        {label}
+      </span>
     </div>
   );
 }

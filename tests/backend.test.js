@@ -121,7 +121,10 @@ async function setup(t, overrides = {}) {
       method: "POST",
       body: { name, email: address, password: PASSWORD, campusId },
     });
-    assert.equal(result.status, 202, JSON.stringify(result.body));
+    assert.ok(
+      [201, 202].includes(result.status),
+      JSON.stringify(result.body),
+    );
     return user;
   };
   const verified = async (address, name = "Test Student", campusId = "usc") => {
@@ -185,13 +188,33 @@ test("verified student lifecycle, one-use tokens, private hashes, reset invalida
   const env = await setup(t);
   const alice = await env.signup("alice@usc.edu", "Alice Student");
   const verifyToken = env.tokenFor("alice@usc.edu");
-  assert.equal((await alice.call("/api/session")).body.user, null);
+  // A fresh signup is signed in right away, but not yet verified.
+  assert.equal((await alice.call("/api/session")).body.user.verified, false);
   const unverifiedLogin = await alice.call("/api/auth/login", {
     method: "POST",
     body: { email: "alice@usc.edu", password: PASSWORD },
   });
-  assert.equal(unverifiedLogin.status, 403);
-  assert.equal((await alice.call("/api/my-listings")).status, 401);
+  assert.equal(unverifiedLogin.status, 200);
+  assert.equal(unverifiedLogin.body.user.verified, false);
+  assert.equal((await alice.call("/api/my-listings")).status, 200);
+  assert.equal(
+    (
+      await alice.call("/api/listings", {
+        method: "POST",
+        body: validListing([], { status: "active" }),
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await alice.call("/api/requests", {
+        method: "POST",
+        body: { listingId: "00000000-0000-4000-8000-000000000000", message: "Hi" },
+      })
+    ).status,
+    403,
+  );
   const verified = await alice.call("/api/auth/verify", {
     method: "POST",
     body: { token: verifyToken },
@@ -306,6 +329,43 @@ test("verified student lifecycle, one-use tokens, private hashes, reset invalida
   );
   alice.cookie = staleCookie;
   assert.equal((await alice.call("/api/session")).body.user, null);
+});
+
+test("a six digit code from the email verifies the signed in student, wrong codes do not", async (t) => {
+  const env = await setup(t);
+  const sam = await env.signup("sam@usc.edu", "Sam Student");
+  const message = env.messages.findLast((m) => m.to === "sam@usc.edu");
+  const code = message.text.match(/code is (\d{6})/)[1];
+  assert.equal(
+    (
+      await sam.call("/api/auth/verify-code", {
+        method: "POST",
+        body: { code: code === "000000" ? "000001" : "000000" },
+      })
+    ).status,
+    400,
+  );
+  const ok = await sam.call("/api/auth/verify-code", {
+    method: "POST",
+    body: { code },
+  });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.user.verified, true);
+  assert.equal((await sam.call("/api/session")).body.user.verified, true);
+  assert.equal(
+    (await sam.call("/api/auth/verify-code", { method: "POST", body: { code } }))
+      .status,
+    200,
+  );
+  assert.equal(
+    (
+      await env.client().call("/api/auth/verify", {
+        method: "POST",
+        body: { token: env.tokenFor("sam@usc.edu") },
+      })
+    ).status,
+    400,
+  );
 });
 
 test("two-student workflow preserves ownership and hides contacts until acceptance", async (t) => {
@@ -985,9 +1045,10 @@ test("re-registering an unverified email replaces pre-registered credentials and
         },
       })
     ).status,
-    202,
+    201,
   );
   const attackerToken = env.tokenFor("student@usc.edu");
+  assert.equal((await attacker.call("/api/session")).body.user.verified, false);
   const victim = env.client();
   assert.equal(
     (
@@ -1001,10 +1062,12 @@ test("re-registering an unverified email replaces pre-registered credentials and
         },
       })
     ).status,
-    202,
+    201,
   );
   const victimToken = env.tokenFor("student@usc.edu");
   assert.notEqual(victimToken, attackerToken);
+  // The attacker's pre-verification session is gone once the real student signs up.
+  assert.equal((await attacker.call("/api/session")).body.user, null);
   assert.equal(
     (
       await attacker.call("/api/auth/verify", {

@@ -28,12 +28,17 @@ const forbidden = ["/var/lib/handoff", "/var/backups/handoff", "/opt/handoff"];
 const blocked = forbidden.some(
   (root) => dataDir === root || dataDir.startsWith(root + sep),
 );
-if (blocked) {
+const REMOVE_ONLY = process.argv.includes("--remove");
+if (blocked && process.env.HANDOFF_SEED_CONFIRM !== "production") {
   console.error(
-    `Refusing to seed ${dataDir}. That path is a production location. Set HANDOFF_DATA_DIR to a local directory such as ./data.`,
+    `Refusing to seed ${dataDir}. That path is a production location. Set HANDOFF_DATA_DIR to a local directory such as ./data, or set HANDOFF_SEED_CONFIRM=production on purpose.`,
   );
   process.exit(1);
 }
+if (blocked)
+  console.log(
+    `Production seed confirmed explicitly. Remove it later with --remove.`,
+  );
 
 /* ------------------------------------------------------------- demo data */
 
@@ -964,6 +969,11 @@ if (existing.length) {
     if (existsSync(path)) rmSync(path);
   }
   console.log(`Removed ${files.length} previously seeded photo files.`);
+}
+if (REMOVE_ONLY) {
+  console.log("Demo data removed. Nothing was seeded.");
+  db.close();
+  process.exit(0);
 }
 
 const passwordHash = await hashPassword(DEMO_PASSWORD);

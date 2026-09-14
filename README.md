@@ -10,7 +10,7 @@ The app never creates sample inventory in production. Verification and password 
 
 ## Product
 
-Campus discovery with dates, budget, room type, amenities and map. Listers can share what they pay on the original lease, so every listing below it shows the monthly savings and can be sorted by biggest savings. Verified student accounts. Listing photos, drafts, publishing and archiving. Saved listings. Handoff requests with acceptance, decline and withdrawal. Contact details revealed only to accepted request participants. Reports saved for operator review. Account verification and recovery links expire and are single use.
+Campus discovery with dates, budget, room type, amenities and map. Listers can share what they pay on the original lease, so every listing below it shows the monthly savings and can be sorted by biggest savings. Student accounts with campus email verification by six digit code or link. Browsing, saving and drafts work right after signup, publishing and handoff requests need a verified email. Listing photos, drafts, publishing and archiving. Saved listings. Handoff requests with acceptance, decline and withdrawal. Contact details revealed only to accepted request participants. Reports saved for operator review. Account verification and recovery links expire and are single use.
 
 ## Deployment
 
@@ -30,7 +30,7 @@ See `API.md`, `server/README.md`, and the migration record in the Handoff zone d
 
 ## Demo data
 
-`HANDOFF_DATA_DIR=./data npm run seed:demo` fills the local database with seven verified demo students, about thirty listings around USC, UCLA and LMU with generated photos, saved places and handoff requests in every status. It refuses to run against production paths. Credentials and details are in `scripts/README.md`. Production is never seeded.
+`HANDOFF_DATA_DIR=./data npm run seed:demo` fills the local database with seven verified demo students, about thirty listings around USC, UCLA and LMU with generated photos, saved places and handoff requests in every status. It refuses to run against production paths. Credentials and details are in `scripts/README.md`. Production was seeded with the same demo set on 2026-09-14 for testing at David's request (`HANDOFF_SEED_CONFIRM=production`, run as the `handoff` user). Remove it with `scripts/seed-demo.js --remove` before real launch.
 
 ## Styles
 

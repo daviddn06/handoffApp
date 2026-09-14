@@ -8,7 +8,6 @@ maplibregl.setWorkerUrl(mapWorkerUrl);
 import { Link } from "react-router-dom";
 import {
   ArrowUpRight,
-  BedDouble,
   ChevronDown,
   Image as ImageIcon,
   Info,
@@ -43,6 +42,8 @@ type Props = {
   onPin?: (point: { lat: number; lng: number }) => void;
   /** Compact mode hides the legend and shrinks controls (editor, detail). */
   compact?: boolean;
+  /** Pixels covered along the bottom edge, the phone sheet, kept clear when framing. */
+  bottomInset?: number;
 };
 
 // OpenFreeMap serves the Positron style without an API key.
@@ -98,6 +99,7 @@ export default function Map({
   pin,
   onPin,
   compact = false,
+  bottomInset = 0,
 }: Props) {
   const element = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
@@ -126,16 +128,25 @@ export default function Map({
     (animate = false) => {
       const m = map.current;
       if (!m || pin) return;
+      const pad = compact ? 24 : 48;
       if (zoneBounds.current)
         m.fitBounds(zoneBounds.current, {
-          padding: compact ? 24 : 48,
+          padding: { top: pad, left: pad, right: pad, bottom: pad + bottomInset },
           duration: animate ? 600 : 0,
         });
       else if (animate)
-        m.flyTo({ center: [campus.lng, campus.lat], zoom: 14, duration: 600 });
-      else m.jumpTo({ center: [campus.lng, campus.lat], zoom: 14 });
+        m.flyTo({
+          center: [campus.lng, campus.lat],
+          zoom: 14,
+          offset: [0, -bottomInset / 2],
+          duration: 600,
+        });
+      else {
+        m.jumpTo({ center: [campus.lng, campus.lat], zoom: 14 });
+        if (bottomInset) m.panBy([0, bottomInset / 2], { duration: 0 });
+      }
     },
-    [campus.lat, campus.lng, pin, compact],
+    [campus.lat, campus.lng, pin, compact, bottomInset],
   );
   const frameRef = useRef(frame);
   frameRef.current = frame;
@@ -282,13 +293,22 @@ export default function Map({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campus.id, ready]);
 
-  // Markers.
+  // Markers. One marker per listing lives for the whole session of the
+  // listings array. Clustering never removes pins, it slides them together
+  // under a cluster bubble and slides them back apart, so zooming reads as
+  // a fluid merge and split instead of pins popping in and out.
+  const clusterNodes = useRef<globalThis.Map<string, { marker: maplibregl.Marker; node: HTMLElement; timer?: number }>>(
+    new globalThis.Map(),
+  );
+  const layoutRef = useRef<() => void>(() => {});
   useEffect(() => {
     const m = map.current;
     if (!m || !ready) return;
     for (const marker of markers.current) marker.remove();
     markers.current = [];
     markerIndex.current.clear();
+    for (const c of clusterNodes.current.values()) c.marker.remove();
+    clusterNodes.current.clear();
     const add = (
       node: HTMLElement,
       lng: number,
@@ -304,42 +324,14 @@ export default function Map({
     add(
       el(
         "campus-marker-wrap",
-        `<span class="campus-marker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>${campus.shortName}</span>`,
+        `<span class="campus-marker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>${campus.name}</span>`,
       ),
       campus.lng,
       campus.lat,
     );
-
-    const clusterRadius = zoomLevel >= 15 ? 0 : zoomLevel >= 14 ? 34 : 56;
-    const groups = clusterRadius
-      ? clusterListings(m, listings, clusterRadius)
-      : listings
-          .filter((l) => Number.isFinite(l.lat) && Number.isFinite(l.lng))
-          .map((l) => ({ items: [l], lat: l.lat, lng: l.lng }));
-    for (const group of groups) {
-      if (group.items.length > 1) {
-        const count = group.items.length;
-        const size = count < 5 ? "sm" : count < 12 ? "md" : "lg";
-        const node = el(
-          "cluster-marker-wrap",
-          `<button type="button" class="cluster-marker ${size}" aria-label="${count} places here, zoom in">${count}</button>`,
-        );
-        node.addEventListener("click", (e) => {
-          e.stopPropagation();
-          setPreview(null);
-          const bounds = new maplibregl.LngLatBounds();
-          for (const i of group.items) bounds.extend([i.lng, i.lat]);
-          m.fitBounds(bounds, {
-            padding: 80,
-            maxZoom: Math.min(18, m.getZoom() + 3),
-            duration: 500,
-          });
-        });
-        add(node, group.lng, group.lat);
-        for (const item of group.items) markerIndex.current.set(item.id, node);
-        continue;
-      }
-      const item = group.items[0];
+    const pins = new globalThis.Map<string, HTMLElement>();
+    for (const item of listings) {
+      if (!Number.isFinite(item.lat) || !Number.isFinite(item.lng)) continue;
       const save = savings(item);
       const node = el(
         `price-marker-wrap${item.id === activeId ? " is-active" : ""}${save ? " has-savings" : ""}`,
@@ -347,26 +339,126 @@ export default function Map({
       );
       node.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (node.classList.contains("is-merged")) return;
         positionPreview(item);
         callbacks.current.onActive?.(item.id);
       });
-      node.addEventListener("mouseenter", () =>
-        callbacks.current.onActive?.(item.id),
-      );
+      node.addEventListener("mouseenter", () => {
+        if (!node.classList.contains("is-merged"))
+          callbacks.current.onActive?.(item.id);
+      });
       node.addEventListener("mouseleave", () =>
         callbacks.current.onActive?.(null),
       );
       add(node, item.lng, item.lat);
       markerIndex.current.set(item.id, node);
+      pins.set(item.id, node);
     }
+
+    /** Slide pins into clusters (or apart) for the current zoom. */
+    const layout = () => {
+      const zoom = m.getZoom();
+      const radius = zoom >= 15 ? 0 : zoom >= 14 ? 34 : 56;
+      const groups = radius ? clusterListings(m, listings, radius) : [];
+      const live = new Set<string>();
+      for (const group of groups) {
+        if (group.items.length < 2) continue;
+        const key = group.items
+          .map((i) => i.id)
+          .sort()
+          .join("|");
+        live.add(key);
+        const center = m.project([group.lng, group.lat]);
+        let entry = clusterNodes.current.get(key);
+        if (!entry) {
+          const count = group.items.length;
+          const size = count < 5 ? "sm" : count < 12 ? "md" : "lg";
+          const node = el(
+            "cluster-marker-wrap",
+            `<button type="button" class="cluster-marker ${size}" aria-label="${count} places here, zoom in">${count}</button>`,
+          );
+          node.addEventListener("click", (e) => {
+            e.stopPropagation();
+            setPreview(null);
+            const bounds = new maplibregl.LngLatBounds();
+            for (const i of group.items) bounds.extend([i.lng, i.lat]);
+            m.fitBounds(bounds, {
+              padding: 80,
+              maxZoom: Math.min(18, m.getZoom() + 3),
+              duration: 500,
+            });
+          });
+          const marker = new maplibregl.Marker({ element: node })
+            .setLngLat([group.lng, group.lat])
+            .addTo(m);
+          entry = { marker, node };
+          clusterNodes.current.set(key, entry);
+          // Next frame so the scale in transition runs from the resting state.
+          requestAnimationFrame(() => node.classList.add("is-on"));
+        } else {
+          if (entry.timer) {
+            window.clearTimeout(entry.timer);
+            entry.timer = undefined;
+          }
+          entry.node.classList.add("is-on");
+        }
+        for (const item of group.items) {
+          const node = pins.get(item.id);
+          if (!node) continue;
+          const p = m.project([item.lng, item.lat]);
+          node.style.setProperty("--dx", `${center.x - p.x}px`);
+          node.style.setProperty("--dy", `${center.y - p.y}px`);
+          node.classList.add("is-merged");
+          markerIndex.current.set(item.id, entry.node);
+        }
+      }
+      for (const [id, node] of pins) {
+        if (markerIndex.current.get(id) !== node && !live.has(clusterKeyOf(id)))
+          markerIndex.current.set(id, node);
+        if (!node.classList.contains("is-merged")) continue;
+        const merged = groups.some(
+          (g) => g.items.length > 1 && g.items.some((i) => i.id === id),
+        );
+        if (!merged) {
+          node.classList.remove("is-merged");
+          node.style.setProperty("--dx", "0px");
+          node.style.setProperty("--dy", "0px");
+          markerIndex.current.set(id, node);
+        }
+      }
+      for (const [key, entry] of clusterNodes.current) {
+        if (live.has(key) || entry.timer) continue;
+        entry.node.classList.remove("is-on");
+        entry.timer = window.setTimeout(() => {
+          entry.marker.remove();
+          clusterNodes.current.delete(key);
+        }, 320);
+      }
+    };
+    const clusterKeyOf = (id: string) => {
+      for (const key of clusterNodes.current.keys())
+        if (key.split("|").includes(id)) return key;
+      return "";
+    };
+    layoutRef.current = layout;
+    layout();
+    let frame = 0;
+    const onZoom = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(layout);
+    };
+    m.on("zoom", onZoom);
+    m.on("zoomend", layout);
+
+    let pinMarker: maplibregl.Marker | null = null;
     if (pin) {
       const node = el(
         "location-marker-wrap",
         '<span class="location-marker"></span>',
       );
-      const marker = add(node, pin.lng, pin.lat, { draggable: !!onPin });
-      marker.on("dragend", () => {
-        const p = marker.getLngLat();
+      pinMarker = add(node, pin.lng, pin.lat, { draggable: !!onPin });
+      pinMarker.on("dragend", () => {
+        const p = pinMarker!.getLngLat();
         callbacks.current.onPin?.({
           lat: Number(p.lat.toFixed(6)),
           lng: Number(p.lng.toFixed(6)),
@@ -374,8 +466,18 @@ export default function Map({
       });
       if (!onPin) m.jumpTo({ center: [pin.lng, pin.lat], zoom: 15 });
     }
+    return () => {
+      cancelAnimationFrame(frame);
+      m.off("zoom", onZoom);
+      m.off("zoomend", layout);
+      for (const c of clusterNodes.current.values()) {
+        if (c.timer) window.clearTimeout(c.timer);
+        c.marker.remove();
+      }
+      clusterNodes.current.clear();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campus.id, listings, pin?.lat, pin?.lng, !!onPin, zoomLevel, ready]);
+  }, [campus.id, listings, pin?.lat, pin?.lng, !!onPin, ready]);
 
   // Keep the active marker in sync without rebuilding.
   useEffect(() => {
@@ -411,6 +513,10 @@ export default function Map({
         ) : (
           <ImageIcon size={20} strokeWidth={1.5} />
         )}
+        <span className="map-preview-open">
+          View
+          <ArrowUpRight size={13} />
+        </span>
       </div>
       <div className="map-preview-body">
         <div className="map-preview-price">
@@ -423,20 +529,19 @@ export default function Map({
         <div className="map-preview-title">{preview.listing.title}</div>
         <div className="map-preview-meta">
           <span>
-            <BedDouble size={12} />
+            {ROOM_LABELS[preview.listing.roomType]} ·{" "}
             {preview.listing.bedrooms === 0
               ? "Studio"
               : `${preview.listing.bedrooms} bd`}{" "}
-            · {ROOM_LABELS[preview.listing.roomType]} ·{" "}
-            {distanceLabel(milesBetween(campus, preview.listing))}
+            · {preview.listing.bathrooms} ba
           </span>
           <span>
             {dateLabel(preview.listing.availableFrom)} to{" "}
-            {dateLabel(preview.listing.availableTo)}
+            {dateLabel(preview.listing.availableTo)} ·{" "}
+            <b>{distanceLabel(milesBetween(campus, preview.listing))}</b>
           </span>
         </div>
       </div>
-      <ArrowUpRight size={15} className="map-preview-arrow" />
     </Link>
   );
 
@@ -453,6 +558,19 @@ export default function Map({
             : `Map of listings near ${campus.name}`
         }
       />
+      <div
+        className={`map-veil ${ready ? "is-done" : ""}`}
+        aria-hidden={ready}
+      >
+        <span className="loading-dots">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="t-shimmer" data-text="Drawing the map…">
+          Drawing the map…
+        </span>
+      </div>
       <div className="map-controls" aria-label="Map controls">
         <div className="map-control-group">
           <button
@@ -475,8 +593,8 @@ export default function Map({
         <button
           type="button"
           className="map-control solo"
-          aria-label={`Recenter on ${campus.shortName}`}
-          title={`Recenter on ${campus.shortName}`}
+          aria-label={`Recenter on ${campus.name}`}
+          title={`Recenter on ${campus.name}`}
           onClick={recenter}
         >
           <LocateFixed size={16} />
@@ -518,7 +636,7 @@ export default function Map({
               )}
               <li>
                 <span className="legend-swatch campus" aria-hidden="true" />
-                <span>{campus.shortName} campus</span>
+                <span>{campus.name}</span>
               </li>
               {zone && (
                 <li className={zoneVisible ? "" : "is-dim"}>

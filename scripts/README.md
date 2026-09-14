@@ -12,7 +12,7 @@ HANDOFF_DATA_DIR=./data HANDOFF_ORIGIN=http://127.0.0.1:4741 node scripts/seed-d
 HANDOFF_DATA_DIR=./data npm run seed:demo
 ```
 
-The script prints the data directory it is about to use and refuses to run against `/var/lib/handoff`, `/var/backups/handoff` or `/opt/handoff`. When `HANDOFF_DATA_DIR` is unset it defaults to `./data`, which is gitignored. Run `npm run server` and `npm run dev` afterwards and open http://127.0.0.1:4741.
+The script prints the data directory it is about to use and refuses to run against `/var/lib/handoff`, `/var/backups/handoff` or `/opt/handoff` unless `HANDOFF_SEED_CONFIRM=production` is set on purpose. `--remove` deletes the demo accounts and everything they own without seeding again. On the VPS run it as the `handoff` user so the photo files stay readable by the service. When `HANDOFF_DATA_DIR` is unset it defaults to `./data`, which is gitignored. Run `npm run server` and `npm run dev` afterwards and open http://127.0.0.1:4741.
 
 Re-running is safe. The script finds the demo accounts by their fixed email addresses, deletes their listings, uploads, saved listings, requests, sessions and tokens, removes the photo files those uploads pointed at, and then seeds again from scratch. Demo rows are identified by those fixed email addresses.
 

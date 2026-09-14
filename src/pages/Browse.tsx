@@ -12,8 +12,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
   SlidersHorizontal,
-  Map as MapIcon,
-  List,
   ChevronDown,
   X,
   Plus,
@@ -23,14 +21,16 @@ import {
   Check,
   LogIn,
   Crosshair,
+  ArrowRight,
 } from "lucide-react";
 import { useApp } from "../lib/context";
 import { useResource, money } from "../lib/api";
 import { AMENITIES, ROOM_LABELS, type Listing } from "../types";
-import { Button, EmptyState, ErrorBox, Loading } from "../components/ui";
+import { Button, EmptyState, ErrorBox, Loading, Modal } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
 import { Popover } from "../components/Popover";
 import { inBounds, type MapBounds } from "../lib/dps";
+import { isEmbed } from "../components/Layout";
 const Map = lazy(() => import("../components/Map"));
 
 const filterKeys = [
@@ -49,6 +49,21 @@ const PRICE_PRESETS = [
   { label: "$2,200 and up", min: "2200", max: "" },
 ];
 const PANEL_KEY = "handoff:panel-width";
+const CAMPUS_KEY = "handoff:campus";
+function readCampus() {
+  try {
+    return localStorage.getItem(CAMPUS_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+function rememberCampus(id: string) {
+  try {
+    localStorage.setItem(CAMPUS_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
 const PANEL_MIN = 360;
 const PANEL_DEFAULT = 440;
 
@@ -72,11 +87,91 @@ export default function Browse() {
   const { campuses, user } = useApp(),
     navigate = useNavigate(),
     [params, setParams] = useSearchParams();
+  const remembered = readCampus();
   const campus =
     campuses.find(
-      (c) => c.id === (params.get("campusId") || user?.campusId || "usc"),
+      (c) =>
+        c.id ===
+        (params.get("campusId") || user?.campusId || remembered || "usc"),
     ) || campuses[0];
-  const [mobileView, setMobileView] = useState<"list" | "map">("list");
+  // First visit without an account or a remembered campus asks where to look.
+  const [pickCampus, setPickCampus] = useState(
+    () => !user && !remembered && !params.get("campusId") && !isEmbed(),
+  );
+  const chooseCampus = (id: string) => {
+    rememberCampus(id);
+    setParam("campusId", id);
+    setPickCampus(false);
+  };
+  // Mobile bottom sheet. The listing panel slides over a full screen map and
+  // snaps to three heights, a peek with search, half, and full.
+  const [sheet, setSheet] = useState<"peek" | "half" | "full">("half");
+  const [sheetY, setSheetY] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const snapFor = useCallback((name: "peek" | "half" | "full") => {
+    const h = pageRef.current?.clientHeight || window.innerHeight;
+    return name === "full" ? 0 : name === "half" ? Math.round(h * 0.5) : h - 132;
+  }, []);
+  const startSheetDrag = (e: ReactPointerEvent<HTMLElement>) => {
+    if (window.innerWidth > 760) return;
+    const scroller = scrollRef.current;
+    const fromScroll = (e.target as HTMLElement).closest(".panel-scroll");
+    // Inside the list only a downward drag from the very top moves the sheet.
+    if (fromScroll && sheet === "full" && (scroller?.scrollTop || 0) > 0) return;
+    const startY = e.clientY,
+      startOffset = snapFor(sheet),
+      startTime = performance.now();
+    let last = startY,
+      lastTime = startTime,
+      moved = false;
+    const h = pageRef.current?.clientHeight || window.innerHeight;
+    const move = (ev: PointerEvent) => {
+      const dy = ev.clientY - startY;
+      if (!moved && Math.abs(dy) < 6) return;
+      if (fromScroll && !moved && dy < 0) {
+        stop();
+        return;
+      }
+      moved = true;
+      setDragging(true);
+      setSheetY(Math.max(0, Math.min(h - 96, startOffset + dy)));
+      last = ev.clientY;
+      lastTime = performance.now();
+    };
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      if (!moved) return;
+      const dt = Math.max(1, performance.now() - lastTime);
+      const velocity = (last - startY) / Math.max(1, performance.now() - startTime);
+      const current = Math.max(0, Math.min(h - 96, startOffset + (last - startY)));
+      const snaps: Array<["peek" | "half" | "full", number]> = [
+        ["full", snapFor("full")],
+        ["half", snapFor("half")],
+        ["peek", snapFor("peek")],
+      ];
+      let next: "peek" | "half" | "full";
+      if (Math.abs(velocity) > 0.45 && dt < 120) {
+        // A flick moves one step in the flick direction.
+        const order: Array<"full" | "half" | "peek"> = ["full", "half", "peek"];
+        const i = order.indexOf(sheet);
+        next = order[Math.max(0, Math.min(2, i + (velocity > 0 ? 1 : -1)))];
+      } else {
+        next = snaps.reduce((best, s) =>
+          Math.abs(s[1] - current) < Math.abs(best[1] - current) ? s : best,
+        )[0];
+      }
+      setDragging(false);
+      setSheetY(null);
+      setSheet(next);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
   const [search, setSearch] = useState(params.get("query") || "");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [inViewOnly, setInViewOnly] = useState(false);
@@ -113,6 +208,8 @@ export default function Browse() {
   const handleMapActive = useCallback((id: string | null) => {
     activeSource.current = "map";
     setActiveId(id);
+    // On a phone a tapped pin shows its card above the peeking sheet.
+    if (id && window.innerWidth <= 760) setSheet("peek");
   }, []);
   const handleListActive = useCallback((id: string | null) => {
     activeSource.current = "list";
@@ -268,10 +365,28 @@ export default function Browse() {
 
   return (
     <div
-      className={`browse-page mobile-${mobileView} ${resizing ? "is-resizing" : ""}`}
-      style={{ "--panel-w": `${panelWidth}px` } as React.CSSProperties}
+      ref={pageRef}
+      className={`browse-page sheet-${sheet} ${resizing ? "is-resizing" : ""} ${dragging ? "is-dragging" : ""}`}
+      style={
+        {
+          "--panel-w": `${panelWidth}px`,
+          "--sheet-y": `${sheetY ?? snapFor(sheet)}px`,
+        } as React.CSSProperties
+      }
     >
-      <aside className="browse-panel" aria-label="Listings">
+      <aside
+        className="browse-panel"
+        aria-label="Listings"
+        onPointerDown={startSheetDrag}
+      >
+        <button
+          type="button"
+          className="sheet-handle"
+          aria-label={sheet === "full" ? "Collapse the list" : "Expand the list"}
+          onClick={() => setSheet(sheet === "full" ? "peek" : sheet === "half" ? "full" : "half")}
+        >
+          <span />
+        </button>
         <div className="panel-head">
           <div className="head-row">
             <Popover
@@ -282,8 +397,8 @@ export default function Browse() {
                     <GraduationCap size={15} />
                   </span>
                   <span className="campus-text">
-                    <strong>Near {campus.shortName}</strong>
-                    <small>{campus.name}</small>
+                    <strong>Near {campus.name}</strong>
+                    <small>Tap to change campus</small>
                   </span>
                   <ChevronDown size={15} className="chip-chevron" />
                 </button>
@@ -299,13 +414,12 @@ export default function Browse() {
                       aria-selected={c.id === campus.id}
                       className={c.id === campus.id ? "is-selected" : ""}
                       onClick={() => {
-                        setParam("campusId", c.id);
+                        chooseCampus(c.id);
                         close();
                       }}
                     >
                       <span>
-                        <strong>{c.shortName}</strong>
-                        <small>{c.name}</small>
+                        <strong>{c.name}</strong>
                       </span>
                       {c.id === campus.id && <Check size={15} />}
                     </button>
@@ -351,6 +465,7 @@ export default function Browse() {
                 </button>
               )}
             >
+              {(close) => (
               <div className="popover-body">
                 <div className="popover-title">When do you need it?</div>
                 <div className="field-row">
@@ -378,10 +493,14 @@ export default function Browse() {
                     className="text-button"
                     onClick={() => setMany({ from: "", to: "" })}
                   >
-                    Clear dates
+                    Clear
+                  </button>
+                  <button type="button" className="button primary small" onClick={close}>
+                    Done
                   </button>
                 </div>
               </div>
+              )}
             </Popover>
             <Popover
               width={300}
@@ -397,6 +516,7 @@ export default function Browse() {
                 </button>
               )}
             >
+              {(close) => (
               <div className="popover-body">
                 <div className="popover-title">Monthly rent</div>
                 <div className="field-row">
@@ -453,10 +573,14 @@ export default function Browse() {
                     className="text-button"
                     onClick={() => setMany({ minPrice: "", maxPrice: "" })}
                   >
-                    Clear price
+                    Clear
+                  </button>
+                  <button type="button" className="button primary small" onClick={close}>
+                    Done
                   </button>
                 </div>
               </div>
+              )}
             </Popover>
             <Popover
               width={300}
@@ -472,6 +596,7 @@ export default function Browse() {
                 </button>
               )}
             >
+              {(close) => (
               <div className="popover-body">
                 <div className="popover-title">Bedrooms</div>
                 <div className="segment-grid">
@@ -495,7 +620,7 @@ export default function Browse() {
                   ))}
                 </div>
                 <div className="popover-title">Type of place</div>
-                <div className="segment-grid">
+                <div className="segment-grid four">
                   {[["", "Any"], ...Object.entries(ROOM_LABELS)].map(
                     ([value, label]) => (
                       <button
@@ -516,10 +641,14 @@ export default function Browse() {
                     className="text-button"
                     onClick={() => setMany({ bedrooms: "", roomType: "" })}
                   >
-                    Clear rooms
+                    Clear
+                  </button>
+                  <button type="button" className="button primary small" onClick={close}>
+                    Done
                   </button>
                 </div>
               </div>
+              )}
             </Popover>
             <Popover
               width={320}
@@ -538,6 +667,7 @@ export default function Browse() {
                 </button>
               )}
             >
+              {(close) => (
               <div className="popover-body">
                 <div className="popover-title">Amenities</div>
                 <div className="check-grid">
@@ -566,10 +696,14 @@ export default function Browse() {
                     className="text-button"
                     onClick={() => setParam("amenities", "")}
                   >
-                    Clear amenities
+                    Clear
+                  </button>
+                  <button type="button" className="button primary small" onClick={close}>
+                    Done
                   </button>
                 </div>
               </div>
+              )}
             </Popover>
             {filtered && (
               <button
@@ -583,7 +717,7 @@ export default function Browse() {
             )}
           </div>
         </div>
-        <div className="panel-scroll">
+        <div className="panel-scroll" ref={scrollRef}>
           {!user && (
             <Link to="/sign-in" className="signin-banner">
               <LogIn size={14} />
@@ -664,7 +798,7 @@ export default function Browse() {
                   ? "Nothing in this part of the map."
                   : filtered
                     ? "No places match just yet."
-                    : `Be the first at ${campus.shortName}.`
+                    : `Be the first at ${campus.name}.`
               }
               description={
                 inViewOnly && listings.length
@@ -712,36 +846,42 @@ export default function Browse() {
             onActive={handleMapActive}
             onListing={navigateListing}
             onBounds={setBounds}
+            bottomInset={
+              window.innerWidth <= 760
+                ? (pageRef.current?.clientHeight || window.innerHeight) -
+                  snapFor("half")
+                : 0
+            }
           />
         </Suspense>
       </section>
-      <div className="mobile-view-toggle t-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          className="t-tab"
-          aria-selected={mobileView === "list"}
-          onClick={() => setMobileView("list")}
-        >
-          <List size={15} />
-          List
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className="t-tab"
-          aria-selected={mobileView === "map"}
-          onClick={() => setMobileView("map")}
-        >
-          <MapIcon size={15} />
-          Map
-        </button>
-        <span
-          className="t-tabs-pill"
-          aria-hidden="true"
-          data-pos={mobileView}
-        />
-      </div>
+      <Modal
+        open={pickCampus}
+        onClose={() => chooseCampus(campus.id)}
+        title="Where are you looking?"
+      >
+        <p className="muted">
+          Pick a campus to see subleases nearby. You can change it any time.
+        </p>
+        <div className="campus-picker-grid" style={{ marginTop: 16 }}>
+          {campuses.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="campus-option"
+              onClick={() => chooseCampus(c.id)}
+            >
+              <span className="campus-icon">
+                <GraduationCap size={16} />
+              </span>
+              <span>
+                <strong>{c.name}</strong>
+              </span>
+              <ArrowRight size={16} />
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

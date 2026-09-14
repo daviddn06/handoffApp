@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 import {
   ArrowUpRight,
+  MailCheck,
   Search,
   Heart,
   Inbox,
@@ -77,6 +78,9 @@ export function Layout() {
       "/profile": "Profile",
       "/sign-in": "Sign in",
       "/sign-up": "Create account",
+      "/verify": "Verify your email",
+      "/forgot-password": "Forgot password",
+      "/reset-password": "Reset password",
       "/listings/new": "List your place",
     };
     document.title = `${names[location.pathname] || "Your next place"} · Handoff`;
@@ -179,6 +183,7 @@ export function Layout() {
           </div>
         </div>
       </header>
+      {user && !user.verified && !embed && <VerifyBanner email={user.email} />}
       <main id="main-content" tabIndex={-1}>
         {loading ? (
           <Loading />
@@ -211,5 +216,39 @@ export function RequireAuth() {
       to={`/sign-in?next=${encodeURIComponent(location.pathname + location.search)}`}
       replace
     />
+  );
+}
+
+/** Reminder strip for signed in students who have not verified their email. */
+export function VerifyBanner({ email }: { email: string }) {
+  const { notify } = useApp();
+  const location = useLocation();
+  const [busy, setBusy] = useState(false);
+  if (location.pathname === "/verify") return null;
+  async function resend() {
+    setBusy(true);
+    try {
+      await api("/auth/resend", { method: "POST", body: JSON.stringify({ email }) });
+      notify("We sent a fresh code and link to your inbox.");
+    } catch (e) {
+      notify(errorMessage(e), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="verify-banner" role="status">
+      <MailCheck size={15} />
+      <span>
+        <strong>Verify your student email</strong> to publish a listing or
+        request a handoff. We sent a code to {email}.
+      </span>
+      <Link to="/verify" className="button primary small">
+        Enter code
+      </Link>
+      <button type="button" className="text-button" onClick={resend} disabled={busy}>
+        {busy ? "Sending…" : "Resend"}
+      </button>
+    </div>
   );
 }

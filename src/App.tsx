@@ -1,6 +1,14 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
-import { AppProvider } from "./lib/context";
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useSearchParams,
+} from "react-router-dom";
+import { AppProvider, useApp } from "./lib/context";
+import { safeNext } from "./lib/api";
 import { Layout, RequireAuth } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
 import Browse from "./pages/Browse";
@@ -19,6 +27,14 @@ const Requests = lazy(() =>
 const Profile = lazy(() =>
   import("./pages/Account").then((m) => ({ default: m.Profile })),
 );
+/** Signed in students never see sign in or sign up, they go straight in. */
+function GuestOnly({ children }: { children: React.ReactElement }) {
+  const { user } = useApp();
+  const [params] = useSearchParams();
+  if (user) return <Navigate to={safeNext(params.get("next"))} replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -29,17 +45,22 @@ export default function App() {
               <Route index element={<Navigate to="/browse" replace />} />
               <Route path="browse" element={<Browse />} />
               <Route path="listings/:id" element={<ListingDetail />} />
-              {(
-                [
-                  "sign-in",
-                  "sign-up",
-                  "forgot-password",
-                  "reset-password",
-                  "verify",
-                ] as const
-              ).map((mode) => (
-                <Route key={mode} path={mode} element={<Auth mode={mode} />} />
+              {(["sign-in", "sign-up"] as const).map((mode) => (
+                <Route
+                  key={mode}
+                  path={mode}
+                  element={
+                    <GuestOnly>
+                      <Auth mode={mode} />
+                    </GuestOnly>
+                  }
+                />
               ))}
+              {(["forgot-password", "reset-password", "verify"] as const).map(
+                (mode) => (
+                  <Route key={mode} path={mode} element={<Auth mode={mode} />} />
+                ),
+              )}
               <Route element={<RequireAuth />}>
                 <Route path="listings/new" element={<ListingEditor />} />
                 <Route path="listings/:id/edit" element={<ListingEditor />} />
