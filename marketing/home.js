@@ -10,6 +10,41 @@
   var yearEl = document.getElementById("year");
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
+  // Signed in on the app? Show the student in the header instead of sign in.
+  // The app answers with CORS for this origin and the same site cookie.
+  (function showSession() {
+    var host = document.querySelector("[data-session]");
+    if (!host || !window.fetch) return;
+    fetch("https://app.handofflease.com/api/session", {
+      credentials: "include",
+    })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (data) {
+        var user = data && data.user;
+        if (!user) return;
+        var initials = String(user.name || "")
+          .split(" ")
+          .map(function (n) {
+            return n[0];
+          })
+          .slice(0, 2)
+          .join("")
+          .toUpperCase();
+        host.querySelector("[data-avatar]").textContent = initials || "•";
+        host.querySelector("[data-name]").textContent =
+          String(user.name || "").split(" ")[0] || "You";
+        host.querySelector("[data-guest]").hidden = true;
+        host.querySelector("[data-member]").hidden = false;
+        host.classList.add("is-signed-in");
+        document.querySelectorAll('a[href$="/sign-in"], a[href$="/sign-up"]').forEach(function (a) {
+          if (!a.closest("[data-session]")) a.setAttribute("href", "https://app.handofflease.com/browse");
+        });
+      })
+      .catch(function () {});
+  })();
+
   document.querySelectorAll('a[href="#contact-privacy"]').forEach(function (a) {
     a.addEventListener("click", function () {
       var target = document.getElementById("contact-privacy");
