@@ -62,7 +62,7 @@ export function MobileAccount({
             openAuth({ next: location.pathname + location.search })
           }
         >
-          Confirm
+          Sign up
         </button>
       </div>
     );

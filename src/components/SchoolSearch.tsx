@@ -331,28 +331,26 @@ export function SchoolSearch({
       </div>
 
       <div className="t-page" data-page-id="waitlist" aria-hidden={!waiting}>
-        <div className="school-waitlist-head">
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Back to search"
-            tabIndex={waiting ? undefined : -1}
-            onClick={() => {
-              setWaiting(null);
-              setDone("");
-              setError("");
-              input.current?.focus();
-            }}
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <SchoolLogo src={waiting ? logoFor(waiting) : ""} big />
-          <span className="school-waitlist-name">
+        <button
+          type="button"
+          className="school-back"
+          tabIndex={waiting ? undefined : -1}
+          onClick={() => {
+            setWaiting(null);
+            setDone("");
+            setError("");
+            input.current?.focus();
+          }}
+        >
+          <ArrowLeft size={15} />
+          Back to search
+        </button>
+        <div className="school-waitlist">
+          <div className="school-waitlist-id">
+            <SchoolLogo src={waiting ? logoFor(waiting) : ""} big />
             <strong>{waiting?.name || ""}</strong>
-            <small>Handoff is not open here yet</small>
-          </span>
-        </div>
-        <div className="school-panel plain">
+            <span className="school-soon">Opening soon</span>
+          </div>
           {done ? (
             <div className="school-done">
               <span
@@ -365,29 +363,25 @@ export function SchoolSearch({
               <p>{done}</p>
             </div>
           ) : (
-            <form onSubmit={joinWaitlist} className="stack">
-              <p className="muted">
-                We will email you when Handoff opens at{" "}
-                {waiting?.name || "your school"}.
-              </p>
-              <label className="field">
-                <span className="field-label">School email</span>
-                <input
-                  type="email"
-                  required
-                  inputMode="email"
-                  autoComplete="email"
-                  tabIndex={waiting ? undefined : -1}
-                  placeholder={`you@${waiting?.domain || "school.edu"}`}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
+            <form onSubmit={joinWaitlist} className="school-waitlist-form">
+              <p>Be first to know when Handoff opens here.</p>
+              <input
+                type="email"
+                required
+                inputMode="email"
+                autoComplete="email"
+                aria-label="School email"
+                tabIndex={waiting ? undefined : -1}
+                placeholder={`you@${waiting?.domain || "school.edu"}`}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
               {error && <ErrorBox message={error} />}
               <Button type="submit" busy={busy} tabIndex={waiting ? undefined : -1}>
                 <MailPlus size={16} />
                 Notify me
               </Button>
+              <small>One email when it opens. Nothing else.</small>
             </form>
           )}
         </div>

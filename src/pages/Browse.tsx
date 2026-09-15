@@ -451,60 +451,61 @@ export default function Browse() {
       <aside className="browse-panel" aria-label="Listings">
         <div className="panel-head">
           <div className="head-row">
-            <Popover
-              width={campusMenuWidth}
-              open={switchCampus}
-              onOpenChange={setSwitchCampus}
-              className="campus-pop"
-              trigger={(props) => (
-                <button type="button" className="campus-switch" {...props}>
-                  <SchoolLogo src={campusLogo(campus)} />
-                  <span className="campus-value">
-                    <span className="campus-near">Near </span>
-                    {campus.name}
-                  </span>
-                  <ChevronDown size={16} className="campus-chevron" />
+            <div className="search-field">
+              <Popover
+                width={campusMenuWidth}
+                open={switchCampus}
+                onOpenChange={setSwitchCampus}
+                className="campus-pop"
+                trigger={(props) => (
+                  <button
+                    type="button"
+                    className="school-chip"
+                    aria-label={`Near ${campus.name}. Change school`}
+                    title={`Near ${campus.name}`}
+                    {...props}
+                  >
+                    <SchoolLogo src={campusLogo(campus)} />
+                    <ChevronDown size={14} className="campus-chevron" />
+                  </button>
+                )}
+              >
+                {(close) => (
+                  <div className="popover-body">
+                    <SchoolSearch
+                      campuses={campuses}
+                      current={campus.id}
+                      onClose={close}
+                      onChoose={(id) => {
+                        chooseCampus(id);
+                        close();
+                      }}
+                    />
+                  </div>
+                )}
+              </Popover>
+              <input
+                aria-label={`Search listings near ${campus.name}`}
+                placeholder={phone ? "Search this area" : `Search near ${campus.name}`}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="icon-button clear"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setSearch("");
+                    setParam("query", "");
+                  }}
+                >
+                  <X size={15} />
                 </button>
               )}
-            >
-              {(close) => (
-                <div className="popover-body">
-                  <SchoolSearch
-                    campuses={campuses}
-                    current={campus.id}
-                    onClose={close}
-                    onChoose={(id) => {
-                      chooseCampus(id);
-                      close();
-                    }}
-                  />
-                </div>
-              )}
-            </Popover>
+            </div>
             <MobileAccount className="browse-account" />
           </div>
-          <label className="search-field">
-            <Search size={16} />
-            <input
-              aria-label="Search listings"
-              placeholder="Search by street, building, or keyword"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button
-                type="button"
-                className="icon-button clear"
-                aria-label="Clear search"
-                onClick={() => {
-                  setSearch("");
-                  setParam("query", "");
-                }}
-              >
-                <X size={15} />
-              </button>
-            )}
-          </label>
           <div className="chip-strip">
           <div className="chip-row" role="group" aria-label="Filters">
             <Popover

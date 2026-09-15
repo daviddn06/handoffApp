@@ -30,11 +30,57 @@
   gap: var(--s-3);
   background: var(--surface);
 }
+/* One field carries both searches. The school chip on its left opens the
+   school search, the input itself searches listings near that school. */
 .head-row {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
 }
-.head-row > .popover-anchor {
-  display: block;
+.head-row > .search-field {
+  flex: 1;
+  min-width: 0;
+}
+.search-field > .popover-anchor {
+  display: flex;
+  flex: none;
+}
+.school-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 32px;
+  padding: 0 4px 0 2px;
+  margin-left: -6px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.school-chip[aria-expanded="true"],
+.school-chip:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
+.school-chip .school-logo {
+  width: 26px;
+  height: 26px;
+}
+.school-chip .school-logo img {
+  width: 17px;
+  height: 17px;
+}
+.school-chip .school-logo img.brand {
+  width: 20px;
+  height: 20px;
+}
+.school-chip::after {
+  content: "";
+  width: 1px;
+  height: 18px;
+  margin-left: 4px;
+  background: var(--line-2);
 }
 /* The campus control is a plain row, not a field. The search below it already
    carries a box, so this one only needs a mark, the name and an arrow. */
@@ -1465,25 +1511,11 @@
     gap: var(--s-2);
   }
   /* The campus field and the account entry share the top row. */
+  /* The search field and the account entry share the top row. */
   .head-row {
     display: flex;
     align-items: center;
     gap: var(--s-2);
-  }
-  .head-row > .popover-anchor {
-    flex: 1;
-    min-width: 0;
-  }
-  /* Over the map the row takes a soft white fill so it stays legible. No
-     border, no ring, it is still a row and not a field. */
-  .browse-page.mobile-map .campus-switch {
-    margin-left: 0;
-    padding: var(--s-2) var(--s-3);
-    border-radius: var(--r-md);
-    background: rgb(255 255 255 / 0.82);
-    backdrop-filter: saturate(1.6) blur(14px);
-    -webkit-backdrop-filter: saturate(1.6) blur(14px);
-    box-shadow: none;
   }
   .browse-page.mobile-map .search-field {
     background: rgb(255 255 255 / 0.96);
@@ -2073,29 +2105,73 @@
   color: var(--muted);
   line-height: 1.55;
 }
-.school-waitlist-head {
-  display: flex;
+.school-back {
+  display: inline-flex;
   align-items: center;
-  gap: var(--s-3);
-  flex: 0 0 auto;
-  min-height: 46px;
+  gap: 6px;
+  min-height: 32px;
+  margin-left: -4px;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: color var(--duration-quick) var(--ease-out);
 }
-.school-waitlist-name {
-  min-width: 0;
+.school-back:hover {
+  color: var(--ink);
+}
+.school-waitlist {
   display: flex;
   flex-direction: column;
-  line-height: 1.25;
+  gap: var(--s-5);
+  padding: var(--s-3) 0 var(--s-2);
 }
-.school-waitlist-name strong {
-  font-size: 15px;
+.school-waitlist-id {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  text-align: center;
+}
+.school-waitlist-id .school-logo.big {
+  width: 60px;
+  height: 60px;
+  margin-bottom: var(--s-1);
+}
+.school-waitlist-id strong {
+  font-size: 17px;
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  text-wrap: balance;
 }
-.school-waitlist-name small {
-  font-size: 13px;
+.school-soon {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: #fff4e3;
+  color: #8a5a10;
+  font-size: 12px;
+  font-weight: 600;
+}
+.school-waitlist-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.school-waitlist-form p {
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
   color: var(--muted);
+}
+.school-waitlist-form small {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted-2);
 }
 .school-done {
   display: flex;
