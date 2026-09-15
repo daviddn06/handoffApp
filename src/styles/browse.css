@@ -1635,9 +1635,12 @@
   .browse-page.mobile-map .panel-scroll {
     display: none;
   }
+  /* Controls sit just above the card carousel, never behind a card. The
+     carousel is 24px above the nav pill and a card is about 148px tall with
+     the two line title, so the group starts 12px above the tallest card. */
   .browse-page.mobile-map .map-controls {
     top: auto;
-    bottom: calc(var(--mobile-nav-h) + 148px + env(safe-area-inset-bottom));
+    bottom: calc(var(--mobile-nav-h) + 196px + env(safe-area-inset-bottom));
     left: auto;
     right: 12px;
   }
@@ -1646,8 +1649,9 @@
   .browse-page.mobile-map .map-sheet {
     display: none;
   }
+  /* Attribution sits above the control group, so nothing hides behind it. */
   .browse-page.mobile-map .maplibregl-ctrl-bottom-right {
-    bottom: calc(var(--mobile-nav-h) + 130px + env(safe-area-inset-bottom));
+    bottom: calc(var(--mobile-nav-h) + 364px + env(safe-area-inset-bottom));
   }
   .browse-page.mobile-map .maplibregl-ctrl-bottom-left {
     display: none;
