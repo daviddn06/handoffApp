@@ -115,11 +115,11 @@ async function setup(t, overrides = {}) {
       message.text.split("\n").find((line) => line.startsWith("http")),
     ).searchParams.get("token");
   };
-  const signup = async (address, name = "Test Student", campusId = "usc") => {
+  const signup = async (address, name = "Test Student") => {
     const user = client();
     const result = await user.call("/api/auth/signup", {
       method: "POST",
-      body: { name, email: address, password: PASSWORD, campusId },
+      body: { name, email: address, password: PASSWORD },
     });
     assert.ok(
       [201, 202].includes(result.status),
@@ -127,8 +127,8 @@ async function setup(t, overrides = {}) {
     );
     return user;
   };
-  const verified = async (address, name = "Test Student", campusId = "usc") => {
-    const user = await signup(address, name, campusId);
+  const verified = async (address, name = "Test Student") => {
+    const user = await signup(address, name);
     const result = await user.call("/api/auth/verify", {
       method: "POST",
       body: { token: tokenFor(address) },
@@ -870,7 +870,6 @@ test("cross-origin, campus validation, expired tokens and durable rate limits ar
     name: "Student Name",
     email: "student@usc.edu",
     password: PASSWORD,
-    campusId: "usc",
   };
   assert.equal(
     (
@@ -897,22 +896,19 @@ test("cross-origin, campus validation, expired tokens and durable rate limits ar
       .count,
     0,
   );
+  // A school Handoff does not recognise at all is turned away with the
+  // waitlist message. A school it does know is welcome, live or not.
   for (const wrong of [
     "student@gmail.com",
     "student@usc.edu.evil.example",
     "student@evilusc.edu",
-    "student@ucla.edu",
   ]) {
-    assert.equal(
-      (
-        await user.call("/api/auth/signup", {
-          method: "POST",
-          body: { ...signup, email: wrong },
-        })
-      ).status,
-      400,
-      wrong,
-    );
+    const refused = await user.call("/api/auth/signup", {
+      method: "POST",
+      body: { ...signup, email: wrong },
+    });
+    assert.equal(refused.status, 400, wrong);
+    assert.equal(refused.body.code, "school_unknown", wrong);
   }
   const account = await env.signup("student@marshall.usc.edu");
   const expired = env.tokenFor("student@marshall.usc.edu");
@@ -987,7 +983,6 @@ test("unconfigured and failed email never claim success; requests survive notifi
             name: "Student",
             email: "nomail@usc.edu",
             password: PASSWORD,
-            campusId: "usc",
           },
         })
     ).status,
@@ -1008,7 +1003,6 @@ test("unconfigured and failed email never claim success; requests survive notifi
         name: "Mail Fail",
         email: "mailfail@usc.edu",
         password: PASSWORD,
-        campusId: "usc",
       },
     });
   assert.equal(failedSignup.status, 503);
@@ -1083,7 +1077,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 6);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 7);
   assert.throws(
     () =>
       createApp({
@@ -1096,8 +1090,8 @@ test("secure host cookies and database persistence survive restart", async (t) =
 
 test("re-registering an unverified email replaces pre-registered credentials and invalidates old links", async (t) => {
   const env = await setup(t);
-  const attackerPassword = "Attacker chosen password 867";
-  const victimPassword = "Actual student password 915";
+  const attackerPassword = "Quiet lantern parade 867";
+  const victimPassword = "Copper harbor lantern 915";
   const attacker = env.client();
   assert.equal(
     (
@@ -1107,7 +1101,6 @@ test("re-registering an unverified email replaces pre-registered credentials and
           name: "Attacker Name",
           email: "student@usc.edu",
           password: attackerPassword,
-          campusId: "usc",
         },
       })
     ).status,
@@ -1124,7 +1117,6 @@ test("re-registering an unverified email replaces pre-registered credentials and
           name: "Actual Student",
           email: "student@usc.edu",
           password: victimPassword,
-          campusId: "usc",
         },
       })
     ).status,
@@ -1175,7 +1167,6 @@ test("re-registering an unverified email replaces pre-registered credentials and
           name: "Attacker Name",
           email: "student@usc.edu",
           password: attackerPassword,
-          campusId: "usc",
         },
       })
     ).status,
@@ -1399,16 +1390,17 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      6,
+      7,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
       "Preserved Student",
     );
     const files = (await readdir(join(dataDir, "backups"))).sort();
-    assert.equal(files.length, 2);
+    assert.equal(files.length, 3);
     assert.match(files[0], /^before-schema-2-/);
     assert.match(files[1], /^before-schema-3-/);
+    assert.match(files[2], /^before-schema-7-/);
     assert.ok(
       migrated.locals.db
         .prepare("SELECT name FROM sqlite_master WHERE name='waitlist'")
@@ -1587,4 +1579,127 @@ test("boosted listings come first in browse, inside the requested sort", async (
   assert.equal(listed[0].boosted, true);
   assert.equal(listed[1].boosted, false);
   assert.equal(listed[1].boostUntil, null);
+});
+
+test("a student at any known school can sign up, browse, save and request, but not list", async (t) => {
+  const env = await setup(t);
+  // A USC student gets the live campus, so listing is open to them.
+  const trojan = await env.verified("owner@usc.edu", "Maya Owner");
+  const session = (await trojan.call("/api/session")).body.user;
+  assert.equal(session.campusId, "usc");
+  assert.deepEqual(session.school, {
+    name: "University of Southern California",
+    domain: "usc.edu",
+    live: true,
+  });
+  const listing = await env.publish(trojan);
+
+  // An NYU student is welcome. Handoff is not open there, so campusId is null.
+  const visitor = await env.verified("intern@nyu.edu", "Riley Visitor");
+  const account = (await visitor.call("/api/session")).body.user;
+  assert.equal(account.campusId, null);
+  assert.deepEqual(account.school, {
+    name: "New York University",
+    domain: "nyu.edu",
+    live: false,
+  });
+
+  // Browsing, saving and requesting are open to them everywhere Handoff runs.
+  assert.equal(
+    (await visitor.call("/api/listings?campusId=usc")).body.listings.length,
+    1,
+  );
+  assert.equal(
+    (await visitor.call(`/api/saved/${listing.id}`, { method: "POST" })).status,
+    200,
+  );
+  assert.equal((await visitor.call("/api/saved")).body.listings.length, 1);
+  const asked = await visitor.call("/api/requests", {
+    method: "POST",
+    body: {
+      listingId: listing.id,
+      message: "Hello, I am in Los Angeles for a summer internship.",
+    },
+  });
+  assert.equal(asked.status, 201, JSON.stringify(asked.body));
+
+  // Listing, publishing and boosting are the only things held back.
+  for (const status of ["draft", "active"]) {
+    const refused = await visitor.call("/api/listings", {
+      method: "POST",
+      body: validListing([], { status }),
+    });
+    assert.equal(refused.status, 403, status);
+    assert.equal(refused.body.code, "school_not_live", status);
+    assert.match(refused.body.error, /New York University/);
+  }
+  const boost = await visitor.call(`/api/listings/${listing.id}/boost`, {
+    method: "POST",
+    body: { kind: "launch" },
+  });
+  assert.equal(boost.status, 403);
+  assert.equal(boost.body.code, "school_not_live");
+  assert.equal(
+    env.app.locals.db.prepare("SELECT count(*) AS n FROM listings").get().n,
+    1,
+  );
+
+  // A subdomain of a known school still resolves to that school.
+  const alum = await env.signup("grad@alumni.usc.edu", "Sam Alum");
+  const alumni = (await alum.call("/api/session")).body.user;
+  assert.equal(alumni.campusId, "usc");
+  assert.equal(alumni.school.name, "University of Southern California");
+});
+
+test("password rules reject weak, personal and common choices", async (t) => {
+  const env = await setup(t);
+  const user = env.client();
+  const attempt = (overrides) =>
+    user.call("/api/auth/signup", {
+      method: "POST",
+      body: {
+        name: "Dana Fielding",
+        email: "dana@usc.edu",
+        password: "Quiet lantern parade 214",
+        ...overrides,
+      },
+    });
+  const cases = [
+    ["short1234", /at least 10 characters/],
+    ["lanternparade", /at least one number/],
+    ["1234567890123", /at least one letter/],
+    ["dana is here 12", /email address in your password/],
+    ["fielding house 42", /name in your password/],
+    ["password12345", /most common ones/],
+    ["Tr0jans2026", /most common ones/],
+  ];
+  for (const [password, expected] of cases) {
+    const result = await attempt({ password });
+    assert.equal(result.status, 400, password);
+    assert.match(result.body.error, expected, password);
+  }
+  const good = await attempt({});
+  assert.equal(good.status, 201, JSON.stringify(good.body));
+  await user.call("/api/auth/verify", {
+    method: "POST",
+    body: { token: env.tokenFor("dana@usc.edu") },
+  });
+
+  // A reset holds the same line, including the account's own name and email.
+  await user.call("/api/auth/forgot", {
+    method: "POST",
+    body: { email: "dana@usc.edu" },
+  });
+  const token = env.tokenFor("dana@usc.edu", "reset");
+  const weak = await user.call("/api/auth/reset", {
+    method: "POST",
+    body: { token, password: "Fielding harbor 2026" },
+  });
+  assert.equal(weak.status, 400);
+  assert.match(weak.body.error, /name in your password/);
+  const reset = await user.call("/api/auth/reset", {
+    method: "POST",
+    body: { token, password: "Copper harbor lantern 915" },
+  });
+  assert.equal(reset.status, 200, JSON.stringify(reset.body));
 });

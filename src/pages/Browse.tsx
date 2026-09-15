@@ -94,12 +94,19 @@ export default function Browse() {
     navigate = useNavigate(),
     [params, setParams] = useSearchParams();
   const remembered = readCampus();
+  // Everyone starts at the first live campus unless they chose another one.
+  // A student whose own school is not open yet has no campusId, so the
+  // default must never come from their email.
+  const firstLive = campuses.find((c) => c.live !== false) || campuses[0];
   const campus =
     campuses.find(
       (c) =>
         c.id ===
-        (params.get("campusId") || user?.campusId || remembered || "usc"),
-    ) || campuses[0];
+        (params.get("campusId") ||
+          remembered ||
+          user?.campusId ||
+          firstLive?.id),
+    ) || firstLive;
   // First visit without an account or a remembered campus asks where to look.
   const [pickCampus, setPickCampus] = useState(() => {
     if (user || isEmbed()) return false;

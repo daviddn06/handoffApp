@@ -64,9 +64,11 @@ export default function App() {
               )}
               <Route path="terms" element={<Legal kind="terms" />} />
               <Route path="privacy" element={<Legal kind="privacy" />} />
-              <Route element={<RequireAuth />}>
+              <Route element={<RequireAuth to="/sign-up" />}>
                 <Route path="listings/new" element={<ListingEditor />} />
                 <Route path="listings/:id/edit" element={<ListingEditor />} />
+              </Route>
+              <Route element={<RequireAuth />}>
                 <Route path="saved" element={<Saved />} />
                 <Route path="my-listings" element={<MyListings />} />
                 <Route path="requests" element={<Requests />} />

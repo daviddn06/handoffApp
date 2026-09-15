@@ -1,5 +1,5 @@
-/* Auth: one centered box on the soft page, form on the left, a composed
-   preview of the real app UI on the right. Sign in, stepped sign up,
+/* Auth: one centered box on the soft page, form on the left, a flat scaled
+   replica of the real browse screen on the right. Sign in, stepped sign up,
    verification, forgot and reset. Self contained. */
 .auth-page {
   flex: 1;
@@ -210,66 +210,84 @@
   font-size: 12.5px;
   font-weight: 500;
 }
-.auth-campus-card {
+/* One quiet line, not a card. The email decided the school, so there is
+   nothing here to change. */
+.auth-school-line {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border-radius: var(--r-md);
-  background: var(--soft);
-  box-shadow: var(--ring);
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
 }
-.auth-campus-card > div {
-  flex: 1;
-  min-width: 0;
+.auth-school-line > span {
+  font-weight: 500;
+}
+.auth-school-line small {
+  flex-basis: 100%;
+  padding-left: 30px;
+  font-size: 12px;
+  color: var(--muted-2);
+}
+.auth-school-line .school-logo {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+/* Password strength, four segments plus one line of advice */
+.auth-meter-block {
   display: flex;
   flex-direction: column;
-}
-.auth-campus-card strong {
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-.auth-campus-card small {
-  font-size: 12px;
-  color: var(--muted);
-}
-.auth-campus-card select {
-  width: auto;
-  min-width: 96px;
-  min-height: 36px;
-  font-size: 13px;
-  padding: 4px 30px 4px 10px;
-  background-position: right 8px center;
-}
-.auth-campus-icon {
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  border-radius: var(--r-sm);
-  display: grid;
-  place-items: center;
-  background: var(--blue-soft);
-  color: var(--blue);
+  gap: 6px;
+  margin-top: -6px;
 }
 .auth-meter {
-  height: 4px;
-  margin-top: -6px;
-  border-radius: var(--r-pill);
-  background: var(--line);
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
 }
 .auth-meter span {
-  display: block;
-  height: 100%;
+  height: 4px;
   border-radius: var(--r-pill);
-  background: var(--amber);
-  transition:
-    width var(--duration-fast) var(--ease-smooth-out),
-    background-color var(--duration-fast) var(--ease-out);
+  background: var(--line);
+  transition: background-color var(--duration-fast) var(--ease-out);
 }
-.auth-meter[data-filled="yes"] span {
+.auth-meter[data-level="weak"] span[data-on="yes"] {
+  background: var(--red);
+}
+.auth-meter[data-level="okay"] span[data-on="yes"] {
+  background: var(--amber);
+}
+.auth-meter[data-level="good"] span[data-on="yes"] {
+  background: var(--blue);
+}
+.auth-meter[data-level="strong"] span[data-on="yes"] {
   background: var(--green);
+}
+.auth-meter-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  min-height: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.auth-meter-note strong {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.auth-meter-note[data-level="weak"] strong {
+  color: var(--red-ink);
+}
+.auth-meter-note[data-level="good"] strong {
+  color: var(--blue-ink);
+}
+.auth-meter-note[data-level="strong"] strong {
+  color: var(--green-ink);
 }
 
 /* Verification */
@@ -300,7 +318,9 @@
   min-height: 40px;
 }
 
-/* Right section, a composed still life of the real app UI */
+/* Right section, a flat replica of the real browse screen. Soft cloud
+   gradient behind it, the replica scaled down inside an overflow hidden
+   frame so it reads as the product and not a drawing. */
 .auth-preview {
   position: relative;
   flex: 1;
@@ -308,87 +328,108 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 16px;
-  padding: 24px;
+  padding: 20px;
   overflow: hidden;
   background:
-    radial-gradient(110% 80% at 85% 0%, #dcebff 0%, transparent 62%),
-    linear-gradient(180deg, #eef4fd 0%, #f6f8fa 100%);
+    radial-gradient(70% 55% at 18% 8%, rgb(255 255 255 / 0.95) 0%, transparent 70%),
+    radial-gradient(60% 45% at 88% 18%, rgb(255 255 255 / 0.85) 0%, transparent 72%),
+    radial-gradient(120% 90% at 85% 0%, #dcebff 0%, transparent 62%),
+    linear-gradient(180deg, #e9f1fd 0%, #f5f8fb 100%);
   box-shadow: inset 1px 0 0 var(--line);
 }
-.auth-preview-stage {
-  position: relative;
-  flex: 1;
-  min-height: 350px;
+.auth-replica-frame {
+  position: absolute;
+  inset: 26px 0 0 26px;
+  overflow: hidden;
+  border-top-left-radius: var(--r-lg);
+  box-shadow:
+    0 18px 50px rgb(16 24 40 / 0.16),
+    0 0 0 1px rgb(16 24 40 / 0.06);
   pointer-events: none;
 }
-.auth-preview .listing-card.compact {
-  position: absolute;
-  width: min(100%, 320px);
-  grid-template-columns: 112px minmax(0, 1fr);
-  animation: auth-float 7s var(--ease-in-out) infinite;
+.auth-replica {
+  width: 900px;
+  height: 640px;
+  transform: scale(var(--auth-replica-scale, 0.62));
+  transform-origin: top left;
+  background: var(--surface);
 }
-.auth-card-behind {
-  left: 34px;
-  top: 92px;
-  opacity: 0.6;
-  rotate: -2.5deg;
-  animation-delay: 300ms;
+/* The real browse page sizes itself to the viewport, here it fills the frame. */
+.auth-replica .browse-page {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: 440px minmax(0, 1fr);
 }
-.auth-card-front {
-  left: 0;
-  top: 170px;
-  box-shadow: var(--shadow-md), var(--ring);
+.auth-replica .listing-list {
+  padding-top: 10px;
+}
+/* The price never gives way to the tags beside it. */
+.auth-replica .card-price {
+  flex: none;
+}
+.auth-replica .listing-card {
+  box-shadow: var(--shadow-xs), var(--ring);
+}
+.auth-replica .chip-row {
+  mask-image: none;
+  -webkit-mask-image: none;
+  overflow: hidden;
+}
+.auth-replica .results-toolbar {
+  position: static;
+}
+.auth-replica-placeholder {
+  font-size: 14px;
+  color: var(--muted-2);
+}
+.auth-replica-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--ink-2);
 }
 .auth-photo {
   display: block;
   width: 100%;
   height: 100%;
   min-height: 118px;
-  background: linear-gradient(145deg, #cfe0f8 0%, #9dc0ee 55%, #7aa5e3 100%);
+  background: linear-gradient(145deg, #e3d7c3 0%, #cbb896 58%, #b9a37c 100%);
 }
 .auth-photo.two {
   background: linear-gradient(145deg, #dbe7d6 0%, #accba3 60%, #8ab581 100%);
 }
-/* The map markers carry left: 0 by default, so each one resets what it does
-   not use. */
-.auth-preview .price-marker,
-.auth-preview .cluster-marker {
+.auth-photo.three {
+  background: linear-gradient(145deg, #eedcd2 0%, #d8ac96 58%, #c4907a 100%);
+}
+
+/* The map half, a still picture with the app's own markers on top */
+.auth-replica-map {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: #f4f6f8;
+}
+.auth-replica-art {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.auth-replica-map .price-marker,
+.auth-replica-map .cluster-marker,
+.auth-replica-map .campus-marker {
   position: absolute;
-  left: auto;
-  top: auto;
-  transform: none;
+  transform: translate(-50%, -50%);
   opacity: 1;
   cursor: default;
-  animation: auth-float 7s var(--ease-in-out) infinite;
+  transition: none;
 }
-.auth-pin.one {
-  right: 8%;
-  top: 2%;
-}
-.auth-pin.two {
-  left: 6%;
-  top: 13%;
-  animation-delay: 600ms;
-}
-.auth-pin.three {
-  right: 30%;
-  top: 13%;
-  animation-delay: 1200ms;
-}
-.auth-preview .cluster-marker {
-  right: 3%;
-  top: 34%;
-  animation-delay: 900ms;
-}
-@keyframes auth-float {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  50% {
-    translate: 0 -6px;
-  }
+.auth-replica-map .price-marker.is-active {
+  background: var(--blue);
+  color: #fff;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 4px 12px rgb(59 120 215 / 0.4);
 }
 .auth-preview-caption {
   position: relative;
@@ -459,11 +500,10 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .auth-preview .listing-card.compact,
-  .auth-preview .price-marker,
-  .auth-preview .cluster-marker {
+  .auth-replica *,
+  .auth-preview * {
     animation: none !important;
-    translate: none !important;
+    transition: none !important;
   }
   .auth-shake {
     animation: none !important;
@@ -472,4 +512,22 @@
   .auth-slide .t-page {
     transition: none !important;
   }
+}
+
+.auth-hint a {
+  color: var(--blue);
+  font-weight: 500;
+}
+.auth-hint a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Which part of confirming you are a student this step covers */
+.auth-step-name {
+  margin: 0 0 -14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
 }

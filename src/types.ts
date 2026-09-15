@@ -8,11 +8,20 @@ export type Campus = {
   /** Campuses students can pick today. The rest are waitlist only. */
   live?: boolean;
 };
+/** The student's own school, whether or not Handoff has opened there. */
+export type School = {
+  name: string;
+  domain: string;
+  /** True when listing is open at this school. */
+  live: boolean;
+};
 export type User = {
   id: string;
   name: string;
   email: string;
-  campusId: string;
+  /** The live campus this student may post at, null when theirs is not open. */
+  campusId: string | null;
+  school: School;
   verified: boolean;
   termsAccepted: boolean;
   bio: string;

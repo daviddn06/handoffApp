@@ -60,13 +60,19 @@ export function campusForEmail(email: string, campuses: Campus[]) {
   );
 }
 
-/** Any known US school for an email domain, supported or not. */
+/**
+ * Any known US school for an email domain, supported or not. The domain is
+ * walked up label by label, so alumni.usc.edu resolves to USC while
+ * usc.edu.evil.example resolves to nothing.
+ */
 export function schoolForEmail(email: string, schools: School[]) {
-  const domain = emailDomain(email);
+  const domain = emailDomain(email).replace(/\.$/, "");
   if (!domain) return null;
-  return (
-    schools.find((s) =>
-      s.d.some((d) => domain === d || domain.endsWith(`.${d}`)),
-    ) || null
-  );
+  const labels = domain.split(".");
+  for (let i = 0; i < labels.length - 1; i++) {
+    const candidate = labels.slice(i).join(".");
+    const match = schools.find((s) => s.d.includes(candidate));
+    if (match) return { school: match, domain: candidate };
+  }
+  return null;
 }

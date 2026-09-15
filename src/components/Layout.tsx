@@ -89,7 +89,7 @@ export function Layout() {
       "/my-listings": "My listings",
       "/profile": "Profile",
       "/sign-in": "Sign in",
-      "/sign-up": "Create account",
+      "/sign-up": "Confirm you are a student",
       "/verify": "Verify your email",
       "/forgot-password": "Forgot password",
       "/reset-password": "Reset password",
@@ -238,14 +238,19 @@ export function Layout() {
     </>
   );
 }
-export function RequireAuth() {
+/**
+ * A signed out visitor who wants to list a place is almost always new, so the
+ * listing routes send them to create an account. Everything else still opens
+ * sign in, where a returning student expects to land.
+ */
+export function RequireAuth({ to = "/sign-in" }: { to?: string } = {}) {
   const { user } = useApp(),
     location = useLocation();
   return user ? (
     <Outlet />
   ) : (
     <Navigate
-      to={`/sign-in?next=${encodeURIComponent(location.pathname + location.search)}`}
+      to={`${to}?next=${encodeURIComponent(location.pathname + location.search)}`}
       replace
     />
   );

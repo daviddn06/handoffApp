@@ -8,6 +8,7 @@ import { join, resolve, sep } from "node:path";
 import sharp from "sharp";
 import { openDatabase } from "../server/database.js";
 import { hashPassword } from "../server/security.js";
+import { liveCampusForEmail, schoolForEmail } from "../server/schools.js";
 
 const DEMO_PASSWORD = "Demo password 2026!";
 const TODAY = new Date().toLocaleDateString("en-CA", {
@@ -990,13 +991,18 @@ db.transaction(() => {
   users.forEach((user, index) => {
     const id = randomUUID();
     userIds[user.key] = id;
+    const school = schoolForEmail(user.email);
     db.prepare(
-      "INSERT INTO users(id,name,email,campus_id,password_hash,verified_at,bio,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,verified_at,bio,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
     ).run(
       id,
       user.name,
       user.email,
-      user.campusId,
+      // Only a live campus grants posting. The demo listings keep their own
+      // campus either way, so browsing still shows every seeded city.
+      liveCampusForEmail(user.email)?.id || null,
+      school?.domain || null,
+      school?.name || null,
       passwordHash,
       daysAgo(60 - index),
       user.bio,

@@ -140,7 +140,8 @@ export function SchoolSearch({
     key: `campus-${campus.id}`,
     name: campus.name,
     domain: campus.domain,
-    meta: campus.shortName,
+    // The domain, never an abbreviation. Schools are named in full here.
+    meta: campus.domain,
     campus,
     school: null,
     brand: BRAND_LOGOS[campus.id],

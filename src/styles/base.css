@@ -1556,3 +1556,84 @@ html:has(.verify-banner) .browse-page {
 .menu-legal a:hover {
   color: var(--ink);
 }
+
+/* Handoff is not open at this student's school yet. A calm page, not a wall:
+   browsing, saving and requesting all still work, only listing waits. */
+.not-live {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 520px;
+  margin: auto;
+  padding: 64px 24px 72px;
+}
+.not-live.compact {
+  padding: 40px 24px 48px;
+}
+.not-live-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 20px;
+  border-radius: var(--r-lg);
+  background: var(--blue-soft);
+}
+.not-live-mark .school-logo {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  box-shadow: none;
+}
+.not-live h1 {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 28px;
+  line-height: 1.22;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.not-live.compact h1 {
+  font-size: 22px;
+}
+.not-live p {
+  margin-top: 10px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--muted);
+  max-width: 400px;
+  text-wrap: pretty;
+}
+.not-live-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+.not-live-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 13.5px;
+  font-weight: 500;
+  max-width: none;
+}
+@media (max-width: 760px) {
+  .not-live {
+    padding: 44px 18px 56px;
+  }
+  .not-live h1 {
+    font-size: 24px;
+  }
+  .not-live-actions > *,
+  .not-live-actions form,
+  .not-live-actions .button {
+    width: 100%;
+  }
+}

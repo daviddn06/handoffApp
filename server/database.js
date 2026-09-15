@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { CAMPUSES } from "./config.js";
 
 export function openDatabase(dataDir) {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
@@ -13,7 +14,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 6) {
+  if (version > 7) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -39,7 +40,7 @@ export function openDatabase(dataDir) {
       db.exec(`
       CREATE TABLE users (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-        campus_id TEXT NOT NULL, password_hash TEXT NOT NULL, verified_at TEXT,
+        campus_id TEXT, school_domain TEXT, school_name TEXT, password_hash TEXT NOT NULL, verified_at TEXT,
         bio TEXT NOT NULL DEFAULT '', terms_accepted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE TABLE sessions (
@@ -110,7 +111,7 @@ export function openDatabase(dataDir) {
         created_at TEXT NOT NULL, PRIMARY KEY(listing_id, viewer_key, hour)
       );
       CREATE INDEX listing_views_listing ON listing_views(listing_id, created_at);
-      PRAGMA user_version = 6;
+      PRAGMA user_version = 7;
     `);
     })();
   if (version === 1) {
@@ -193,6 +194,63 @@ export function openDatabase(dataDir) {
       );
       db.pragma("user_version = 6");
     })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 6) {
+    const backupDir = join(dataDir, "backups");
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const backup = join(backupDir, `before-schema-7-${Date.now()}.sqlite`);
+    db.prepare("VACUUM INTO ?").run(backup);
+    chmodSync(backup, 0o600);
+    // Rebuilding users means dropping a table other tables point at, so the
+    // foreign key check is suspended for the length of the rebuild only.
+    db.pragma("foreign_keys = OFF");
+    try {
+      db.transaction(() => {
+        // Any student at any school may hold an account. campus_id keeps its
+        // name but changes meaning: the live campus this student may post at,
+        // NULL when Handoff has not opened at their school. The school itself
+        // is recorded separately so the app can name it in full.
+        const columns = db
+          .prepare("PRAGMA table_info(users)")
+          .all()
+          .map((column) => column.name);
+        if (!columns.includes("school_domain"))
+          db.exec("ALTER TABLE users ADD COLUMN school_domain TEXT");
+        if (!columns.includes("school_name"))
+          db.exec("ALTER TABLE users ADD COLUMN school_name TEXT");
+        for (const campus of CAMPUSES)
+          db.prepare(
+            "UPDATE users SET school_domain=COALESCE(school_domain,?),school_name=COALESCE(school_name,?) WHERE campus_id=?",
+          ).run(campus.domain, campus.name, campus.id);
+        // SQLite cannot drop NOT NULL in place, so users is rebuilt once.
+        db.exec(`
+          CREATE TABLE users_v7 (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            campus_id TEXT, school_domain TEXT, school_name TEXT, password_hash TEXT NOT NULL, verified_at TEXT,
+            bio TEXT NOT NULL DEFAULT '', terms_accepted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+          );
+          INSERT INTO users_v7(id,name,email,campus_id,school_domain,school_name,password_hash,verified_at,bio,terms_accepted_at,created_at,updated_at)
+            SELECT id,name,email,campus_id,school_domain,school_name,password_hash,verified_at,bio,terms_accepted_at,created_at,updated_at FROM users;
+          DROP TABLE users;
+          ALTER TABLE users_v7 RENAME TO users;
+        `);
+        // A campus that is not open can no longer grant posting. Listings keep
+        // their own campus, so nothing already published disappears.
+        for (const campus of CAMPUSES)
+          if (campus.live === false)
+            db.prepare("UPDATE users SET campus_id=NULL WHERE campus_id=?").run(
+              campus.id,
+            );
+        db.pragma("user_version = 7");
+      })();
+      const violations = db.pragma("foreign_key_check");
+      if (violations.length)
+        throw new Error(
+          "Schema 7 migration left dangling references. Restore the backup beside the database and retry.",
+        );
+    } finally {
+      db.pragma("foreign_keys = ON");
+    }
   }
   return db;
 }

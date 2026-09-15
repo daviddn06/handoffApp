@@ -45,6 +45,7 @@ import {
 } from "../lib/api";
 import { useApp } from "../lib/context";
 import { Button, ErrorBox, Field, Loading } from "../components/ui";
+import { SchoolNotLive } from "../components/SchoolNotLive";
 import { DateField } from "../components/DateField";
 const Map = lazy(() => import("../components/Map"));
 type AddressMatch = { line: string; place: string; lat: number; lng: number };
@@ -488,6 +489,14 @@ export default function ListingEditor() {
     }
     await save("active");
   }
+  // Handoff has not opened at this student's school, so the wizard never
+  // loads for them. They keep browsing, saving and requesting everywhere else.
+  if (user && !user.campusId)
+    return (
+      <div className="page-container narrow">
+        <SchoolNotLive />
+      </div>
+    );
   if (loading) return <Loading label="Loading your listing…" />;
   if (error)
     return (

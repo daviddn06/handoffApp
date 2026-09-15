@@ -326,14 +326,13 @@
   .auth-form .field .field-error {
     font-size: 12.5px;
   }
-  .auth-campus-card {
-    border-radius: var(--group-r);
-    background: var(--surface);
-    padding: 12px 14px;
+  .auth-school-line {
+    padding: 0 2px;
+    font-size: 14px;
   }
-  .auth-campus-card select {
-    min-height: 40px;
-    font-size: 15px;
+  .auth-school-line small {
+    padding-left: 32px;
+    font-size: 13px;
   }
   .forgot-link {
     display: inline-flex;
@@ -370,8 +369,16 @@
   .auth-verify-aside .text-button {
     font-size: 14px;
   }
-  .auth-meter {
+  .auth-meter-block {
     margin-top: 2px;
+    gap: 7px;
+  }
+  .auth-meter span {
+    height: 5px;
+  }
+  .auth-meter-note {
+    font-size: 13px;
+    padding: 0 2px;
   }
   /* The stagger puts will-change and filter on the shake wrapper, and either
      one traps a position: fixed descendant. Move the stagger one level in. */

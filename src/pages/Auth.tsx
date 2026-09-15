@@ -12,16 +12,24 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
+  BedDouble,
+  CalendarDays,
+  ChevronDown,
   Eye,
   EyeOff,
   GraduationCap,
+  Search,
+  SlidersHorizontal,
+  Wallet,
+  Zap,
 } from "lucide-react";
 import { api, errorMessage, json, safeNext } from "../lib/api";
 import { useApp } from "../lib/context";
 import { Button, ErrorBox, Field, Loading } from "../components/ui";
-import type { Campus, User } from "../types";
-import { liveCampuses } from "../lib/schools";
+import type { User } from "../types";
+import { liveCampuses, loadSchools, schoolForEmail, type School } from "../lib/schools";
+import { passwordCheck, type PasswordCheck } from "../lib/password";
+import { SchoolLogo } from "../components/SchoolSearch";
 type Mode =
   | "sign-in"
   | "sign-up"
@@ -29,7 +37,9 @@ type Mode =
   | "reset-password"
   | "verify";
 
-const STEPS = 3;
+/** Signing up is a student confirming who they are, so the steps say that. */
+const STEP_NAMES = ["Your school email", "Your name", "A password"];
+const STEPS = STEP_NAMES.length;
 
 function SuccessCheck() {
   const path = useRef<SVGPathElement>(null);
@@ -56,51 +66,282 @@ function SuccessCheck() {
   );
 }
 
-/** A composed still life of the real app UI, built from the app's own classes. */
-function Preview() {
+/**
+ * Four segments that fill as the estimate rises, plus the single most useful
+ * next step. The colour carries the level: red for weak, blue for good, green
+ * for strong.
+ */
+function PasswordMeter({ check }: { check: PasswordCheck }) {
+  return (
+    <div className="auth-meter-block">
+      <div
+        className="auth-meter"
+        data-level={check.level}
+        role="img"
+        aria-label={
+          check.level === "empty"
+            ? "Password strength not measured yet"
+            : `Password strength ${check.label}`
+        }
+      >
+        {[1, 2, 3, 4].map((segment) => (
+          <span key={segment} data-on={check.score >= segment ? "yes" : "no"} />
+        ))}
+      </div>
+      <p className="auth-meter-note" data-level={check.level}>
+        {check.label && <strong>{check.label}</strong>}
+        {check.hint && <span>{check.hint}</span>}
+        {!check.hint && check.crack && (
+          <span>Would take {check.crack} to guess.</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** One card in the replica, the same markup and classes the browse list uses. */
+function ReplicaCard({
+  tone,
+  price,
+  savings,
+  title,
+  meta,
+  dates,
+  walk,
+  boosted,
+}: {
+  tone: string;
+  price: string;
+  savings?: string;
+  title: string;
+  meta: string;
+  dates: string;
+  walk: string;
+  boosted?: boolean;
+}) {
+  return (
+    <article className="listing-card compact">
+      <div className="card-photo">
+        <span className={`auth-photo ${tone}`} />
+      </div>
+      <div className="card-body">
+        <div className="card-topline">
+          <div className="card-price">
+            <strong>{price}</strong>
+            <span>/mo</span>
+          </div>
+          {boosted && (
+            <span className="boost-tag">
+              <Zap size={11} fill="currentColor" strokeWidth={0} />
+              Boosted
+            </span>
+          )}
+          {savings && <span className="savings-tag">{savings}</span>}
+        </div>
+        <h2 className="card-title">{title}</h2>
+        <p className="card-meta">{meta}</p>
+        <p className="card-meta">
+          {dates} · <span className="card-distance">{walk}</span>
+        </p>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * A flat, still replica of the browse screen, built from the app's own
+ * classes so the sign in page shows the real product rather than a drawing.
+ * It is scaled inside an overflow hidden frame and carries no motion.
+ */
+function BrowseReplica() {
   return (
     <aside className="auth-preview" aria-hidden="true">
-      <div className="auth-preview-stage">
-        <article className="listing-card compact auth-card-behind">
-          <div className="card-photo">
-            <span className="auth-photo two" />
-          </div>
-          <div className="card-body">
-            <div className="card-topline">
-              <div className="card-price">
-                <strong>$940</strong>
-                <span>/mo</span>
+      <div className="auth-replica-frame">
+        <div className="auth-replica">
+          <div className="browse-page">
+            <div className="browse-panel">
+              <div className="panel-head">
+                <div className="head-row">
+                  <span className="campus-switch">
+                    <span className="school-logo">
+                      <img src="/logos/usc.svg" alt="" className="brand" />
+                    </span>
+                    <span className="campus-text">
+                      <strong>Near University of Southern California</strong>
+                      <small>Tap to change campus</small>
+                    </span>
+                    <ChevronDown size={15} className="chip-chevron" />
+                  </span>
+                </div>
+                <div className="search-row">
+                  <span className="search-field">
+                    <Search size={17} />
+                    <span className="auth-replica-placeholder">
+                      Search by street, building, or keyword
+                    </span>
+                  </span>
+                </div>
+                <div className="chip-row">
+                  <span className="chip">
+                    <CalendarDays size={15} />
+                    Dates
+                    <ChevronDown size={14} className="chip-chevron" />
+                  </span>
+                  <span className="chip">
+                    <Wallet size={15} />
+                    Price
+                    <ChevronDown size={14} className="chip-chevron" />
+                  </span>
+                  <span className="chip">
+                    <BedDouble size={15} />
+                    Rooms
+                    <ChevronDown size={14} className="chip-chevron" />
+                  </span>
+                  <span className="chip">
+                    <SlidersHorizontal size={15} />
+                    Amenities
+                  </span>
+                </div>
+              </div>
+              <div className="results-toolbar">
+                <span className="results-count">
+                  <span>
+                    <strong>22</strong> places
+                    <span className="results-scope">on the map</span>
+                  </span>
+                </span>
+                <span className="auth-replica-sort">
+                  Closest to campus
+                  <ChevronDown size={14} className="chip-chevron" />
+                </span>
+              </div>
+              <div className="listing-list">
+                <ReplicaCard
+                  tone="one"
+                  price="$1,950"
+                  savings="Save $300"
+                  boosted
+                  title="Two bedroom near Figueroa and Adams"
+                  meta="Entire place · 2 bd · 1 ba"
+                  dates="May 15 to Aug 20"
+                  walk="8 min walk"
+                />
+                <ReplicaCard
+                  tone="two"
+                  price="$1,200"
+                  savings="Save $250"
+                  title="A sunny room off Jefferson"
+                  meta="Private room · 1 bd · 1 ba"
+                  dates="June 1 to Aug 15"
+                  walk="12 min walk"
+                />
+                <ReplicaCard
+                  tone="three"
+                  price="$950"
+                  title="Studio on Vermont Avenue"
+                  meta="Entire place · Studio · 1 ba"
+                  dates="June 1 to Aug 31"
+                  walk="18 min walk"
+                />
               </div>
             </div>
-            <h2 className="card-title">Shared room on Ellendale</h2>
-            <p className="card-meta">Shared room · 2 bd · 1 ba</p>
-          </div>
-        </article>
-        <article className="listing-card compact auth-card-front">
-          <div className="card-photo">
-            <span className="auth-photo one" />
-          </div>
-          <div className="card-body">
-            <div className="card-topline">
-              <div className="card-price">
-                <strong>$1,180</strong>
-                <span>/mo</span>
-              </div>
-              <span className="savings-tag">Save $320</span>
+            <div className="auth-replica-map">
+              <svg
+                className="auth-replica-art"
+                viewBox="0 0 520 620"
+                preserveAspectRatio="xMidYMid slice"
+              >
+                <rect width="520" height="620" fill="#f8f9fa" />
+                <g fill="#eef0f2">
+                  <rect x="16" y="18" width="120" height="96" rx="3" />
+                  <rect x="160" y="18" width="148" height="96" rx="3" />
+                  <rect x="332" y="18" width="130" height="96" rx="3" />
+                  <rect x="16" y="150" width="120" height="120" rx="3" />
+                  <rect x="16" y="300" width="120" height="120" rx="3" />
+                  <rect x="16" y="452" width="120" height="150" rx="3" />
+                  <rect x="160" y="452" width="148" height="150" rx="3" />
+                  <rect x="332" y="452" width="130" height="150" rx="3" />
+                  <rect x="486" y="18" width="34" height="584" rx="3" />
+                </g>
+                <rect
+                  x="160"
+                  y="150"
+                  width="302"
+                  height="270"
+                  rx="6"
+                  fill="#e6eee2"
+                />
+                <g fill="#eef0f2">
+                  <rect x="196" y="186" width="96" height="62" rx="3" />
+                  <rect x="316" y="186" width="110" height="62" rx="3" />
+                  <rect x="196" y="316" width="110" height="60" rx="3" />
+                  <rect x="330" y="316" width="96" height="60" rx="3" />
+                </g>
+                <g stroke="#e3e6ea" strokeWidth="14" fill="none">
+                  <path d="M0 132H520M0 284H520M0 436H520M148 0V620M320 0V620M474 0V620" />
+                </g>
+                <g stroke="#fff" strokeWidth="10" fill="none">
+                  <path d="M0 132H520M0 284H520M0 436H520M148 0V620M320 0V620M474 0V620" />
+                </g>
+                <g stroke="#eceef1" strokeWidth="5" fill="none">
+                  <path d="M0 210H520M0 360H520M234 0V620M398 0V620" />
+                </g>
+                <path
+                  d="M182 176 L402 164 L440 244 L428 384 L262 402 L188 348 Z"
+                  fill="rgb(21 154 106 / 0.07)"
+                  stroke="#159a6a"
+                  strokeWidth="2"
+                  strokeDasharray="7 6"
+                />
+                <g
+                  fontFamily="Geist, sans-serif"
+                  fontSize="10"
+                  fill="#9aa2ab"
+                  letterSpacing="0.6"
+                >
+                  <text x="168" y="124">PICO UNION</text>
+                  <text x="22" y="276" transform="rotate(-90 22 276)">
+                    VERMONT AVENUE
+                  </text>
+                  <text x="186" y="430">JEFFERSON BOULEVARD</text>
+                  <text x="24" y="500">EXPOSITION PARK</text>
+                </g>
+              </svg>
+              <span
+                className="campus-marker"
+                style={{ left: "40%", top: "46%" }}
+              >
+                <GraduationCap size={13} />
+                University of Southern California
+              </span>
+              <span className="price-marker" style={{ left: "26%", top: "23%" }}>
+                $950
+              </span>
+              <span className="price-marker" style={{ left: "58%", top: "31%" }}>
+                $1,100
+              </span>
+              <span
+                className="price-marker is-active"
+                style={{ left: "34%", top: "64%" }}
+              >
+                $1,950
+              </span>
+              <span className="price-marker" style={{ left: "62%", top: "71%" }}>
+                $1,450
+              </span>
+              <span
+                className="cluster-marker"
+                style={{ left: "52%", top: "15%" }}
+              >
+                8
+              </span>
             </div>
-            <h2 className="card-title">Sunny room off Jefferson</h2>
-            <p className="card-meta">Private room · 1 bd · 1 ba</p>
-            <p className="card-meta">
-              Jan 5 to Aug 10 · <span className="card-distance">0.4 mi</span>
-            </p>
           </div>
-        </article>
-        <span className="price-marker auth-pin one">$1,180</span>
-        <span className="price-marker auth-pin two">$940</span>
-        <span className="price-marker auth-pin three">$1,450</span>
-        <span className="cluster-marker auth-cluster">12</span>
+        </div>
       </div>
-      <p className="auth-preview-caption">Real listings near campus</p>
+      <p className="auth-preview-caption">
+        Browsing near University of Southern California
+      </p>
     </aside>
   );
 }
@@ -195,9 +436,12 @@ function OtpInput({
   );
 }
 
-/** Only campuses that are live today can take a signup. */
-function campusFor(email: string, campuses: Campus[]) {
-  const domain = email.trim().toLowerCase().split("@")[1];
+/** The live campus for an email, used only to tell a student what to expect. */
+function liveCampusFor(
+  email: string,
+  campuses: Array<{ id: string; domain: string }>,
+) {
+  const domain = email.trim().toLowerCase().split("@")[1] || "";
   if (!domain) return null;
   return (
     campuses.find(
@@ -216,7 +460,6 @@ export default function Auth({ mode }: { mode: Mode }) {
     [email, setEmail] = useState(""),
     [name, setName] = useState(""),
     [password, setPassword] = useState(""),
-    [campusId, setCampusId] = useState(""),
     [showPassword, setShowPassword] = useState(false),
     [shake, setShake] = useState(0),
     [step, setStep] = useState(1),
@@ -226,6 +469,11 @@ export default function Auth({ mode }: { mode: Mode }) {
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({}),
     [cooldown, setCooldown] = useState(0);
   const campuses = liveCampuses(allCampuses);
+  // The school list is only needed by sign up, so it loads with the page.
+  const [schools, setSchools] = useState<School[] | null>(null);
+  useEffect(() => {
+    if (mode === "sign-up") loadSchools().then(setSchools);
+  }, [mode]);
   const verifiedToken = useRef("");
   const shakeRef = useRef<HTMLDivElement>(null);
   const slideRef = useRef<HTMLDivElement>(null);
@@ -233,10 +481,18 @@ export default function Auth({ mode }: { mode: Mode }) {
   const next = safeNext(params.get("next"));
   const resetToken = params.get("token");
   const code = digits.join("");
-  const detected = campusFor(email, campuses);
-  const campus =
-    campuses.find((c) => c.id === campusId) || detected || campuses[0];
-  const domains = campuses.map((c) => c.domain).join(", ");
+  // The school is read from the email as the student types. There is nothing
+  // to pick: their email decides it, and listing opens when Handoff does.
+  const found = schools ? schoolForEmail(email, schools) : null;
+  const detected = found
+    ? {
+        name: found.school.n,
+        domain: found.domain,
+        live: Boolean(liveCampusFor(email, campuses)),
+      }
+    : null;
+  const listingNext = next === "/listings/new";
+  const strength = passwordCheck(password, { email, name });
 
   useEffect(() => {
     setError("");
@@ -247,9 +503,6 @@ export default function Auth({ mode }: { mode: Mode }) {
     setSignedUp(false);
     setFieldErrors({});
   }, [mode]);
-  useEffect(() => {
-    if (detected) setCampusId(detected.id);
-  }, [detected]);
   useEffect(() => {
     if (!shake) return;
     const el = shakeRef.current;
@@ -300,9 +553,9 @@ export default function Auth({ mode }: { mode: Mode }) {
     if (fields.includes("password") && !password)
       next.password = "Enter your password.";
     if (fields.includes("newPassword")) {
-      if (!password) next.password = "Choose a password.";
-      else if (password.length < 10)
-        next.password = "Use at least 10 characters.";
+      const check = passwordCheck(password, { email, name });
+      if (!check.valid)
+        next.password = check.problem || "Choose a stronger password.";
     }
     setFieldErrors(next);
     const ok = Object.keys(next).length === 0;
@@ -390,12 +643,7 @@ export default function Auth({ mode }: { mode: Mode }) {
           "/auth/signup",
           {
             method: "POST",
-            body: json({
-              name,
-              email,
-              password,
-              campusId: campus?.id || campusId,
-            }),
+            body: json({ name, email, password }),
           },
         );
         if (r.user) {
@@ -429,13 +677,18 @@ export default function Auth({ mode }: { mode: Mode }) {
   }
 
   /* Sign up steps. Enter advances, the last step submits. */
-  function advance(e: FormEvent) {
+  async function advance(e: FormEvent) {
     e.preventDefault();
     setError("");
     if (step === 1) {
       if (!validate(["email"])) return;
-      if (!detected) {
-        setError(`Use your school email. We cover ${domains}.`);
+      // The school list may still be in flight on a fast first keystroke.
+      setBusy(true);
+      const list = schools || (await loadSchools());
+      setSchools(list);
+      setBusy(false);
+      if (!schoolForEmail(email, list)) {
+        setError("Use your school email. We could not find that school yet.");
         setShake((s) => s + 1);
         return;
       }
@@ -481,16 +734,13 @@ export default function Auth({ mode }: { mode: Mode }) {
         <div className="auth-box">
           <section className="auth-panel">
             <div className="auth-panel-inner enter-stagger">
-              <Link to="/browse" className="auth-brand">
-                Handoff
-              </Link>
               <div className="auth-shake" ref={shakeRef}>
                 {children}
               </div>
               {switcher && <p className="auth-switch">{switcher}</p>}
             </div>
           </section>
-          <Preview />
+          <BrowseReplica />
         </div>
       </div>
     );
@@ -537,7 +787,7 @@ export default function Auth({ mode }: { mode: Mode }) {
       return shell(
         <div className="auth-block">
           <header className="auth-head">
-            <h1>Verify your email</h1>
+            <h1>One more step, confirm your email</h1>
             <p>
               Tell us the address you signed up with and we will send a fresh
               code and link.
@@ -579,7 +829,7 @@ export default function Auth({ mode }: { mode: Mode }) {
     return shell(
       <div className="auth-block">
         <header className="auth-head">
-          <h1>Check your email</h1>
+          <h1>One more step, confirm your email</h1>
           <p>
             We sent a 6 digit code to <strong>{address}</strong>. Verify to
             publish a listing or request a handoff.
@@ -684,7 +934,7 @@ export default function Auth({ mode }: { mode: Mode }) {
       <>
         New here?{" "}
         <Link to={`/sign-up?next=${encodeURIComponent(next)}`}>
-          Create an account
+          Confirm you are a student
         </Link>
       </>,
     );
@@ -705,18 +955,19 @@ export default function Auth({ mode }: { mode: Mode }) {
           </Link>
         </div>,
       );
-    const strength =
-      password.length === 0
-        ? ""
-        : password.length < 10
-          ? `${10 - password.length} more characters to go.`
-          : "Long enough. Make it something only you know.";
     return shell(
       <div className="auth-block">
         <header className="auth-head">
-          <h1>Your campus. Your next place.</h1>
-          <p>A student email is all it takes to get started.</p>
+          <h1>
+            {listingNext
+              ? "Confirm you are a student to list your place."
+              : "Confirm you are a student."}
+          </h1>
+          <p>Your school email is all it takes.</p>
         </header>
+        <p className="auth-step-name">
+          Step {step} of {STEPS} · {STEP_NAMES[step - 1]}
+        </p>
         <ol className="auth-progress" aria-label={`Step ${step} of ${STEPS}`}>
           {[1, 2, 3].map((n) => (
             <li
@@ -758,16 +1009,18 @@ export default function Auth({ mode }: { mode: Mode }) {
                   placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
                 />
               </Field>
-              {detected ? (
-                <span className="auth-campus-chip">
-                  <Check size={14} />
-                  {detected.name}
-                </span>
-              ) : (
-                <span className="auth-hint">We cover {domains}.</span>
+              {error && !detected && (
+                <p className="auth-hint">
+                  Not seeing your school?{" "}
+                  <Link to="/browse" tabIndex={step === 1 ? undefined : -1}>
+                    Join the waitlist
+                  </Link>{" "}
+                  and we will tell you when it opens.
+                </p>
               )}
               <Button
                 type="submit"
+                busy={busy && step === 1}
                 className="auth-cta"
                 tabIndex={step === 1 ? undefined : -1}
               >
@@ -805,27 +1058,17 @@ export default function Auth({ mode }: { mode: Mode }) {
                   placeholder="First and last name"
                 />
               </Field>
-              <div className="auth-campus-card">
-                <span className="auth-campus-icon">
-                  <GraduationCap size={18} />
-                </span>
-                <div>
-                  <strong>{campus?.shortName || "Your campus"}</strong>
-                  <small>{campus?.name || "Pick your campus"}</small>
-                </div>
-                <select
-                  aria-label="Campus"
-                  value={campus?.id || ""}
-                  tabIndex={step === 2 ? undefined : -1}
-                  onChange={(e) => setCampusId(e.target.value)}
-                >
-                  {campuses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.shortName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {detected && (
+                <p className="auth-school-line">
+                  <SchoolLogo
+                    src={`/api/logo/${encodeURIComponent(detected.domain)}`}
+                  />
+                  <span>{detected.name}</span>
+                  {!detected.live && (
+                    <small>Browsing only for now, listings open soon</small>
+                  )}
+                </p>
+              )}
               <Button
                 type="submit"
                 className="auth-cta"
@@ -852,11 +1095,7 @@ export default function Auth({ mode }: { mode: Mode }) {
             style={{ "--t-page-from-x": "8px" } as React.CSSProperties}
           >
             <form className="auth-form" noValidate onSubmit={submit}>
-              <Field
-                label="Password"
-                hint={strength || "At least 10 characters."}
-                error={fieldErrors.password}
-              >
+              <Field label="Password" error={fieldErrors.password}>
                 <div className="password-input">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -884,16 +1123,7 @@ export default function Auth({ mode }: { mode: Mode }) {
                   </button>
                 </div>
               </Field>
-              <div
-                className="auth-meter"
-                data-filled={password.length >= 10 ? "yes" : "no"}
-              >
-                <span
-                  style={{
-                    width: `${Math.min(100, (password.length / 10) * 100)}%`,
-                  }}
-                />
-              </div>
+              <PasswordMeter check={strength} />
               {!emailReady && (
                 <p className="auth-hint">
                   Email delivery is paused on this server, so the code may not
@@ -904,9 +1134,10 @@ export default function Auth({ mode }: { mode: Mode }) {
                 type="submit"
                 busy={busy}
                 className="auth-cta"
+                disabled={!strength.valid}
                 tabIndex={step === 3 ? undefined : -1}
               >
-                Create your account
+                Confirm and continue
                 <ArrowRight size={17} />
               </Button>
               <button
@@ -922,8 +1153,9 @@ export default function Auth({ mode }: { mode: Mode }) {
           </section>
         </div>
         <p className="auth-fineprint">
-          Use Handoff to connect with students. Confirm the lease and property
-          details together before committing.
+          By confirming you agree to our{" "}
+          <Link to="/terms">Terms of Service</Link> and{" "}
+          <Link to="/privacy">Privacy Policy</Link>.
         </p>
       </div>,
       <>
@@ -977,11 +1209,7 @@ export default function Auth({ mode }: { mode: Mode }) {
             />
           </Field>
         ) : (
-          <Field
-            label="New password"
-            hint="At least 10 characters. Make it something only you know."
-            error={fieldErrors.password}
-          >
+          <Field label="New password" error={fieldErrors.password}>
             <div className="password-input">
               <input
                 type={showPassword ? "text" : "password"}
@@ -1006,6 +1234,7 @@ export default function Auth({ mode }: { mode: Mode }) {
             </div>
           </Field>
         )}
+        {!forgot && <PasswordMeter check={strength} />}
         {forgot && !emailReady && (
           <p className="auth-hint">
             Email delivery is paused on this server, so the link may not arrive.
@@ -1018,7 +1247,7 @@ export default function Auth({ mode }: { mode: Mode }) {
           type="submit"
           busy={busy}
           className="auth-cta"
-          disabled={!forgot && !resetToken}
+          disabled={!forgot && (!resetToken || !strength.valid)}
         >
           {forgot ? "Send reset link" : "Update password"}
           <ArrowRight size={17} />

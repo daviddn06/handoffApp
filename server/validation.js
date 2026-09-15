@@ -1,12 +1,41 @@
 import { z } from "zod";
 import { CAMPUSES } from "./config.js";
 import { HttpError } from "./security.js";
+import { isCommonPassword, normalizePassword } from "./common-passwords.js";
 
 const text = (max) => z.string().trim().max(max);
+
+/**
+ * Password rules, mirrored by src/lib/password.ts so the meter a student sees
+ * and the answer the server gives never disagree. One message at a time, so
+ * the student is told the single thing that is missing.
+ */
+export function passwordProblem(value, { email: address = "", name = "" } = {}) {
+  const raw = String(value ?? "");
+  if (raw.length < 10) return "Use a password with at least 10 characters.";
+  if (raw.length > 128) return "Use a password with at most 128 characters.";
+  if (!/[a-zA-Z]/.test(raw)) return "Add at least one letter to your password.";
+  if (!/\d/.test(raw)) return "Add at least one number to your password.";
+  const folded = normalizePassword(raw);
+  const local = String(address).split("@")[0].toLowerCase();
+  if (local.length >= 3 && (folded.includes(local) || raw.toLowerCase().includes(local)))
+    return "Do not put your email address in your password.";
+  for (const part of String(name).toLowerCase().split(/[^a-z]+/))
+    if (part.length >= 3 && (folded.includes(part) || raw.toLowerCase().includes(part)))
+      return "Do not put your name in your password.";
+  if (isCommonPassword(raw))
+    return "That password is one of the most common ones. Choose something only you would pick.";
+  return "";
+}
+
+/** A standalone password field, used where no account context is available. */
 export const password = z
   .string()
-  .min(10, "Use a password with at least 10 characters.")
-  .max(128);
+  .max(128)
+  .superRefine((value, ctx) => {
+    const problem = passwordProblem(value);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+  });
 export const email = z.string().trim().toLowerCase().email().max(254);
 export const campus = z.enum(CAMPUSES.map((item) => item.id));
 export const token = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
@@ -20,17 +49,25 @@ export const date = z
       parsed.toISOString().slice(0, 10) === value
     );
   }, "Enter a valid date.");
+/**
+ * Signup takes no campus. The server reads the school out of the email, so a
+ * student can never claim a campus that is not theirs.
+ */
 export const signupSchema = z
-  .object({ name: text(80).min(2), email, password, campusId: campus })
+  .object({ name: text(80).min(2), email, password: z.string().max(128) })
   .strict()
-  .refine(
-    (data) => {
-      const domain = data.email.split("@")[1];
-      const school = CAMPUSES.find((item) => item.id === data.campusId);
-      return domain === school.domain || domain.endsWith(`.${school.domain}`);
-    },
-    { message: "Use your selected university email address.", path: ["email"] },
-  );
+  .superRefine((data, ctx) => {
+    const problem = passwordProblem(data.password, {
+      email: data.email,
+      name: data.name,
+    });
+    if (problem)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: problem,
+        path: ["password"],
+      });
+  });
 export const loginSchema = z
   .object({ email, password: z.string().min(1).max(128) })
   .strict();

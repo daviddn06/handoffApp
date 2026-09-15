@@ -8,6 +8,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { CAMPUSES, configuredMailTransport } from "./config.js";
+import {
+  firstLiveCampus,
+  liveCampusForEmail,
+  schoolForEmail,
+} from "./schools.js";
 import { openDatabase } from "./database.js";
 import { geocode } from "./geocode.js";
 import {
@@ -25,6 +30,7 @@ import {
   token,
   password,
   signupSchema,
+  passwordProblem,
   loginSchema,
   profileSchema,
   createListingSchema,
@@ -267,15 +273,38 @@ export function createApp({
     typeof req.body?.email === "string"
       ? req.body.email.trim().toLowerCase()
       : req.ip;
+  /**
+   * campusId is the live campus this student may post at, null when Handoff
+   * has not opened at their school. school is always present so the app can
+   * name the school in full.
+   */
   const serializeUser = (user) => ({
     id: user.id,
     name: user.name,
     email: user.email,
-    campusId: user.campus_id,
+    campusId: user.campus_id || null,
+    school: {
+      name: user.school_name || schoolForEmail(user.email)?.name || "",
+      domain: user.school_domain || schoolForEmail(user.email)?.domain || "",
+      live: Boolean(user.campus_id),
+    },
     verified: Boolean(user.verified_at),
     termsAccepted: Boolean(user.terms_accepted_at),
     bio: user.bio,
   });
+  /**
+   * Listing is the one thing a live campus unlocks. Browsing, saving and
+   * requesting stay open to every student, wherever they study.
+   */
+  const requirePostingCampus = (req) => {
+    if (req.user?.campus_id) return req.user.campus_id;
+    const school = req.user?.school_name || "your school";
+    throw new HttpError(
+      403,
+      `Listing is not open at ${school} yet. You can still browse, save and request anywhere Handoff is live.`,
+      "school_not_live",
+    );
+  };
   const setSession = (res, userId) => {
     const value = randomToken();
     db.prepare(
@@ -455,8 +484,9 @@ ${button}
           req.query,
         );
         const campus =
-          CAMPUSES.find((c) => c.id === (input.campusId || req.user.campusId)) ||
-          CAMPUSES[0];
+          CAMPUSES.find(
+            (c) => c.id === (input.campusId || req.user.campus_id),
+          ) || firstLiveCampus();
         res.json({ results: await geocode(input.q, campus) });
       } catch (error) {
         if (error?.name === "TimeoutError" || error?.message?.startsWith("geocoder"))
@@ -507,6 +537,15 @@ ${button}
     requireMail,
     async (req, res) => {
       const input = parse(signupSchema, req.body);
+      const school = schoolForEmail(input.email);
+      if (!school)
+        throw new HttpError(
+          400,
+          "Use your school email. We could not find that school yet.",
+          "school_unknown",
+        );
+      // The campus is derived, never chosen. Null means browse only for now.
+      const campusId = liveCampusForEmail(input.email)?.id || null;
       const passwordHash = await hashPassword(input.password);
       const user = db.transaction(() => {
         let existing = db
@@ -517,10 +556,12 @@ ${button}
         if (existing) {
           // A legitimate signup must never activate a password chosen by a prior unverified registrant.
           db.prepare(
-            "UPDATE users SET name=?,campus_id=?,password_hash=?,updated_at=? WHERE id=? AND verified_at IS NULL",
+            "UPDATE users SET name=?,campus_id=?,school_domain=?,school_name=?,password_hash=?,updated_at=? WHERE id=? AND verified_at IS NULL",
           ).run(
             input.name,
-            input.campusId,
+            campusId,
+            school.domain,
+            school.name,
             passwordHash,
             timestamp,
             existing.id,
@@ -530,12 +571,14 @@ ${button}
         } else {
           const id = randomUUID();
           db.prepare(
-            "INSERT INTO users(id,name,email,campus_id,password_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?)",
+            "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
           ).run(
             id,
             input.name,
             input.email,
-            input.campusId,
+            campusId,
+            school.domain,
+            school.name,
             passwordHash,
             timestamp,
             timestamp,
@@ -669,7 +712,16 @@ ${button}
   }
   app.post("/api/auth/reset", limit("reset-ip", 20, HOUR), async (req, res) => {
     const input = parse(z.object({ token, password }).strict(), req.body);
-    validToken(input.token, "reset");
+    const holder = validToken(input.token, "reset");
+    // The same rules as signup, now that the token names the account.
+    const account = db
+      .prepare("SELECT name,email FROM users WHERE id=?")
+      .get(holder.user_id);
+    const problem = passwordProblem(input.password, {
+      email: account?.email || "",
+      name: account?.name || "",
+    });
+    if (problem) throw new HttpError(400, problem);
     const passwordHash = await hashPassword(input.password);
     db.transaction(() => {
       const found = validToken(input.token, "reset");
@@ -868,6 +920,7 @@ ${button}
     limit("listing-create", 20, HOUR, (req) => req.user.id),
     (req, res) => {
       const input = parse(createListingSchema, req.body);
+      const campusId = requirePostingCampus(req);
       if (input.status === "active" && !req.user.verified_at)
         throw new HttpError(
           403,
@@ -887,7 +940,7 @@ ${button}
       ).run(
         id,
         req.user.id,
-        req.user.campus_id,
+        campusId,
         input.title,
         input.description,
         input.address,
@@ -942,6 +995,8 @@ ${button}
         status: old.status,
         ...patch,
       });
+      if (input.status === "active" && row.status !== "active")
+        requirePostingCampus(req);
       if (
         input.status === "active" &&
         row.status !== "active" &&
@@ -1026,6 +1081,7 @@ ${button}
     (req, res) => {
       const input = parse(boostSchema, req.body);
       const row = getListing(req.params.id);
+      requirePostingCampus(req);
       assertOwner(row, req.user);
       if (input.kind === "paid")
         throw new HttpError(402, "Payments open soon.");
@@ -1509,7 +1565,13 @@ ${button}
               : "Upload up to eight photos using the photos field.",
         });
     if (err instanceof HttpError)
-      return res.status(err.status).json({ error: err.message });
+      return res
+        .status(err.status)
+        .json(
+          err.code
+            ? { error: err.message, code: err.code }
+            : { error: err.message },
+        );
     if (err.type === "entity.too.large")
       return res.status(413).json({ error: "This request is too large." });
     if (err instanceof SyntaxError && err.status === 400)

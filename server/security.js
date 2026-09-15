@@ -52,9 +52,11 @@ export function cookies(header = "") {
 }
 
 export class HttpError extends Error {
-  constructor(status, message) {
+  /** code is an optional stable identifier the client can branch on. */
+  constructor(status, message, code) {
     super(message);
     this.status = status;
+    if (code) this.code = code;
   }
 }
 

@@ -55,6 +55,7 @@ import {
 } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
 import { BoostModal, daysLeft } from "../components/BoostModal";
+import { SchoolNotLive } from "../components/SchoolNotLive";
 
 type TabItem = { value: string; label: string; count?: number };
 
@@ -260,7 +261,9 @@ export function MyListings() {
   const { data, loading, error, refresh } = useResource<{
       listings: Listing[];
     }>("/my-listings"),
-    { notify } = useApp();
+    { notify, user } = useApp();
+  // Listing is the one thing a school that is not open yet holds back.
+  const canPost = Boolean(user?.campusId);
   const [filter, setFilter] = useState("all"),
     [action, setAction] = useState<{
       listing: Listing;
@@ -309,10 +312,12 @@ export function MyListings() {
             : `${total} listing${total === 1 ? "" : "s"}, ${countFor("active")} live right now.`
         }
       >
-        <Link className="button primary" to="/listings/new">
-          <Plus size={17} />
-          New listing
-        </Link>
+        {canPost && (
+          <Link className="button primary" to="/listings/new">
+            <Plus size={17} />
+            New listing
+          </Link>
+        )}
       </PageHeading>
       <Tabs
         label="Listing status"
@@ -411,7 +416,7 @@ export function MyListings() {
                 </Link>
                 {l.status === "active" ? (
                   <>
-                    {l.boosted ? (
+                    {!canPost ? null : l.boosted ? (
                       <button
                         type="button"
                         className="boost-pill"
@@ -475,6 +480,8 @@ export function MyListings() {
             </article>
           ))}
         </div>
+      ) : !canPost && filter === "all" ? (
+        <SchoolNotLive compact />
       ) : (
         <EmptyState
           icon={<House size={29} strokeWidth={1.5} />}
@@ -489,7 +496,7 @@ export function MyListings() {
               : "Your listings will appear here when their status changes."
           }
         >
-          {filter === "all" && (
+          {filter === "all" && canPost && (
             <Link className="button primary" to="/listings/new">
               <Plus size={17} />
               List your place

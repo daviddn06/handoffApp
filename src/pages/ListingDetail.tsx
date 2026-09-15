@@ -333,7 +333,7 @@ export default function ListingDetail() {
         <div className="detail-main enter-stagger">
           <header className="detail-head">
             <div className="eyebrow">
-              {ROOM_LABELS[listing.roomType]} · {campus?.shortName}
+              {ROOM_LABELS[listing.roomType]} · {campus?.name}
             </div>
             <h1>{listing.title}</h1>
             <p className="detail-address">
@@ -404,7 +404,7 @@ export default function ListingDetail() {
               <strong>Listed by {listing.ownerName || "a student"}</strong>
               <span className="host-verified">
                 <ShieldCheck size={14} />
-                Verified {campus?.shortName} student
+                Verified {campus?.name} student
               </span>
             </div>
           </section>
