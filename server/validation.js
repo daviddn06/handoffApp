@@ -19,6 +19,48 @@ export function passwordProblem(value, { email: address = "", name = "" } = {}) 
   return "";
 }
 
+/**
+ * A student's name is a first name and a last name. Two words of letters, with
+ * apostrophes and hyphens allowed inside a word, so O'Brien and Smith-Jones
+ * pass and a single word does not. Mirrored by src/lib/name.ts so the message
+ * a student sees and the answer the server gives never disagree.
+ */
+export const NAME_PROBLEM = "Enter your first and last name.";
+const NAME_WORD = "\\p{L}+(?:['\u2019-]\\p{L}+)*";
+const NAME_PATTERN = new RegExp(`^${NAME_WORD}(?:\\s+${NAME_WORD})+$`, "u");
+export function nameProblem(value) {
+  const raw = String(value ?? "").trim();
+  if (raw.length > 80) return "Use a name with at most 80 characters.";
+  return NAME_PATTERN.test(raw) ? "" : NAME_PROBLEM;
+}
+/**
+ * Auto capitalisation, kept deliberately simple. The first letter of every
+ * word goes up, and the rest of the word is left as it was typed, so McDonald
+ * survives. An input typed entirely in lower case has the rest lowered too,
+ * which is the same thing said plainly. A hyphen starts a new word, an
+ * apostrophe does not, so "o'brien" becomes "O'brien".
+ */
+export function titleCaseName(value) {
+  const raw = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+  const allLower = raw === raw.toLowerCase();
+  return raw.replace(
+    /(^|[\s-])(\p{L})(\p{L}*)/gu,
+    (_match, lead, first, rest) =>
+      `${lead}${first.toUpperCase()}${allLower ? rest.toLowerCase() : rest}`,
+  );
+}
+/** The name field, validated then capitalised before anything stores it. */
+export const fullName = z
+  .string()
+  .trim()
+  .superRefine((value, ctx) => {
+    const problem = nameProblem(value);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+  })
+  .transform(titleCaseName);
+
 /** A standalone password field, used where no account context is available. */
 export const password = z
   .string()
@@ -153,7 +195,9 @@ export function readShareChannels(raw) {
  */
 export const signupSchema = z
   .object({
-    name: text(80).min(2),
+    /* The name is asked for after the account exists, so signup may arrive
+       without one. When it is there it follows the first and last name rule. */
+    name: fullName.optional(),
     email,
     password: z.string().max(128),
     gender: gender.default("unspecified"),
@@ -176,7 +220,7 @@ export const loginSchema = z
   .strict();
 export const profileSchema = z
   .object({
-    name: text(80).min(2),
+    name: fullName,
     bio: text(600),
     gender: gender.optional(),
     /* Raw contact input. The server normalises and stores it. */

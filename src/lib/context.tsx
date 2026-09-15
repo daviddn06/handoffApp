@@ -220,6 +220,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         writeHint(Boolean(session.user));
         setUserState(session.user);
         setAuth((current) => {
+          // An account that never finished signing up is not in Handoff yet,
+          // so the dialog goes straight back up on the screen it stopped at.
+          if (session.user?.signupStep)
+            return {
+              ...current,
+              open: true,
+              pending: false,
+              auto: false,
+              mode: "signup",
+            };
           // The session is alive, so anything the route guard put up comes
           // straight back down. A dialog they opened themselves stays.
           if (session.user)

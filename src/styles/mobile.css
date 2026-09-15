@@ -589,9 +589,6 @@
     min-height: 44px;
     font-size: 14px;
   }
-  .auth-progress li {
-    height: 5px;
-  }
   .auth-otp input {
     min-height: 52px;
     border-radius: var(--r-md);

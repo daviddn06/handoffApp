@@ -43,7 +43,7 @@ test("current schema backup restores original lease data and its matched photo a
   assert.equal(result.status, 0, result.stderr);
   const completed = JSON.parse(result.stdout);
   const manifest = JSON.parse(readFileSync(completed.manifest, "utf8"));
-  assert.equal(manifest.schemaVersion, 13);
+  assert.equal(manifest.schemaVersion, 14);
   assert.equal(manifest.uploads.count, 1);
   for (const item of [manifest.database, manifest.uploads])
     assert.equal(createHash("sha256").update(readFileSync(join(completed.directory, item.file))).digest("hex"), item.sha256);
@@ -59,7 +59,7 @@ test("current schema backup restores original lease data and its matched photo a
 
 test("backup still rejects an unknown future database schema", (t) => {
   const f = fixture(t);
-  f.db.pragma("user_version = 14");
+  f.db.pragma("user_version = 15");
   f.db.close();
   const result = backup(f);
   assert.equal(result.status, 1);
@@ -87,7 +87,7 @@ test("the contacts-only schema12 backs up and upgrades to referrals13 without ch
   saved.close();
   const upgraded = openDatabase(f.data);
   try {
-    assert.equal(upgraded.pragma("user_version", { simple: true }), 13);
+    assert.equal(upgraded.pragma("user_version", { simple: true }), 14);
     assert.deepEqual(upgraded.prepare("SELECT * FROM users WHERE id='contacts-owner'").get(), before);
     assert.equal(upgraded.prepare("SELECT COUNT(*) AS n FROM referrals").get().n, 0);
     assert.ok(upgraded.prepare("PRAGMA table_info(handoff_requests)").all().some((column) => column.name === "share_channels"));
@@ -110,7 +110,7 @@ test("a schema11 database adds exact contacts defaults before the referral migra
   f.db.close();
   const upgraded = openDatabase(f.data);
   try {
-    assert.equal(upgraded.pragma("user_version", { simple: true }), 13);
+    assert.equal(upgraded.pragma("user_version", { simple: true }), 14);
     assert.deepEqual(upgraded.prepare("SELECT phone,instagram,facebook,share_channels FROM users WHERE id='legacy-owner'").get(),
       { phone: null, instagram: null, facebook: null, share_channels: '["email"]' });
     assert.equal(upgraded.prepare("SELECT COUNT(*) AS n FROM referrals").get().n, 0);

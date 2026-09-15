@@ -204,6 +204,12 @@ async function serve(t, overrides = {}) {
       body: { name: "Ai Student", email, password: PASSWORD },
     });
     assert.equal(created.status, 201, JSON.stringify(created.body));
+    // Signing up leaves the flow open, which closes the rest of the app.
+    const done = await call("/api/auth/signup-step", {
+      method: "POST",
+      body: { step: "done" },
+    });
+    assert.equal(done.status, 200, JSON.stringify(done.body));
     return email;
   };
   const verify = (email) =>

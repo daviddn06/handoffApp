@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 import { useApp } from "../lib/context";
+import { api } from "../lib/api";
 import { backdropClick, trapTab, useDialogMotion } from "./ui";
 import {
   ForgotForm,
@@ -17,17 +18,40 @@ import {
  * Rendered once by the layout.
  */
 export function AuthModal() {
-  const { auth, closeAuth, notify } = useApp();
+  const { auth, closeAuth, notify, user, setUser } = useApp();
   const navigate = useNavigate();
   const ref = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<AuthFormMode>(auth.mode);
   // Kept across a switch, so "Sign in instead" arrives with the email filled.
   const [email, setEmail] = useState("");
   const motion = useDialogMotion(auth.open, ref);
+  /* An account whose sign up never finished is not in Handoff yet. The dialog
+     stays on the screen it stopped at, and closing it signs them out rather
+     than leaving a half made account loose in the app. */
+  const resume = user?.signupStep
+    ? {
+        step: user.signupStep,
+        email: user.email,
+        name: user.name,
+        user,
+      }
+    : undefined;
 
   useEffect(() => {
-    if (auth.open) setMode(auth.mode);
-  }, [auth.open, auth.key, auth.mode]);
+    if (auth.open) setMode(resume ? "signup" : auth.mode);
+  }, [auth.open, auth.key, auth.mode, resume]);
+
+  async function dismiss() {
+    if (resume) {
+      try {
+        await api("/auth/logout", { method: "POST" });
+      } catch {
+        /* The session may already be gone. The dialog still closes. */
+      }
+      setUser(null);
+    }
+    closeAuth();
+  }
 
   function done() {
     closeAuth();
@@ -42,10 +66,10 @@ export function AuthModal() {
       aria-label={mode === "signin" ? "Sign in" : "Confirm you are a student"}
       onCancel={(e) => {
         e.preventDefault();
-        closeAuth();
+        dismiss();
       }}
       onKeyDown={trapTab}
-      onClick={(e) => backdropClick(e, closeAuth)}
+      onClick={(e) => backdropClick(e, dismiss)}
     >
       <span className="sheet-grip" aria-hidden="true">
         <span />
@@ -54,7 +78,7 @@ export function AuthModal() {
         type="button"
         className="icon-button modal-close auth-modal-close"
         aria-label="Close"
-        onClick={closeAuth}
+        onClick={dismiss}
       >
         <X size={20} />
       </button>
@@ -67,8 +91,9 @@ export function AuthModal() {
               reason={auth.reason}
               email={email}
               onEmail={setEmail}
-              onSwitch={setMode}
+              onSwitch={resume ? undefined : setMode}
               onDone={done}
+              resume={resume}
             />
           )}
           {mode === "signin" && (

@@ -341,17 +341,39 @@ export function createApp({
     }
     next();
   });
+  /**
+   * An account created by signup is not an account yet. Until the last signup
+   * screen clears the flag, every route that needs a session answers 403 with
+   * signup_incomplete, so nobody lands in the app half set up. The signup and
+   * verification routes, the session read, logout and the profile routes the
+   * name, photo and contact screens write through are the exceptions, and
+   * everything a signed out visitor can already read is untouched.
+   */
+  const SIGNUP_STEPS = ["code", "name", "photo", "contact"];
+  const signupBlocked = (req) =>
+    req.user?.signup_step
+      ? new HttpError(
+          403,
+          "Finish setting up your account to continue.",
+          "signup_incomplete",
+        )
+      : undefined;
+  // Any signed in student, including one still inside the signup flow.
+  const requireSignupUser = (req, res, next) =>
+    req.user
+      ? next(disabledError(req.user))
+      : next(new HttpError(401, "Sign in with your student account to continue."));
   // Any signed in student, verified or not. Browsing, saving, drafts, profile.
   const requireUser = (req, res, next) =>
     req.user
-      ? next(disabledError(req.user))
+      ? next(disabledError(req.user) || signupBlocked(req))
       : next(new HttpError(401, "Sign in with your student account to continue."));
   // Verified students only. Publishing, requesting a handoff, reporting.
   const requireVerified = (req, res, next) =>
     !req.user
       ? next(new HttpError(401, "Sign in with your student account to continue."))
-      : disabledError(req.user)
-        ? next(disabledError(req.user))
+      : disabledError(req.user) || signupBlocked(req)
+        ? next(disabledError(req.user) || signupBlocked(req))
         : req.user.verified_at
           ? next()
           : next(
@@ -400,6 +422,9 @@ export function createApp({
     instagram: user.instagram || null,
     facebook: user.facebook || null,
     shareChannels: readShareChannels(user.share_channels),
+    /* The signup screen this student still has to finish, or null when the
+       account is complete. While it is set the app is closed to them. */
+    signupStep: user.signup_step || null,
     // The allow list decides, so the client never offers a dashboard that the
     // API would answer 404 for.
     isAdmin: isAllowedAdmin(user),
@@ -740,7 +765,7 @@ ${button}
           db.prepare(
             "UPDATE users SET name=?,campus_id=?,school_domain=?,school_name=?,password_hash=?,gender=?,updated_at=? WHERE id=? AND verified_at IS NULL",
           ).run(
-            input.name,
+            input.name ?? "",
             campusId,
             school.domain,
             school.name,
@@ -749,15 +774,18 @@ ${button}
             timestamp,
             existing.id,
           );
+          db.prepare("UPDATE users SET signup_step='code' WHERE id=?").run(
+            existing.id,
+          );
           invalidateTokens(existing.id, "verify");
           db.prepare("DELETE FROM sessions WHERE user_id=?").run(existing.id);
         } else {
           const id = randomUUID();
           db.prepare(
-            "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,gender,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,gender,signup_step,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'code',?,?)",
           ).run(
             id,
-            input.name,
+            input.name ?? "",
             input.email,
             campusId,
             school.domain,
@@ -821,6 +849,29 @@ ${button}
       res.json({ user: serializeUser(currentUser) });
     },
   );
+  /**
+   * The signup flow reports where it is, so closing the tab and signing in
+   * again picks the same screen back up. "done" is the last screen finishing,
+   * and it is the only thing that opens the rest of the app.
+   */
+  app.post("/api/auth/signup-step", requireSignupUser, (req, res) => {
+    const input = parse(
+      z.object({ step: z.enum([...SIGNUP_STEPS, "done"]) }).strict(),
+      req.body,
+    );
+    if (req.user.signup_step) {
+      db.prepare("UPDATE users SET signup_step=?,updated_at=? WHERE id=?").run(
+        input.step === "done" ? null : input.step,
+        iso(),
+        req.user.id,
+      );
+    }
+    res.json({
+      user: serializeUser(
+        db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id),
+      ),
+    });
+  });
   app.post("/api/auth/logout", (req, res) => {
     if (req.sessionHash)
       db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
@@ -934,7 +985,7 @@ ${button}
   });
   app.patch(
     "/api/profile",
-    requireUser,
+    requireSignupUser,
     limit("profile", 30, HOUR, (req) => req.user.id),
     (req, res) => {
       const input = parse(profileSchema, req.body);
@@ -1620,7 +1671,7 @@ ${button}
   });
   app.post(
     "/api/profile/avatar",
-    requireUser,
+    requireSignupUser,
     limit("avatar-hour", 20, HOUR, (req) => req.user.id),
     avatarUpload.single("avatar"),
     async (req, res) => {

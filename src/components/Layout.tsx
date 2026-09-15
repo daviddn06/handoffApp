@@ -260,7 +260,11 @@ export function Layout() {
           </div>
         </div>
       </header>
-      {user && !user.verified && !embed && <VerifyBanner email={user.email} />}
+      {/* An account still inside the signup flow is being asked for the code
+          in the dialog itself, so the strip would say the same thing twice. */}
+      {user && !user.verified && !user.signupStep && !embed && (
+        <VerifyBanner email={user.email} />
+      )}
       <main id="main-content" tabIndex={-1}>
         {loading ? (
           <Loading />
@@ -319,7 +323,10 @@ export function RequireAuth(_props: { to?: string } = {}) {
     if (!user && !loading && !auth.open)
       openAuth({ next: target, reason: GUARDED.get(location.pathname) });
   }, [user, loading, auth.open, target, location.pathname, openAuth]);
-  if (user) return <Outlet />;
+  /* An account still inside the signup flow is not in Handoff yet, so a
+     guarded screen behind the dialog would only make calls the server
+     refuses. Browse stands in for it exactly as it does for a visitor. */
+  if (user && !user.signupStep) return <Outlet />;
   // Browse is what sits behind the dialog. Replacing keeps the back button
   // pointing at wherever they came from, not at the page they cannot see.
   return loading ? null : <Navigate to="/browse" replace />;
@@ -344,17 +351,26 @@ export function VerifyBanner({ email }: { email: string }) {
   }
   return (
     <div className="verify-banner" role="status">
-      <MailCheck size={15} />
-      <span>
-        <strong>Verify your student email</strong> to publish a listing or
-        request a handoff. We sent a code to {email}.
-      </span>
-      <Link to="/verify" className="button primary small">
-        Enter code
-      </Link>
-      <button type="button" className="text-button" onClick={resend} disabled={busy}>
-        {busy ? "Sending…" : "Resend"}
-      </button>
+      <p className="verify-banner-text">
+        <MailCheck size={16} aria-hidden="true" />
+        <span>
+          <strong>Verify your student email</strong> to publish a listing or
+          request a handoff. We sent a code to {email}.
+        </span>
+      </p>
+      <div className="verify-banner-actions">
+        <Link to="/verify" className="button primary small">
+          Enter code
+        </Link>
+        <button
+          type="button"
+          className="text-button"
+          onClick={resend}
+          disabled={busy}
+        >
+          {busy ? "Sending…" : "Resend"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -14,7 +14,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 13) {
+  if (version > 14) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -430,5 +430,19 @@ export function openDatabase(dataDir) {
   }
   mkdirSync(join(dataDir, "uploads", "referrals"), { recursive: true, mode: 0o700 });
 
+  if (db.pragma("user_version", { simple: true }) === 13) {
+    db.transaction(() => {
+      // Signing up is a flow, not one request. signup_step names the screen a
+      // student still has to finish, and NULL means the account is complete.
+      // Every account that already exists is complete, which is the default.
+      const userColumns = db
+        .prepare("PRAGMA table_info(users)")
+        .all()
+        .map((column) => column.name);
+      if (!userColumns.includes("signup_step"))
+        db.exec("ALTER TABLE users ADD COLUMN signup_step TEXT");
+      db.pragma("user_version = 14");
+    })();
+  }
   return db;
 }

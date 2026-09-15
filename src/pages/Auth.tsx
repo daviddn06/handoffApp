@@ -34,6 +34,7 @@ import {
   SignInForm,
   SignUpForm,
   SuccessCheck,
+  OtpInput,
 } from "../components/AuthForms";
 type Mode =
   | "sign-in"
@@ -287,95 +288,6 @@ function BrowseReplica() {
 }
 
 /** Six digit code entry. Auto advances, accepts a paste, numeric on mobile. */
-function OtpInput({
-  digits,
-  setDigits,
-  disabled,
-}: {
-  digits: string[];
-  setDigits: (next: string[]) => void;
-  disabled?: boolean;
-}) {
-  const boxes = useRef<(HTMLInputElement | null)[]>([]);
-  const focusAt = (index: number) => {
-    const box = boxes.current[Math.max(0, Math.min(5, index))];
-    box?.focus();
-    box?.select();
-  };
-  function change(index: number, raw: string) {
-    const typed = raw.replace(/\D/g, "");
-    const next = [...digits];
-    if (!typed) {
-      next[index] = "";
-      setDigits(next);
-      return;
-    }
-    let cursor = index;
-    for (const character of typed) {
-      if (cursor > 5) break;
-      next[cursor] = character;
-      cursor += 1;
-    }
-    setDigits(next);
-    focusAt(cursor);
-  }
-  function keyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Backspace" && !digits[index] && index > 0) {
-      event.preventDefault();
-      const next = [...digits];
-      next[index - 1] = "";
-      setDigits(next);
-      focusAt(index - 1);
-    }
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      focusAt(index - 1);
-    }
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      focusAt(index + 1);
-    }
-  }
-  function paste(event: ClipboardEvent<HTMLInputElement>) {
-    const text = event.clipboardData.getData("text").replace(/\D/g, "");
-    if (!text) return;
-    event.preventDefault();
-    const next = ["", "", "", "", "", ""];
-    text
-      .slice(0, 6)
-      .split("")
-      .forEach((character, index) => {
-        next[index] = character;
-      });
-    setDigits(next);
-    focusAt(Math.min(text.length, 5));
-  }
-  return (
-    <div className="auth-otp" role="group" aria-label="Six digit code">
-      {digits.map((digit, index) => (
-        <input
-          key={index}
-          ref={(node) => {
-            boxes.current[index] = node;
-          }}
-          value={digit}
-          disabled={disabled}
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={1}
-          autoComplete={index === 0 ? "one-time-code" : "off"}
-          autoFocus={index === 0}
-          aria-label={`Digit ${index + 1}`}
-          onChange={(e) => change(index, e.target.value)}
-          onKeyDown={(e) => keyDown(index, e)}
-          onPaste={paste}
-          onFocus={(e) => e.target.select()}
-        />
-      ))}
-    </div>
-  );
-}
-
 export default function Auth({ mode }: { mode: Mode }) {
   const { user, setUser, campuses: allCampuses, emailReady, notify } = useApp(),
     navigate = useNavigate(),
@@ -537,7 +449,9 @@ export default function Auth({ mode }: { mode: Mode }) {
     }
   }
 
-  const verifyingUser = user && !user.verified;
+  /* An account whose signup flow is still open is being asked for its code by
+     the signup form itself, so the page must not take the screen from it. */
+  const verifyingUser = user && !user.verified && !user.signupStep;
   const showVerify =
     mode === "verify" || (mode === "sign-up" && signedUp) ||
     ((mode === "sign-in" || mode === "sign-up") && verifyingUser && !verified);
@@ -708,7 +622,13 @@ export default function Auth({ mode }: { mode: Mode }) {
     return shell(
       <SignUpForm
         next={next}
-        onDone={() => {
+        onDone={(student) => {
+          // The code screen inside the flow may already have confirmed them.
+          if (student.verified) {
+            navigate(next, { replace: true });
+            notify("Welcome to Handoff.");
+            return;
+          }
           setSignedUp(true);
           setCooldown(30);
         }}

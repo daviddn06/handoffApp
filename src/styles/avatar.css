@@ -112,22 +112,25 @@
   opacity: 0;
   pointer-events: none;
 }
-/* Sign up gives the photo the whole step, so it is centered there. */
-.photo-step .photo-picker {
+/* Sign up gives the photo the whole step, so it is centred there. The class is
+   signup-photo-step, never photo-step: browse.css owns that name for the small
+   round arrow on a listing card, which is absolutely positioned, invisible
+   until the card is hovered, and display:none on a touch screen. */
+.signup-photo-step .photo-picker {
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: var(--s-4);
 }
-.photo-step .photo-picker-text {
+.signup-photo-step .photo-picker-text {
   align-items: center;
   text-align: center;
 }
-.photo-step .photo-drop {
+.signup-photo-step .photo-drop {
   width: 96px;
   height: 96px;
 }
-.photo-step .photo-drop .avatar-el.size-84 {
+.signup-photo-step .photo-drop .avatar-el.size-84 {
   width: 96px;
   height: 96px;
   font-size: 28px;

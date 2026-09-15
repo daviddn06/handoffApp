@@ -12,10 +12,8 @@ Build, server authorization/integration tests, browser QA, and verified isolated
 
 The preferred visual reference is https://handofflease.vercel.app/, specifically the simple Handoff wordmark, blue, white surfaces, and map/listing layout. David reiterated this during the September 14 rebuild. Do not use the different Lovable landing as the app design reference.
 
-## Active release coordination, September 14, 2026
+## Release coordination, September 15, 2026
 
-Private student referrals are deployed from `codex/referrals-20260915`. Production schema 13 includes `referrals`, `referral_photos`, `referral_visits`, `referral_events` and `referral_attributions`, after contact channels in schema 12. Any new signup-progress migration must use schema 14 after those migrations. Do not reuse schema 13 or deploy an app missing the referral tables/routes.
-
-Before deploying from main, merge `codex/referrals-20260915` and preserve its private-photo backup inventory. An unrelated main worktree was actively editing signup progress during this release, so it was left intact. The latest release evidence and merge instructions are in `../../deliverables/referrals-2026-09-14/release-record.md`.
+`codex/referrals-20260915` is merged into main. Schema order is contact channels 12, referrals 13, signup progress 14 (`users.signup_step`). Deploy from main only. Preserve the private-photo backup inventory the referral release documents in `../../deliverables/referrals-2026-09-14/release-record.md`.
 
 David has explicitly put outreach on hold. Keep referral records and outreach messages as private drafts. Do not send Facebook messages, emails, comments or invitations until he explicitly authorizes outreach.

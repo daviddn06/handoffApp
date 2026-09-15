@@ -10,6 +10,7 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { createApp } from "../server/app.js";
 import { hashToken } from "../server/security.js";
+import { nameProblem, titleCaseName } from "../server/validation.js";
 
 const PASSWORD = "Correct horse battery 572!";
 // The dashboard allow list. The flag alone never opens /api/admin.
@@ -126,7 +127,10 @@ async function setup(t, overrides = {}) {
       message.text.split("\n").find((line) => line.startsWith("http")),
     ).searchParams.get("token");
   };
-  const signup = async (address, name = "Test Student") => {
+  /* Signing up leaves the account in the signup flow, which is closed to the
+     rest of the app. Unless a test is looking at that flag, the helper walks
+     to the end of the flow the way the last signup screen does. */
+  const signup = async (address, name = "Test Student", { finish = true } = {}) => {
     const user = client();
     const result = await user.call("/api/auth/signup", {
       method: "POST",
@@ -136,6 +140,13 @@ async function setup(t, overrides = {}) {
       [201, 202].includes(result.status),
       JSON.stringify(result.body),
     );
+    if (finish && result.status === 201) {
+      const done = await user.call("/api/auth/signup-step", {
+        method: "POST",
+        body: { step: "done" },
+      });
+      assert.equal(done.status, 200, JSON.stringify(done.body));
+    }
     return user;
   };
   const verified = async (address, name = "Test Student") => {
@@ -991,7 +1002,7 @@ test("unconfigured and failed email never claim success; requests survive notifi
         .call("/api/auth/signup", {
           method: "POST",
           body: {
-            name: "Student",
+            name: "No Mail",
             email: "nomail@usc.edu",
             password: PASSWORD,
           },
@@ -1088,7 +1099,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 13);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 14);
   assert.throws(
     () =>
       createApp({
@@ -1418,7 +1429,7 @@ test("version one upgrade makes consistent backups before preserving data in the
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      13,
+      14,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
@@ -2443,4 +2454,106 @@ test("a request with no choice of its own falls back to the profile default", as
     name: "Sam Seeker",
     email: "empty-seeker@usc.edu",
   });
+});
+
+test("a name is a first and a last name, and it is capitalised before it is stored", async (t) => {
+  // The rule itself, so the message and the shape are pinned in one place.
+  assert.equal(nameProblem("dana"), "Enter your first and last name.");
+  assert.equal(nameProblem("   "), "Enter your first and last name.");
+  assert.equal(nameProblem("dana fielding"), "");
+  assert.equal(nameProblem("mary-jane o'brien"), "");
+  assert.equal(nameProblem("Dana 3"), "Enter your first and last name.");
+  assert.equal(nameProblem(`${"a".repeat(60)} ${"b".repeat(30)}`).length > 0, true);
+  assert.equal(titleCaseName("dana fielding"), "Dana Fielding");
+  assert.equal(titleCaseName("mcdonald reyes"), "Mcdonald Reyes");
+  assert.equal(titleCaseName("o'brien walsh"), "O'brien Walsh");
+  assert.equal(titleCaseName("mary-jane smith"), "Mary-Jane Smith");
+  // Anything not typed entirely in lower case keeps the letters it was given.
+  assert.equal(titleCaseName("Ada McDonald"), "Ada McDonald");
+  assert.equal(titleCaseName("  dana   fielding  "), "Dana Fielding");
+
+  const env = await setup(t);
+  const single = await env.client().call("/api/auth/signup", {
+    method: "POST",
+    body: { name: "dana", email: "one.word@usc.edu", password: PASSWORD },
+  });
+  assert.equal(single.status, 400);
+  assert.match(single.body.error, /first and last name/);
+
+  const user = await env.signup("cased@usc.edu", "dana fielding");
+  const session = await user.call("/api/session");
+  assert.equal(session.body.user.name, "Dana Fielding");
+
+  const rejected = await user.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "Dana", bio: "" },
+  });
+  assert.equal(rejected.status, 400);
+  assert.match(rejected.body.error, /first and last name/);
+
+  const saved = await user.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "o'brien mcdonald", bio: "" },
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.user.name, "O'brien Mcdonald");
+  const kept = await user.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "Ada McDonald", bio: "" },
+  });
+  assert.equal(kept.body.user.name, "Ada McDonald");
+});
+
+test("an account still in the signup flow cannot reach the app until it finishes", async (t) => {
+  const env = await setup(t);
+  const user = await env.signup("halfway@usc.edu", "Half Way", {
+    finish: false,
+  });
+  // The session read is open, and it says which screen is still owed.
+  const session = await user.call("/api/session");
+  assert.equal(session.status, 200);
+  assert.equal(session.body.user.signupStep, "code");
+
+  // Everything the app is made of answers 403 with the same code.
+  for (const [path, options] of [
+    ["/api/saved", {}],
+    ["/api/requests", {}],
+    ["/api/auth/accept-terms", { method: "POST" }],
+    ["/api/uploads", { method: "POST" }],
+  ]) {
+    const blocked = await user.call(path, options);
+    assert.equal(blocked.status, 403, path);
+    assert.equal(blocked.body.code, "signup_incomplete", path);
+  }
+
+  // The screens of the flow itself still work.
+  const named = await user.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "Half Way", bio: "" },
+  });
+  assert.equal(named.status, 200, JSON.stringify(named.body));
+
+  // Signing in again resumes rather than entering the app.
+  const stepped = await user.call("/api/auth/signup-step", {
+    method: "POST",
+    body: { step: "contact" },
+  });
+  assert.equal(stepped.body.user.signupStep, "contact");
+  const returning = env.client();
+  const back = await returning.call("/api/auth/login", {
+    method: "POST",
+    body: { email: "halfway@usc.edu", password: PASSWORD },
+  });
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+  assert.equal(back.body.user.signupStep, "contact");
+  assert.equal((await returning.call("/api/saved")).status, 403);
+
+  // The last screen clears the flag and the app opens.
+  const done = await returning.call("/api/auth/signup-step", {
+    method: "POST",
+    body: { step: "done" },
+  });
+  assert.equal(done.status, 200);
+  assert.equal(done.body.user.signupStep, null);
+  assert.equal((await returning.call("/api/saved")).status, 200);
 });

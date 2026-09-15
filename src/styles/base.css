@@ -1631,10 +1631,14 @@ html.is-embed .browse-page {
 }
 
 /* Unverified reminder strip under the header */
+/* One tidy block. The icon and the sentence are one row, the two actions are
+   the next row on a phone and sit inline at the end on a desktop. */
 .verify-banner {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
   padding: var(--s-2) var(--page-x);
   background: var(--amber-soft);
   color: var(--amber-ink);
@@ -1642,26 +1646,45 @@ html.is-embed .browse-page {
   line-height: 1.4;
   border-bottom: 1px solid #f3e2bd;
 }
-.verify-banner > span {
-  flex: 1;
+.verify-banner-text {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  flex: 1 1 320px;
   min-width: 0;
+  margin: 0;
+}
+.verify-banner-text svg {
+  flex: none;
+  margin-top: 1px;
+}
+.verify-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: none;
 }
 .verify-banner .text-button {
   color: var(--amber-ink);
   min-height: 32px;
+  font-weight: 500;
 }
 @media (max-width: 760px) {
   .verify-banner {
-    flex-wrap: wrap;
-    padding: var(--s-2) var(--page-x);
-    font-size: 13px;
+    gap: var(--s-2);
   }
-  .verify-banner > span {
+  .verify-banner-text {
     flex-basis: 100%;
   }
+  /* The buttons line up with the sentence, not with the icon. */
+  .verify-banner-actions {
+    padding-left: calc(16px + var(--s-2));
+  }
 }
+/* 53px is the one row desktop banner: 8px padding twice, a 32px action and
+   the hairline. Keep it in step with .verify-banner above. */
 html:has(.verify-banner) .browse-page {
-  height: calc(100dvh - var(--header-h) - 41px);
+  height: calc(100dvh - var(--header-h) - 53px);
 }
 
 .menu-legal {

@@ -102,6 +102,11 @@ export type User = {
   facebook: string | null;
   /** The channels shared when a request is accepted. Always contains email. */
   shareChannels: ShareChannel[];
+  /**
+   * The sign up screen this student still owes, or null when the account is
+   * complete. While it is set the rest of Handoff answers 403.
+   */
+  signupStep: "code" | "name" | "photo" | "contact" | null;
   /** Opens the internal dashboard at /admin. False for every student. */
   isAdmin: boolean;
 };

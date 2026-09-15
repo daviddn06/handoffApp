@@ -348,7 +348,7 @@ test("matched backup includes private referral source photos and current account
   const backups = join(f.dataDir, "snapshot-test");
   const result = await execute(process.execPath, [resolve("deploy/backup.mjs")], { env: { ...process.env, HANDOFF_DATA_DIR: f.dataDir, HANDOFF_BACKUP_DIR: backups } });
   const completed = JSON.parse(result.stdout), manifest = JSON.parse(await readFile(completed.manifest, "utf8"));
-  assert.equal(manifest.schemaVersion, 13);
+  assert.equal(manifest.schemaVersion, 14);
   assert.equal(manifest.uploads.referralPhotos, 1);
   assert.equal(manifest.uploads.avatars, 1);
   const restore = join(f.dataDir, "restored"); await mkdir(restore);
