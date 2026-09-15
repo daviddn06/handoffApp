@@ -92,7 +92,7 @@ export function createReferrals({ db, limit, dataDir, origin, secureCookies, isA
   const audit = (userId, action, referralId, details = {}) => db.prepare("INSERT INTO admin_audit(id,admin_id,action,target_type,target_id,details,created_at) VALUES(?,?,?,?,?,?,?)").run(randomUUID(), userId, action, "referral", referralId, JSON.stringify(details), iso());
   const byId = (id) => db.prepare("SELECT r.*,l.status AS listing_status FROM referrals r LEFT JOIN listings l ON l.id=r.listing_id WHERE r.id=?").get(id);
   const byToken = (value) => TOKEN.test(value || "") ? db.prepare("SELECT r.*,l.status AS listing_status FROM referrals r LEFT JOIN listings l ON l.id=r.listing_id WHERE r.token=?").get(value) : undefined;
-  const photoRows = (id) => db.prepare("SELECT p.*,u.filename AS owned_filename FROM referral_photos p LEFT JOIN uploads u ON u.id=p.claimed_upload_id WHERE p.referral_id=? ORDER BY p.created_at,p.id").all(id);
+  const photoRows = (id) => db.prepare("SELECT p.*,u.filename AS owned_filename FROM referral_photos p LEFT JOIN uploads u ON u.id=p.claimed_upload_id WHERE p.referral_id=? ORDER BY p.created_at,p.rowid").all(id);
   const currentUser = (req) => req.user && db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id);
   const assertAccess = (req, row) => {
     if (!row || row.status === "revoked" || req.user?.disabled_at || (row.claimed_by && row.claimed_by !== req.user?.id && !isAllowedAdmin(req.user))) throw unavailable();
@@ -221,7 +221,7 @@ export function createReferrals({ db, limit, dataDir, origin, secureCookies, isA
         db.prepare("UPDATE users SET terms_accepted_at=COALESCE(terms_accepted_at,?),updated_at=? WHERE id=?").run(timestamp, timestamp, user.id);
         db.prepare("UPDATE referrals SET status='claimed',claimed_by=?,claimed_at=?,ownership_attested_at=?,terms_accepted_at=?,updated_at=? WHERE id=?").run(user.id, timestamp, timestamp, timestamp, timestamp, row.id);
         event(row.id, "verified", user.id, { alreadyVerified: true, confirmedAtClaim: true });
-        event(row.id, "claimed", user.id, { ownershipConfirmed: true, termsAccepted: true, attestation: "I am currently a USC student and the person responsible for this source post and sublease, have the right to list it, and will review the details before publication.", attestationVersion: "2026-09-15" });
+        event(row.id, "claimed", user.id, { ownershipConfirmed: true, termsAccepted: true, attestation: "I am currently a USC student and the person responsible for this source post and sublease, have the right to list it and use these photos, and will review the details before publication.", attestationVersion: "2026-09-15" });
       })();
     } catch (error) {
       for (const item of copies) await unlink(join(uploadDir, item.filename)).catch(() => {});

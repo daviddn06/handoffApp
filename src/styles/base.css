@@ -1910,3 +1910,217 @@ html:has(.verify-banner) .browse-page {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---------- Contact channels ---------- */
+.contact-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  min-width: 0;
+}
+.contact-email {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--green-soft);
+  box-shadow: inset 0 0 0 1px rgb(21 154 106 / 0.16);
+  color: var(--green-ink);
+}
+.contact-email > svg {
+  flex: none;
+}
+.contact-email div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.contact-email strong {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.contact-email small {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.contact-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.contact-field {
+  min-width: 0;
+}
+.contact-input {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding-left: var(--s-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  transition:
+    border-color var(--duration-quick) var(--ease-out),
+    box-shadow var(--duration-quick) var(--ease-out);
+}
+.contact-input > svg {
+  flex: none;
+  color: var(--muted);
+}
+.contact-input input {
+  border: 0;
+  background: none;
+  padding-left: 0;
+  min-width: 0;
+  flex: 1;
+}
+.contact-input input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.contact-input:has(input:focus-visible),
+.contact-input:has(input:focus) {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+}
+.contact-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.contact-toggle:has(input:disabled) {
+  cursor: default;
+  opacity: 0.55;
+}
+.contact-toggle.is-on {
+  color: var(--blue-ink);
+}
+.contact-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--blue);
+  cursor: inherit;
+}
+.contact-summary {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--soft);
+  margin: 0;
+}
+.contact-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.contact-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  max-width: 100%;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    border-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.contact-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.contact-chip > svg {
+  flex: none;
+  color: var(--muted);
+}
+.contact-chip:hover {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+.contact-chip:hover > svg {
+  color: var(--blue);
+}
+.channel-chooser {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+.channel-chooser-fixed,
+.channel-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+.channel-chooser-fixed {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+.channel-choice {
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    border-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.channel-choice input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--blue);
+  cursor: inherit;
+}
+.channel-choice.is-on {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+.channel-choice svg,
+.channel-chooser-fixed svg {
+  flex: none;
+}
+.contact-share-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2);
+  font-size: 13px;
+  color: var(--ink-2);
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .contact-chip {
+    max-width: 100%;
+  }
+}

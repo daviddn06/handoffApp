@@ -195,16 +195,40 @@
   min-width: 36px;
   min-height: 36px;
 }
+@property --fade-l {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-r {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+/* The filter strip is one line that scrolls sideways. The scroller fades the
+   edge that has more and shows a small arrow there for mouse users. */
+.chip-scroller {
+  position: relative;
+  min-width: 0;
+  margin: 0 calc(var(--s-4) * -1);
+}
 .chip-row {
   display: flex;
   gap: var(--s-2);
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
-  margin: 0 calc(var(--s-4) * -1);
   padding: 2px var(--s-4);
-  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  overscroll-behavior-x: contain;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l, 0px), #000 calc(100% - var(--fade-r, 0px)), transparent 100%);
+  transition: --fade-l var(--duration-fast) var(--ease-out), --fade-r var(--duration-fast) var(--ease-out);
+}
+.chip-scroller[data-more-right] .chip-row {
+  --fade-r: 56px;
+}
+.chip-scroller[data-more-left] .chip-row {
+  --fade-l: 56px;
 }
 .chip-row::-webkit-scrollbar {
   display: none;
@@ -221,18 +245,41 @@
   padding: 0 var(--s-3);
   font-size: 13px;
 }
-/* On desktop the filter strip wraps rather than hiding a chip behind a fade,
-   because there is no floating view toggle sharing the row up here. */
-@media (min-width: 761px) {
-  .chip-row {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    row-gap: var(--s-2);
-    mask-image: none;
-    -webkit-mask-image: none;
+.chip-more {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-2);
+  box-shadow: var(--shadow-sm), var(--ring);
+  transform: translateY(-50%);
+  animation: chip-more-in var(--duration-fast) var(--ease-smooth-out) both;
+  transition: background-color var(--duration-quick) var(--ease-out), color var(--duration-quick) var(--ease-out);
+}
+.chip-more:hover {
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+}
+.chip-more.right {
+  right: var(--s-3);
+}
+.chip-more.left {
+  left: var(--s-3);
+}
+@keyframes chip-more-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.8);
   }
-  .chip-row::after {
-    content: none;
+}
+@media (pointer: coarse) {
+  .chip-more {
+    display: none;
   }
 }
 .clear-chip {
@@ -1611,10 +1658,6 @@
     inset: 0;
     border-right: 0;
   }
-  .chip-row {
-    margin: 0 calc(var(--s-4) * -1);
-    padding: 2px var(--s-4);
-  }
   .listing-list {
     padding: var(--s-3) var(--s-4)
       calc(var(--mobile-nav-h) + var(--s-8) + env(safe-area-inset-bottom));
@@ -1633,10 +1676,12 @@
     gap: var(--s-2);
     min-width: 0;
   }
-  .chip-strip > .chip-row {
+  .chip-strip > .chip-scroller {
     flex: 1;
     min-width: 0;
     margin-right: 0;
+  }
+  .chip-strip .chip-row {
     padding-right: var(--s-2);
   }
   .mobile-view-fab {

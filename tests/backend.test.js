@@ -1088,7 +1088,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 12);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 13);
   assert.throws(
     () =>
       createApp({
@@ -1418,15 +1418,15 @@ test("version one upgrade makes consistent backups before preserving data in the
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      12,
+      13,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
       "Preserved Student",
     );
     const files = (await readdir(join(dataDir, "backups"))).sort();
-    assert.equal(files.length, 5);
-    for (const version of [2, 3, 7, 12]) assert.ok(files.some((file) => file.startsWith(`before-schema-${version}-`)));
+    assert.equal(files.length, 7);
+    for (const version of [2, 3, 7, 12, 13]) assert.ok(files.some((file) => file.startsWith(`before-schema-${version}-`)));
     const originalBackup = files.find((file) => file.startsWith("before-schema-2-"));
     assert.ok(
       migrated.locals.db
@@ -2213,4 +2213,234 @@ test("owners can delete a listing and everything attached to it", async (t) => {
   assert.ok(!mine.body.listings.some((l) => l.id === id));
   const file = await owner.call(photos[0]);
   assert.equal(file.status, 404);
+});
+
+test("contact channels are normalised, kept private, and cleared when emptied", async (t) => {
+  const env = await setup(t);
+  const student = await env.verified("channels@usc.edu", "Casey Channel");
+  const fresh = (await student.call("/api/session")).body.user;
+  assert.equal(fresh.phone, null);
+  assert.equal(fresh.instagram, null);
+  assert.equal(fresh.facebook, null);
+  assert.deepEqual(fresh.shareChannels, ["email"]);
+
+  const patch = (body) =>
+    student.call("/api/profile", {
+      method: "PATCH",
+      body: { name: "Casey Channel", bio: "", ...body },
+    });
+
+  // Three ways of writing the same US number all reach the same E.164 value.
+  for (const written of ["(213) 555-0142", "213-555-0142", "+1 213 555 0142"]) {
+    const saved = await patch({ phone: written });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.user.phone, "+12135550142");
+  }
+  // Eleven digits are only a number when the leading digit is the country 1.
+  assert.equal(
+    (await patch({ phone: "1 213 555 0142" })).body.user.phone,
+    "+12135550142",
+  );
+  for (const bad of ["555-0142", "21355501421", "213 555 014", "call me"]) {
+    const rejected = await patch({ phone: bad });
+    assert.equal(rejected.status, 400, `${bad} should be refused`);
+  }
+
+  // A handle, an @ handle and a full profile link all store the handle.
+  for (const written of [
+    "casey.channel",
+    "@casey.channel",
+    "https://www.instagram.com/casey.channel/",
+    "instagram.com/casey.channel?hl=en",
+  ]) {
+    const saved = await patch({ instagram: written });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.user.instagram, "casey.channel");
+  }
+  for (const bad of ["ca sey", "casey!", "x".repeat(31)]) {
+    assert.equal((await patch({ instagram: bad })).status, 400, bad);
+  }
+
+  // Facebook keeps a link as written and a username as a username.
+  assert.equal(
+    (await patch({ facebook: "https://facebook.com/casey.channel" })).body.user
+      .facebook,
+    "https://facebook.com/casey.channel",
+  );
+  assert.equal(
+    (await patch({ facebook: "  casey.channel  " })).body.user.facebook,
+    "casey.channel",
+  );
+  for (const bad of ["ca", "casey channel", "casey_channel"]) {
+    assert.equal((await patch({ facebook: bad })).status, 400, bad);
+  }
+
+  // Email can never be taken out, and a channel with no value is never shared.
+  const chosen = await patch({
+    phone: "(213) 555-0142",
+    instagram: "casey.channel",
+    facebook: "",
+    shareChannels: ["phone", "facebook"],
+  });
+  assert.equal(chosen.status, 200);
+  assert.deepEqual(chosen.body.user.shareChannels, ["email", "phone"]);
+  assert.equal(chosen.body.user.facebook, null);
+
+  // Asking for nothing still leaves email in place.
+  assert.deepEqual(
+    (await patch({ shareChannels: [] })).body.user.shareChannels, ["email"]);
+
+  // Clearing a field removes it and drops it out of the shared set.
+  const cleared = await patch({
+    phone: "",
+    instagram: "casey.channel",
+    shareChannels: ["email", "phone", "instagram"],
+  });
+  assert.equal(cleared.body.user.phone, null);
+  assert.deepEqual(cleared.body.user.shareChannels, ["email", "instagram"]);
+
+  // A round trip through a new session returns exactly what was stored.
+  const again = await student.call("/api/session");
+  assert.equal(again.body.user.instagram, "casey.channel");
+  assert.deepEqual(again.body.user.shareChannels, ["email", "instagram"]);
+});
+
+test("an accepted request reveals only the channels that student chose", async (t) => {
+  const env = await setup(t);
+  const owner = await env.verified("lister@usc.edu", "Olivia Owner");
+  const renter = await env.verified("seeker@usc.edu", "Riley Renter");
+  const outsider = await env.verified("nobody@usc.edu", "Other Student");
+  const publicClient = env.client();
+
+  await owner.call("/api/profile", {
+    method: "PATCH",
+    body: {
+      name: "Olivia Owner",
+      bio: "",
+      phone: "(213) 555-0111",
+      instagram: "@olivia.owner",
+      facebook: "https://facebook.com/olivia.owner",
+      shareChannels: ["email", "phone"],
+    },
+  });
+  await renter.call("/api/profile", {
+    method: "PATCH",
+    body: {
+      name: "Riley Renter",
+      bio: "",
+      phone: "(213) 555-0222",
+      instagram: "riley.renter",
+      shareChannels: ["email", "instagram", "phone"],
+    },
+  });
+  const listing = await env.publish(owner);
+
+  // The request shares less than the profile default does.
+  const created = await renter.call("/api/requests", {
+    method: "POST",
+    body: {
+      listingId: listing.id,
+      message: "Hi, I am looking for a room for the spring semester.",
+      shareChannels: ["email", "instagram"],
+    },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const requestId = created.body.request.id;
+  assert.equal(created.body.request.contact, undefined);
+
+  // Nothing is revealed while the request is only pending.
+  const pending = await owner.call("/api/requests");
+  assert.equal(pending.body.incoming[0].contact, undefined);
+  const pendingText = JSON.stringify(pending.body);
+  assert.ok(!pendingText.includes("5550222"));
+  assert.ok(!pendingText.includes("riley.renter"));
+  assert.ok(!pendingText.includes("seeker@usc.edu"));
+
+  const accepted = await owner.call(`/api/requests/${requestId}`, {
+    method: "PATCH",
+    body: { status: "accepted" },
+  });
+  assert.equal(accepted.status, 200);
+  // The lister sees the request's own choice, not the requester's default.
+  assert.deepEqual(accepted.body.request.contact, {
+    name: "Riley Renter",
+    email: "seeker@usc.edu",
+    instagram: "riley.renter",
+  });
+  // The requester sees the lister's profile default, and nothing more.
+  const outgoing = (await renter.call("/api/requests")).body.outgoing[0];
+  assert.deepEqual(outgoing.contact, {
+    name: "Olivia Owner",
+    email: "lister@usc.edu",
+    phone: "+12135550111",
+  });
+  assert.equal(outgoing.contact.instagram, undefined);
+  assert.equal(outgoing.contact.facebook, undefined);
+
+  // A third party and a signed out visitor see none of it, anywhere.
+  for (const stranger of [outsider, publicClient]) {
+    const requests = await stranger.call("/api/requests");
+    const detail = await stranger.call(`/api/listings/${listing.id}`);
+    const browse = await stranger.call("/api/listings");
+    const text = JSON.stringify([requests.body, detail.body, browse.body]);
+    for (const secret of [
+      "5550111",
+      "5550222",
+      "olivia.owner",
+      "riley.renter",
+      "lister@usc.edu",
+      "seeker@usc.edu",
+    ])
+      assert.ok(!text.includes(secret), `${secret} must stay private`);
+  }
+  assert.equal(
+    (await outsider.call(`/api/requests/${requestId}`)).status === 200,
+    false,
+  );
+});
+
+test("a request with no choice of its own falls back to the profile default", async (t) => {
+  const env = await setup(t);
+  const owner = await env.verified("default-lister@usc.edu", "Olivia Owner");
+  const renter = await env.verified("default-seeker@usc.edu", "Riley Renter");
+  await renter.call("/api/profile", {
+    method: "PATCH",
+    body: {
+      name: "Riley Renter",
+      bio: "",
+      phone: "(213) 555-0333",
+      shareChannels: ["email", "phone"],
+    },
+  });
+  const listing = await env.publish(owner);
+  const created = await renter.call("/api/requests", {
+    method: "POST",
+    body: { listingId: listing.id, message: "No per request choice here." },
+  });
+  assert.equal(created.status, 201);
+  const accepted = await owner.call(`/api/requests/${created.body.request.id}`, {
+    method: "PATCH",
+    body: { status: "accepted" },
+  });
+  assert.equal(accepted.body.request.contact.phone, "+12135550333");
+
+  // A channel the requester never filled in cannot be forced into a request.
+  const second = await env.verified("empty-seeker@usc.edu", "Sam Seeker");
+  const another = await second.call("/api/requests", {
+    method: "POST",
+    body: {
+      listingId: listing.id,
+      message: "Asking to share a number I never added.",
+      shareChannels: ["email", "phone", "instagram"],
+    },
+  });
+  assert.equal(another.status, 201);
+  const alsoAccepted = await owner.call(
+    `/api/requests/${another.body.request.id}`,
+    { method: "PATCH", body: { status: "accepted" } },
+  );
+  assert.deepEqual(alsoAccepted.body.request.contact, {
+    name: "Sam Seeker",
+    email: "empty-seeker@usc.edu",
+  });
 });

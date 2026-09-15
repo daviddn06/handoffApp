@@ -70,9 +70,48 @@ The script refuses production data directories unless `HANDOFF_SEED_CONFIRM=prod
 
 The dashboard's sections are at `/`, `/users`, `/listings` and so on on the internal host. Every admin write lands in `admin_audit` and is visible on the dashboard's Audit page. Disabling an account sets `users.disabled_at`, ends every session for it, and refuses both login and every authenticated route with 403. Nothing is deleted. The System page reads the release marker, the schema version, host memory and load, `df -k` on the data directory, the backups directory, and `journalctl -u handoff -n 50 --no-pager` when the service user can read it. The dashboard shows private student details, so treat an open browser tab the same as an operator shell.
 
+## Private USC referrals
+
+An allowlisted administrator can prepare an unpublished USC student sublease draft from a manually reviewed source. This creates no student account and sends no message. A private, reusable link at `HANDOFF_ORIGIN/referral/TOKEN` lets the actual student review it. Tokens contain 32 random bytes and are retained in the private database so the dashboard can always copy the same link. Treat links, source records, and backups as private.
+
+Admin endpoints exist only on the authenticated internal surface, under `/api/admin/referrals`.
+
+| Method and path | Behavior |
+| --- | --- |
+| `GET /` | Lists 25 records per page. Accepts `page`, `query`, `status`, and `outreachStatus`. Returns `referrals`, `totals`, `page`, `pages`, and `total`. |
+| `POST /` | Creates a private source draft. Returns 201 with `referral`; a duplicate canonical source returns 409 with `referralId`. |
+| `GET /:id` | Returns `referral` and up to 1,000 recent `events`, newest first. |
+| `PATCH /:id` | Updates source metadata, partial imported `listing`, outreach fields, or an audit `note`. An included `listing` replaces the imported field object. Claimed source identity and listing details cannot be changed by the operator. |
+| `POST /:id/photos` | Multipart `photos`, up to 16 total, 8 MB per original. Only pending referrals accept additions. Raster images are reencoded to WebP with metadata removed, preserving source order. |
+| `GET /:id/photos/:photoId` | Reads a private image for an authorized internal admin. |
+| `POST /:id/revoke` | Disables the private capability. Keeps the source and timeline; an already created owner listing remains under the owner's control. |
+
+Creation requires `sourceUrl`, `sourceName`, `authorName`, `sourceText`, and `evidence` containing literal `student`, `usc`, and `sublease` excerpts. `authorProfileUrl` and an ISO `sourcePostedAt` are optional. The sublease excerpt must appear in the captured post. Student and USC excerpts must appear in the post or cite the recorded public author profile. Current-profile wording such as “Studies” and “Studying” is accepted; “Studied” alone is not current-student evidence. Operators must review the real evidence. The service never fetches or independently verifies a source profile.
+
+Optional `listing` uses normal listing fields without `status` or `photos`. Leave unknown facts absent, including deposit, availability, location, or room type. Monetary amounts retain up to two decimal places. Optional outreach fields are `outreachStatus`, `outreachNotes`, and `outreachDraft`. Allowed statuses are `draft`, `ready`, `sent`, `replied`, `declined`, and `do_not_contact`. They are manually maintained records, not delivery actions. `{{link}}` in the draft becomes the exact private link; a nonempty draft always retains that link. Changes and human notes create timeline events and admin audit entries.
+
+Student endpoints live on the app surface, under `/api/referrals`.
+
+| Method and path | Behavior |
+| --- | --- |
+| `GET /:token` | Reads the private draft and records one open. `?track=0` reads without an open or visitor-cookie replacement, for editor and auth refreshes. |
+| `GET /:token/photos/:photoId` | Reads the corresponding private source image. |
+| `POST /:token/claim` | Requires an active verified USC account and `{ownershipConfirmed:true,termsAccepted:true}`. Records the current-student, ownership and photo-rights attestation, copies the photos into that owner's upload registry, and creates no listing. Repeating the claim as the same owner is safe. |
+| `POST /:token/listing` | Requires the claimed owner and a complete normal listing payload with `status` set to `draft` or `active`. Reuses listing validation and photo ownership checks, then creates one linked listing atomically. Repeated submission returns the same listing; a deleted linked listing returns 410. |
+
+Draft reads return `{referral,next}`. Student-visible referral fields are `id`, `status`, `campusId`, `authorName`, `sourceName`, `sourceUrl`, `sourcePostedAt`, partial `listing`, `photos:[{id,url}]`, `missing`, `claimedByMe`, `listingId`, and `listingStatus`. `next` contains signup, signin and review URLs; a successful claim also returns `editUrl`. Source post text, evidence, author profile URL, outreach records, and aggregate analytics remain admin-only. Before claim, the unique capability authorizes access. After claim, draft and photo reads additionally require its actual owner or an admin. Revoked capabilities return 404.
+
+Admin referral objects additionally contain the exact `link`, source evidence and profile metadata, outreach fields, `metrics`, `lastOpenedAt`, creation/update times, and claim/attestation times. Metrics are `opens`, `uniqueVisits`, `accountCreated`, `verified`, `claimed`, and `published`; list totals add `referrals`. Unique visits represent random browser cookies, not proven unique people. Publication counts record whether a linked listing has ever been published; `listingStatus` shows its current state. Events contain `id`, `type`, `createdAt`, `actorId`, `actorName`, and `details`.
+
+The HttpOnly referral cookie attributes actual signup/login and later verification, including an email link opened on another browser. Attribution is not proof that an account belongs to the named source author; ownership is attested at claim. Visitor records contain only a hash of a random visitor cookie, not an IP fingerprint. Referral API and landing routes send `no-store`, `noindex`, and `no-referrer` protections. Private source images live under `HANDOFF_DATA_DIR/uploads/referrals`, never a public static directory.
+
+For reviewed JSON plus local source photos on the VPS, use `scripts/import-referrals.js` as documented in [the operator script guide](../scripts/README.md). It requires an existing active, verified USC allowlisted admin, creates a five-minute temporary session, uses these same internal API validations, and removes the session afterward. Reruns deduplicate canonical sources and original photos without changing existing outreach state. It never sends outreach.
+
 ## Backup and recovery
 
-Use SQLite's backup API rather than copying the main database file while it is live. Run before deploying any schema migration. Copy uploads into the same dated backup set. New schema versions must add an explicit migration with backup and rollback instructions; startup creates the current schema for fresh databases and migrates older ones in order, most recently schema 9 which adds the `ai_usage` table. Version 1 upgrades to version 2 only after a consistent SQLite backup is written under `HANDOFF_DATA_DIR/backups/`. Unknown newer schemas and unversioned populated databases are refused.
+Use SQLite's backup API rather than copying the main database file while it is live. Run before deploying any schema migration. Copy uploads into the same dated backup set. New schema versions must add an explicit migration with backup and rollback instructions. Startup migrates in order through contacts schema 12 (`users.phone`, `users.instagram`, `users.facebook`, `users.share_channels`, and `handoff_requests.share_channels`), then referrals schema 13 (drafts, private photo registry, visits, account attribution, and events). Each of these migrations first writes a consistent dated SQLite backup under `HANDOFF_DATA_DIR/backups/`. Unknown newer schemas and unversioned populated databases are refused.
+
+`deploy/backup.mjs` creates one matched set containing `manifest.json`, `handoff.sqlite`, and `uploads.tar.gz`, covering registered listing uploads, current avatars, and schema13 referral source photos. It also supports contacts-only schema12 backups before an upgrade. Preserve the complete matched set for rollback; a database-only startup backup is not a replacement for the photo archive.
 
 ```bash
 sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js backup /var/lib/handoff-backups/2026-09-14/handoff.sqlite

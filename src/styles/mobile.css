@@ -878,11 +878,13 @@
     font-size: 14px;
     margin-top: var(--s-2);
   }
-  /* Slim segmented progress bar under the large title, one segment per step. */
+  /* The step count carries the position now. No bar, matching the chooser
+     and the assisted paths, which have none. */
   .mobile-progress {
-    display: flex;
-    gap: var(--s-1);
-    margin: var(--s-5) 2px var(--s-6);
+    display: none;
+  }
+  .editor-head {
+    margin-bottom: var(--s-6);
   }
   .mobile-progress > span {
     flex: 1;

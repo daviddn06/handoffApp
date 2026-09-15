@@ -14,7 +14,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 12) {
+  if (version > 13) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -348,6 +348,43 @@ export function openDatabase(dataDir) {
     db.prepare("VACUUM INTO ?").run(backup);
     chmodSync(backup, 0o600);
     db.transaction(() => {
+      // Contact channels. A student may add a phone number, an Instagram
+      // handle and a Facebook profile, and choose which of them travel with
+      // an accepted request. Email is the verified identity, so it is always
+      // in share_channels and the server never takes it out. A request keeps
+      // its own choice, so a student can share less on one place than their
+      // profile default says.
+      const userColumns = db
+        .prepare("PRAGMA table_info(users)")
+        .all()
+        .map((column) => column.name);
+      if (!userColumns.includes("phone"))
+        db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
+      if (!userColumns.includes("instagram"))
+        db.exec("ALTER TABLE users ADD COLUMN instagram TEXT");
+      if (!userColumns.includes("facebook"))
+        db.exec("ALTER TABLE users ADD COLUMN facebook TEXT");
+      if (!userColumns.includes("share_channels"))
+        db.exec(
+          `ALTER TABLE users ADD COLUMN share_channels TEXT NOT NULL DEFAULT '["email"]'`,
+        );
+      const requestColumns = db
+        .prepare("PRAGMA table_info(handoff_requests)")
+        .all()
+        .map((column) => column.name);
+      // NULL means this request follows whatever the profile shares.
+      if (!requestColumns.includes("share_channels"))
+        db.exec("ALTER TABLE handoff_requests ADD COLUMN share_channels TEXT");
+      db.pragma("user_version = 12");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 12) {
+    const backupDir = join(dataDir, "backups");
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const backup = join(backupDir, `before-schema-13-${Date.now()}.sqlite`);
+    db.prepare("VACUUM INTO ?").run(backup);
+    chmodSync(backup, 0o600);
+    db.transaction(() => {
       db.exec(`
         CREATE TABLE referrals (
           id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, source_key TEXT NOT NULL UNIQUE,
@@ -387,10 +424,11 @@ export function openDatabase(dataDir) {
         CREATE INDEX referral_events_timeline ON referral_events(referral_id,created_at);
         CREATE UNIQUE INDEX referral_events_once ON referral_events(referral_id,actor_id,type)
           WHERE type IN ('account_created','verified','claimed');
-        PRAGMA user_version = 12;
+        PRAGMA user_version = 13;
       `);
     })();
   }
   mkdirSync(join(dataDir, "uploads", "referrals"), { recursive: true, mode: 0o700 });
+
   return db;
 }

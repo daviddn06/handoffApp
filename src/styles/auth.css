@@ -308,7 +308,8 @@
 .auth-slide[data-step="1"] .t-page[data-page-id="1"],
 .auth-slide[data-step="2"] .t-page[data-page-id="2"],
 .auth-slide[data-step="3"] .t-page[data-page-id="3"],
-.auth-slide[data-step="4"] .t-page[data-page-id="4"] {
+.auth-slide[data-step="4"] .t-page[data-page-id="4"],
+.auth-slide[data-step="5"] .t-page[data-page-id="5"] {
   /* The step on screen is the one in flow, so the track measures itself. */
   position: relative;
   opacity: 1;
@@ -781,4 +782,15 @@
   .auth-meter span::after {
     transition: none !important;
   }
+}
+
+/* The one line that introduces the contact step. */
+.auth-step-lead {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0 0 var(--s-2);
+}
+.contact-step .contact-section {
+  gap: var(--s-4);
 }

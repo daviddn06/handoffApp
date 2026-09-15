@@ -724,17 +724,6 @@ export default function ListingEditor() {
             : live
               ? "This listing is live. Saving updates it right away."
               : "Your draft stays private until you publish."}
-          <Button
-            type="button"
-            variant="secondary"
-            className="rail-save"
-            onClick={() => save("draft")}
-            busy={saving && step !== LAST}
-            disabled={uploading || saving}
-          >
-            <Save size={15} />
-            Save and exit
-          </Button>
         </p>
       </aside>
       <section className="editor-main">
@@ -1616,7 +1605,7 @@ export default function ListingEditor() {
                 disabled={uploading || saving}
               >
                 <Save size={16} />
-                Save draft
+                Save and exit
               </Button>
               <Button type="submit" disabled={uploading} busy={saving}>
                 {step === LAST ? (

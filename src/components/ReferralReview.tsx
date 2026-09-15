@@ -5,9 +5,16 @@ import { api, errorMessage, json, money, today } from "../lib/api";
 import { useApp } from "../lib/context";
 import { emptyDraft, type ImportDraft } from "../lib/import";
 import { referralPath, type Referral } from "../lib/referrals";
-import { AMENITIES, ROOM_LABELS, type Listing } from "../types";
+import {
+  AMENITIES,
+  ROOM_LABELS,
+  type Listing,
+  type User,
+  type ShareChannel,
+} from "../types";
 import { Button, ErrorBox, Field, Loading } from "./ui";
 import { PreferenceChoice } from "./Gender";
+import { ContactFields, type ContactValues } from "./Contact";
 const Map = lazy(() => import("./Map"));
 
 export function ReferralReview({
@@ -17,7 +24,16 @@ export function ReferralReview({
   referral: Referral;
   token: string;
 }) {
-  const { user, campuses } = useApp();
+  const { user, setUser, campuses } = useApp();
+  const [contact, setContact] = useState<ContactValues>({
+    phone: user?.phone || "",
+    instagram: user?.instagram || "",
+    facebook: user?.facebook || "",
+  });
+  const [channels, setChannels] = useState<ShareChannel[]>(
+    user?.shareChannels || ["email"],
+  );
+  const [contactOpen, setContactOpen] = useState(false);
   const key = `handoff:referral-review:${r.id}:${user?.id}`;
   const [draft, setDraft] = useState<ImportDraft>(() => {
     const original = {
@@ -182,6 +198,30 @@ export function ReferralReview({
     }
     setBusy(true);
     try {
+      if (
+        user &&
+        (contact.phone !== (user.phone || "") ||
+          contact.instagram !== (user.instagram || "") ||
+          contact.facebook !== (user.facebook || "") ||
+          channels.join(",") !== user.shareChannels.join(","))
+      ) {
+        try {
+          const result = await api<{ user: User }>("/profile", {
+            method: "PATCH",
+            body: json({
+              name: user.name,
+              bio: user.bio,
+              gender: user.gender,
+              ...contact,
+              shareChannels: channels,
+            }),
+          });
+          setUser(result.user);
+        } catch (reason) {
+          setContactOpen(true);
+          throw reason;
+        }
+      }
       const { pinSource, ...payload } = draft;
       void pinSource;
       const result = await api<{ listing: Listing }>(
@@ -500,6 +540,24 @@ export function ReferralReview({
           <Mail size={18} /> New requests go to {user?.email}. You choose who to
           connect with.
         </p>
+        <details
+          className="referral-contact-options"
+          open={contactOpen}
+          onToggle={(event) => setContactOpen(event.currentTarget.open)}
+        >
+          <summary>Choose other ways to connect (optional)</summary>
+          <p>
+            We will email new requests. You can also share these contact details
+            when you accept one.
+          </p>
+          <ContactFields
+            email={user?.email || ""}
+            values={contact}
+            onValues={setContact}
+            channels={channels}
+            onChannels={setChannels}
+          />
+        </details>
         <label className="check-label referral-consent">
           <input
             type="checkbox"

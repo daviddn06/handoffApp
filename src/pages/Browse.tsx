@@ -29,6 +29,7 @@ import { AMENITIES, ROOM_LABELS, type Listing } from "../types";
 import { Button, EmptyState, ErrorBox, Loading, Modal } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
 import { Popover } from "../components/Popover";
+import { ChipRow } from "../components/ChipRow";
 import { Calendar } from "../components/Calendar";
 import { inBounds, milesBetween, type MapBounds } from "../lib/dps";
 import {
@@ -516,7 +517,7 @@ export default function Browse() {
             <MobileAccount className="browse-account" />
           </div>
           <div className="chip-strip">
-          <div className="chip-row" role="group" aria-label="Filters">
+          <ChipRow>
             <Popover
               width={340}
               trigger={(props) => (
@@ -802,7 +803,7 @@ export default function Browse() {
                 Clear
               </button>
             )}
-          </div>
+          </ChipRow>
           <button
             type="button"
             className="mobile-view-fab"

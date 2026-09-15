@@ -35,6 +35,7 @@ import {
   ROOM_LABELS,
   STATUS_LABELS,
   type HandoffRequest,
+  type ShareChannel,
   type Listing,
 } from "../types";
 import {
@@ -57,6 +58,11 @@ import {
   preferenceSentence,
 } from "../components/Gender";
 import { BoostModal, daysLeft } from "../components/BoostModal";
+import {
+  channelSentence,
+  ChannelChooser,
+  ContactChips,
+} from "../components/Contact";
 import { milesBetween, tripLabel } from "../lib/dps";
 const Map = lazy(() => import("../components/Map"));
 
@@ -177,7 +183,12 @@ export default function ListingDetail() {
     [reportError, setReportError] = useState(""),
     [reportBusy, setReportBusy] = useState(false),
     [boostOpen, setBoostOpen] = useState(false),
-    [preferenceWarning, setPreferenceWarning] = useState(false);
+    [preferenceWarning, setPreferenceWarning] = useState(false),
+    /* What this one request shares. Seeded from the profile default, and the
+       student can change it for this place only. */
+    [channels, setChannels] = useState<ShareChannel[]>(
+      user?.shareChannels || ["email"],
+    );
   /* Confirming who you are unlocks the address, the description and the
      lister, so the listing is fetched again the moment the session changes. */
   const signedInId = user?.id || "";
@@ -199,6 +210,9 @@ export default function ListingDetail() {
     setBoostOpen(false);
     setPreferenceWarning(false);
   }, [id]);
+  useEffect(() => {
+    setChannels(user?.shareChannels || ["email"]);
+  }, [user]);
   const listing = data?.listing,
     campus = campuses.find((c) => c.id === listing?.campusId),
     own = user?.id === listing?.ownerId;
@@ -236,7 +250,7 @@ export default function ListingDetail() {
         notification?: { emailSent: boolean };
       }>("/requests", {
         method: "POST",
-        body: json({ listingId: id, message }),
+        body: json({ listingId: id, message, shareChannels: channels }),
       });
       setCreatedRequest(result.request);
       refreshRequests();
@@ -677,6 +691,12 @@ export default function ListingDetail() {
                       : "The student will review your message. Check Requests for updates."}
                   </p>
                 </div>
+                {request.contact && (
+                  <ContactChips
+                    contact={request.contact}
+                    className="request-contact-chips"
+                  />
+                )}
                 <div className="request-actions">
                   {request.contact && (
                     <a
@@ -710,7 +730,7 @@ export default function ListingDetail() {
               <>
                 <p className="request-note">
                   {user
-                    ? "Introduce yourself and share your dates. Your email is shared only if they accept."
+                    ? "Introduce yourself and share your dates. Your contact details are shared only if they accept."
                     : "Confirm you are a student to ask about the place and connect."}
                 </p>
                 <div className="request-actions">
@@ -829,7 +849,7 @@ export default function ListingDetail() {
         description={
           createdRequest
             ? undefined
-            : "Your email is shared only if they accept."
+            : "Your contact details are shared only if they accept."
         }
       >
         {createdRequest ? (
@@ -879,6 +899,32 @@ export default function ListingDetail() {
                 At least 20 characters, no contact details.
               </span>
             </Field>
+            {/* Exactly what the lister will see, and a way to change it for
+                this place without leaving the sheet. */}
+            <div className="request-share">
+              <p className="contact-share-line">
+                <span>
+                  {listing.ownerName.split(" ")[0]} will see{" "}
+                  {channelSentence(channels)} if they accept.
+                </span>
+                <Link
+                  className="text-button"
+                  to="/profile"
+                  onClick={() => setRequestOpen(false)}
+                >
+                  Change
+                </Link>
+              </p>
+              <ChannelChooser
+                user={{
+                  phone: user?.phone || null,
+                  instagram: user?.instagram || null,
+                  facebook: user?.facebook || null,
+                }}
+                channels={channels}
+                onChannels={setChannels}
+              />
+            </div>
             {!hardPreference &&
               preferenceMismatch(listing.genderPreference, user?.gender) && (
                 <p className="notice request-preference-note">

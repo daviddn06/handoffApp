@@ -7,7 +7,7 @@ import {
   ShieldCheck,
   Mail,
 } from "lucide-react";
-import { api, dateLabel, json, money, useResource } from "../lib/api";
+import { ApiError, api, dateLabel, json, money, useResource } from "../lib/api";
 import { useApp } from "../lib/context";
 import { Button, ErrorBox, Loading, Modal } from "../components/ui";
 import { ReferralAccess } from "../components/ReferralAccess";
@@ -27,6 +27,7 @@ export default function Referral() {
   const { data, setData, error, loading, refresh } =
     useResource<ReferralResponse>(`${referralPath(token)}?track=0`);
   const trackedToken = useRef("");
+  const accountId = useRef(user?.id);
   const [accessOpen, setAccessOpen] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   useEffect(() => {
@@ -42,6 +43,10 @@ export default function Referral() {
     });
   }, [token]);
   useEffect(() => {
+    const changedAccount = accountId.current !== user?.id;
+    accountId.current = user?.id;
+    if (changedAccount)
+      setData((previous) => (previous?.referral.claimedByMe ? null : previous));
     if (!user?.id) return;
     let current = true;
     // Refresh ownership without unmounting the signup and verification dialog.
@@ -54,7 +59,14 @@ export default function Referral() {
               : result,
           );
       })
-      .catch(() => {});
+      .catch((reason) => {
+        if (
+          current &&
+          reason instanceof ApiError &&
+          [401, 403, 404].includes(reason.status)
+        )
+          setData(null);
+      });
     return () => {
       current = false;
     };
@@ -76,7 +88,7 @@ export default function Referral() {
     window.scrollTo({ top: 0, behavior: "instant" });
   }
   if (loading && !data) return <Loading label="Finding your sublease…" />;
-  if (error || !data)
+  if (!data)
     return (
       <div className="referral-page">
         <div className="referral-card referral-unavailable">
@@ -86,6 +98,14 @@ export default function Referral() {
             free listing.
           </p>
           <ErrorBox message={error || "Please try again."} retry={refresh} />
+          {!user && (
+            <Link
+              className="button secondary"
+              to={`/sign-in?next=${encodeURIComponent(`/referral/${token}`)}`}
+            >
+              Sign in to your claimed listing
+            </Link>
+          )}
           <Link className="button primary" to="/listings/new">
             Create a listing
           </Link>
@@ -97,7 +117,11 @@ export default function Referral() {
   if (r.claimedByMe)
     return (
       <div className="referral-page">
-        <ReferralReview key={r.id} referral={r} token={token} />
+        <ReferralReview
+          key={`${r.id}:${user?.id}`}
+          referral={r}
+          token={token}
+        />
       </div>
     );
   const missing = [
@@ -106,6 +130,9 @@ export default function Referral() {
   return (
     <div className="referral-page">
       <header className="referral-intro">
+        <Link className="referral-brand" to="/browse">
+          Handoff<span>Student to student.</span>
+        </Link>
         <span className="pill blue">
           <ShieldCheck size={14} /> A personal invitation
         </span>

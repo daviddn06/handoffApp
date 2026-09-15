@@ -97,7 +97,7 @@ export async function importReferrals({ adminEmail, batchPath, env = process.env
     db = new Database(join(dataDir, "handoff.sqlite"), { fileMustExist: true });
     db.pragma("busy_timeout = 5000");
     db.pragma("foreign_keys = ON");
-    if (db.pragma("user_version", { simple: true }) !== 12) fail("Run this importer only against its matching deployed schema 12 release.");
+    if (db.pragma("user_version", { simple: true }) !== 13) fail("Run this importer only against its matching deployed schema 13 release.");
     eligibleAdmin(db, email, allowList);
     try { lock = await open(lockPath, "wx", 0o600); }
     catch (error) { if (error.code === "EEXIST") fail("Another import holds the local lock. If a previous process was killed, review the stale lock before removing it."); throw error; }

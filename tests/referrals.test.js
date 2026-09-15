@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import sharp from "sharp";
 import Database from "better-sqlite3";
 import { createApp } from "../server/app.js";
+import { encodeReferralPhoto } from "../server/referrals.js";
 import { hashToken, randomToken } from "../server/security.js";
 
 process.env.HANDOFF_ADMIN_EMAILS = "operator@usc.edu";
@@ -154,6 +155,9 @@ test("nine source photos and exact cents survive owner claim and publication, wh
   const uploaded = await f.admin.call(`/api/admin/referrals/${created.referral.id}/photos`, { method: "POST", body: multipart(buffers) });
   assert.equal(uploaded.status, 201, JSON.stringify(uploaded.body));
   assert.equal(uploaded.body.referral.photos.length, 9);
+  for (const [index, photo] of uploaded.body.referral.photos.entries()) {
+    assert.deepEqual(await readFile(join(f.dataDir, "uploads", "referrals", `${photo.id}.webp`)), await encodeReferralPhoto(buffers[index]), "Gallery and cover retain source upload order");
+  }
   const over = await f.admin.call(`/api/admin/referrals/${created.referral.id}/photos`, { method: "POST", body: multipart(buffers.slice(0, 8)) });
   assert.equal(over.status, 400, "Nine existing plus eight new would exceed sixteen");
   assert.equal(f.app.locals.db.prepare("SELECT COUNT(*) AS n FROM referral_photos WHERE referral_id=?").get(created.referral.id).n, 9);
@@ -162,7 +166,11 @@ test("nine source photos and exact cents survive owner claim and publication, wh
   assert.equal(claim.status, 200);
   assert.equal(claim.body.referral.listing.photos.length, 9);
   assert.equal(claim.body.referral.listing.price, 1497.50);
+  const attested = JSON.parse(f.app.locals.db.prepare("SELECT details FROM referral_events WHERE referral_id=? AND type='claimed'").get(created.referral.id).details);
+  assert.match(attested.attestation, /currently a USC student/);
+  assert.match(attested.attestation, /right to list it and use these photos/);
   const photos = claim.body.referral.listing.photos;
+  for (const [index, path] of photos.entries()) assert.deepEqual(await readFile(join(f.dataDir, path)), await encodeReferralPhoto(buffers[index]), "Claimed copies retain the same source order");
   const published = await owner.user.call(created.path + "/listing", { method: "POST", body: listingBody(photos, { status: "active", price: 1497.50, deposit: 99.01, originalPrice: 1600.25 }) });
   assert.equal(published.status, 201, JSON.stringify(published.body));
   assert.equal(published.body.listing.price, 1497.50);
@@ -340,7 +348,7 @@ test("matched backup includes private referral source photos and current account
   const backups = join(f.dataDir, "snapshot-test");
   const result = await execute(process.execPath, [resolve("deploy/backup.mjs")], { env: { ...process.env, HANDOFF_DATA_DIR: f.dataDir, HANDOFF_BACKUP_DIR: backups } });
   const completed = JSON.parse(result.stdout), manifest = JSON.parse(await readFile(completed.manifest, "utf8"));
-  assert.equal(manifest.schemaVersion, 12);
+  assert.equal(manifest.schemaVersion, 13);
   assert.equal(manifest.uploads.referralPhotos, 1);
   assert.equal(manifest.uploads.avatars, 1);
   const restore = join(f.dataDir, "restored"); await mkdir(restore);

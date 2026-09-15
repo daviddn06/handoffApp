@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { cpus, freemem, hostname, loadavg, totalmem, uptime } from "node:os";
 import { HttpError } from "./security.js";
+import { readShareChannels } from "./validation.js";
 
 const execute = promisify(execFile);
 const iso = () => new Date().toISOString();
@@ -326,6 +327,13 @@ export function adminRouter({
       termsAccepted: Boolean(row.terms_accepted_at),
       termsAcceptedAt: row.terms_accepted_at || null,
       gender: hasColumn("users", "gender") ? row.gender || "unspecified" : null,
+      /* Contact channels, shown to an admin reviewing an account. */
+      phone: hasColumn("users", "phone") ? row.phone || null : null,
+      instagram: hasColumn("users", "instagram") ? row.instagram || null : null,
+      facebook: hasColumn("users", "facebook") ? row.facebook || null : null,
+      shareChannels: hasColumn("users", "share_channels")
+        ? readShareChannels(row.share_channels)
+        : ["email"],
       isAdmin: Boolean(row.is_admin),
       disabledAt: row.disabled_at || null,
       bio: row.bio || "",

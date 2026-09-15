@@ -29,8 +29,6 @@ const BRAND_LOGOS: Record<string, string> = { usc: "/logos/usc.svg" };
 /* The starting list under the search field, so the panel is never a bare
    field. Live campuses always lead, these fill the rest. */
 const STARTER_SCHOOLS = [
-  "University of California, Los Angeles",
-  "California State University, Long Beach",
   "University of California, Berkeley",
   "New York University",
   "University of Michigan",
