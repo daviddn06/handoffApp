@@ -113,26 +113,23 @@
     position: relative;
     flex: none;
   }
+  /* The button is the 44px target. The ring inside it is 32px, so nothing
+     spills past the header row the way a negative inset pseudo did. */
   .m-account-avatar {
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     transition: transform var(--duration-quick) var(--ease-out);
-  }
-  .m-account-avatar::after {
-    content: "";
-    position: absolute;
-    inset: -5px;
   }
   .m-account-avatar:active {
     transform: scale(0.94);
   }
   .m-account-avatar .avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 13px;
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
   }
   .m-account-pill {
     display: inline-flex;
@@ -720,12 +717,25 @@
     font-size: 14px;
   }
   /* Facts scroll sideways instead of wrapping into a block. */
+  /* The strip scrolls inside the content column. It used to bleed past the
+     gutter with a negative margin, which made .detail-main 16px wider than
+     its own box and left the page relying on an overflow clip. */
   .fact-strip {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
-    margin: 0 calc(var(--gutter) * -1);
-    padding: 2px var(--gutter);
+    margin: 0;
+    padding: 2px 0;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 calc(100% - 24px),
+      transparent
+    );
+  }
+  .fact-strip::after {
+    content: "";
+    flex: 0 0 var(--s-3);
   }
   .fact-strip::-webkit-scrollbar,
   .gallery::-webkit-scrollbar {
@@ -1488,5 +1498,121 @@
   .mg-actions .button.small.quiet:hover {
     color: var(--muted);
     background: none;
+  }
+}
+
+/* ---------- Touch targets ----------
+   On a coarse pointer every control clears 44px. Where the visual size has
+   to stay small the hit area is extended with a pseudo element instead. */
+@media (pointer: coarse) {
+  .chip,
+  .chip-row .chip,
+  .amenity-chip {
+    min-height: 44px;
+  }
+  .sort-select select,
+  .popover-body input,
+  .mobile-view-fab {
+    min-height: 44px;
+    height: auto;
+  }
+  .save-button {
+    width: 44px;
+    height: 44px;
+  }
+  .save-button::after {
+    inset: 0;
+  }
+  .map-control,
+  .cal-nav {
+    width: 44px;
+    height: 44px;
+  }
+  .icon-button,
+  .search-field .clear {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .cal-day {
+    min-height: 44px;
+  }
+  .cal-day-inner {
+    min-height: 40px;
+  }
+  .check-label,
+  .popover-body .check-label,
+  .gender-option {
+    min-height: 44px;
+  }
+  .check-label input[type="checkbox"],
+  .check-label input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+  }
+  .tab,
+  .popover-footer .text-button,
+  .text-button,
+  .back-link {
+    min-height: 44px;
+  }
+  .photo-tool {
+    width: 44px;
+    height: 44px;
+  }
+  .admin-pager button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* Inline links inside prose keep their size and grow their hit area. */
+  .auth-fineprint a,
+  .forgot-link,
+  .legal-contact a,
+  .menu-legal a {
+    position: relative;
+    display: inline-block;
+  }
+  .auth-fineprint a::after,
+  .forgot-link::after,
+  .legal-contact a::after,
+  .menu-legal a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+}
+
+/* The save affordance is never hover revealed on a phone. */
+@media (max-width: 760px) {
+  .save-button {
+    opacity: 1;
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (pointer: coarse) {
+  .chat-composer .button,
+  .button.small {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Every phone specific transform based motion is guarded here too, not only
+   by the global reset in base.css. */
+@media (prefers-reduced-motion: reduce) {
+  .m-sheet-panel,
+  .m-sheet-scrim,
+  .mobile-nav,
+  .mobile-view-fab,
+  .mobile-carousel,
+  .m-account-avatar {
+    animation: none !important;
+    transition: none !important;
   }
 }

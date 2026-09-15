@@ -30,14 +30,18 @@ const COLUMNS: Column[] = [
   { key: "price", label: "Price", numeric: true },
   { key: "campus", label: "Campus" },
   { key: "boost", label: "Boosted until" },
-  { key: "views", label: "Views", numeric: true },
-  { key: "requests", label: "Requests", numeric: true },
   { key: "created", label: "Created" },
   { key: "updated", label: "Updated" },
 ];
 
 export default function Listings() {
-  const { notify } = useApp();
+  const { notify, campuses } = useApp();
+  /* Campus is stored as a slug. The dashboard shows the school name. */
+  const campusName = (id: string) =>
+    campuses.find((c) => c.id === id)?.name || id;
+  /* The table is tight, so it takes the short name. */
+  const campusShort = (id: string) =>
+    campuses.find((c) => c.id === id)?.shortName || campusName(id);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -129,10 +133,8 @@ export default function Listings() {
                   </div>
                 </td>
                 <td className="num">{money(item.price)}</td>
-                <td>{item.campusId}</td>
-                <td>{item.boosted ? when(item.boostUntil, false) : "No"}</td>
-                <td className="num">{number(item.views)}</td>
-                <td className="num">{number(item.requests)}</td>
+                <td>{campusShort(item.campusId)}</td>
+                <td>{item.boosted ? when(item.boostUntil, false) : ""}</td>
                 <td>{when(item.createdAt, false)}</td>
                 <td>{when(item.updatedAt, false)}</td>
               </tr>
@@ -222,7 +224,7 @@ export default function Listings() {
                   ["Deposit", money(row.deposit)],
                   ["Room", `${row.roomType}, ${row.bedrooms} bed, ${row.bathrooms} bath`],
                   ["Available", `${row.availableFrom} to ${row.availableTo}`],
-                  ["Campus", row.campusId],
+                  ["Campus", campusName(row.campusId)],
                   ["Photos", number(row.photos.length)],
                   ["Views", number(row.views)],
                   ["Requests", number(row.requests)],

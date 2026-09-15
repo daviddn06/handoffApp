@@ -48,11 +48,11 @@ function NotFound() {
   return (
     <div className="page-container">
       <EmptyState
-        title="This page has moved on."
+        title="We could not find that page."
         description={
           isInternalSurface
             ? "That section does not exist."
-            : "Let’s get you back to finding your next place."
+            : "The link may be broken or the listing may have been taken down."
         }
       >
         <Link className="button primary" to={isInternalSurface ? "/" : "/browse"}>

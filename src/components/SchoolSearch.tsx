@@ -26,6 +26,15 @@ import { Button, ErrorBox } from "./ui";
 
 /** High resolution marks for the campuses we run, favicons are too soft. */
 const BRAND_LOGOS: Record<string, string> = { usc: "/logos/usc.svg" };
+/* The starting list under the search field, so the panel is never a bare
+   field. Live campuses always lead, these fill the rest. */
+const STARTER_SCHOOLS = [
+  "University of California, Los Angeles",
+  "California State University, Long Beach",
+  "University of California, Berkeley",
+  "New York University",
+  "University of Michigan",
+];
 
 type Row = {
   key: string;
@@ -148,6 +157,25 @@ export function SchoolSearch({
 
   const trimmed = query.trim();
   const searching = trimmed.length > 0;
+  /* Before anything is typed the panel is not empty. The live campus leads,
+     then a short starting list of the schools students look for most. */
+  const suggestions = useMemo<Row[]>(() => {
+    const leading = live.map(campusRow);
+    if (!schools) return leading;
+    const seen = new Set(leading.map((r) => r.key));
+    const picked: Row[] = [];
+    for (const name of STARTER_SCHOOLS) {
+      const hit = searchSchools(schools, name, 1)[0];
+      if (!hit) continue;
+      const row = schoolRow(hit);
+      if (seen.has(row.key)) continue;
+      seen.add(row.key);
+      picked.push(row);
+      if (picked.length === 4) break;
+    }
+    return [...leading, ...picked];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schools, live]);
   const rows = useMemo<Row[]>(() => {
     if (!searching) return [];
     // A live campus that matches always leads, matched on its own fields so a
@@ -170,12 +198,13 @@ export function SchoolSearch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schools, trimmed, searching, live]);
 
+  const shown = searching ? rows : suggestions;
   useEffect(() => setActive(0), [trimmed]);
   useEffect(() => {
     list.current
       ?.querySelector<HTMLElement>(".school-row.is-active")
       ?.scrollIntoView({ block: "nearest" });
-  }, [active, rows]);
+  }, [active, shown]);
 
   function pick(row: Row) {
     if (row.campus) return onChoose(row.campus.id);
@@ -188,12 +217,12 @@ export function SchoolSearch({
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      if (!rows.length) return;
+      if (!shown.length) return;
       const step = e.key === "ArrowDown" ? 1 : -1;
-      setActive((i) => (i + step + rows.length) % rows.length);
+      setActive((i) => (i + step + shown.length) % shown.length);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const row = rows[active];
+      const row = shown[active];
       if (row) pick(row);
       else if (trimmed) waitlistFor(trimmed);
     } else if (e.key === "Escape") {
@@ -265,7 +294,6 @@ export function SchoolSearch({
             </button>
           )}
         </label>
-        {searching && (
         <div
           className="school-panel"
           ref={list}
@@ -274,7 +302,10 @@ export function SchoolSearch({
         >
           <div className="school-rows" key={trimmed}>
             {!schools && <div className="school-note">Loading schools…</div>}
-            {schools && rows.length === 0 && (
+            {!searching && (
+              <div className="school-group">Start with one of these</div>
+            )}
+            {schools && searching && rows.length === 0 && (
               <div className="school-empty">
                 <p>No school called {trimmed} yet.</p>
                 <button
@@ -287,7 +318,7 @@ export function SchoolSearch({
                 </button>
               </div>
             )}
-            {rows.map((row, index) => (
+            {shown.map((row, index) => (
               <div key={row.key} className="school-slot">
                 <button
                   type="button"
@@ -327,7 +358,6 @@ export function SchoolSearch({
             ))}
           </div>
         </div>
-        )}
       </div>
 
       <div className="t-page" data-page-id="waitlist" aria-hidden={!waiting}>

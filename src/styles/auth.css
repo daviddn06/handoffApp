@@ -103,7 +103,7 @@
 }
 .auth-panel .field-hint {
   font-size: 12.5px;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 .auth-cta {
   min-height: 48px;
@@ -117,13 +117,36 @@
   color: var(--muted);
   margin: 0;
 }
+/* Server state is a notice, not another sentence in the form. */
+.auth-hint.is-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+.auth-hint.is-notice svg {
+  margin-top: 1px;
+}
 .forgot-link {
+  position: relative;
   align-self: flex-end;
   margin-top: -6px;
   font-size: 12.5px;
   font-weight: 500;
   color: var(--blue);
   transition: color var(--duration-quick) var(--ease-out);
+}
+.forgot-link::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 50%;
+  height: 40px;
+  transform: translateY(-50%);
 }
 .forgot-link:hover {
   color: var(--blue-hover);
@@ -134,10 +157,24 @@
 .auth-fineprint {
   font-size: 12px;
   line-height: 1.55;
-  color: var(--muted-2);
+  color: var(--muted);
   margin: 0;
-  text-align: center;
+  text-align: left;
   text-wrap: pretty;
+}
+/* Inline legal links keep their type size and get a real hit area. */
+.auth-fineprint a {
+  position: relative;
+  display: inline-block;
+}
+.auth-fineprint a::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  height: 40px;
+  transform: translateY(-50%);
 }
 .auth-fineprint a {
   color: var(--muted);
@@ -242,6 +279,11 @@
 }
 .auth-slide {
   position: relative;
+  /* The off screen steps are laid out beside the visible one, so the track
+     clips instead of widening the card. clip with a 6px margin keeps the
+     focus rings visible without adding width to the card. */
+  overflow: clip;
+  overflow-clip-margin: 6px;
   /* Animated on a step change with the card resize tokens, then released
      back to auto so nothing is ever held at a stale height. */
   transition: height var(--resize-dur) var(--resize-ease);
@@ -307,7 +349,7 @@
   flex-basis: 100%;
   padding-left: 30px;
   font-size: 12px;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 .auth-school-line .school-logo {
   width: 22px;
@@ -508,7 +550,7 @@
   color: #fff;
   box-shadow:
     0 0 0 2px #fff,
-    0 4px 12px rgb(59 120 215 / 0.4);
+    0 4px 12px rgb(47 104 196 / 0.4);
 }
 
 /* transitions.dev 12, error state shake on the form block */

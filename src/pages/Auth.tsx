@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
+  AlertCircle,
   ArrowRight,
   BedDouble,
   CalendarDays,
@@ -700,12 +701,6 @@ export default function Auth({ mode }: { mode: Mode }) {
           notify("Welcome back.");
         }}
       />,
-      <>
-        New here?{" "}
-        <Link to={`/sign-up?next=${encodeURIComponent(next)}`}>
-          Confirm you are a student
-        </Link>
-      </>,
     );
 
   /* Sign up, the shared three step form inside the full page shell. */
@@ -718,19 +713,12 @@ export default function Auth({ mode }: { mode: Mode }) {
           setCooldown(30);
         }}
       />,
-      <>
-        Already have an account?{" "}
-        <Link to={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link>
-      </>,
     );
 
   /* Forgot password, the shared form inside the full page shell. */
   if (mode === "forgot-password")
     return shell(
       <ForgotForm next={next} />,
-      <>
-        Remembered it? <Link to="/sign-in">Sign in</Link>
-      </>,
     );
 
   /* Reset password. */
@@ -782,8 +770,9 @@ export default function Auth({ mode }: { mode: Mode }) {
         </Field>
         <PasswordMeter check={strength} />
         {!emailReady && (
-          <p className="auth-hint">
-            Email delivery is paused on this server, so the link may not arrive.
+          <p className="auth-hint is-notice">
+            <AlertCircle size={15} />
+            Email is paused on this server. The link may not arrive.
           </p>
         )}
         {!resetToken && (

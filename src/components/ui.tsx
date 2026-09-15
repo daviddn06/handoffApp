@@ -365,7 +365,7 @@ export function Field({
         {label}
       </label>
       {attach(children)}
-      {hint && (
+      {hint && !error && (
         <span className="field-hint" id={`${id}-hint`}>
           {hint}
         </span>

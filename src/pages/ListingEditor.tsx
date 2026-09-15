@@ -218,7 +218,7 @@ export default function ListingEditor() {
         );
         if (lookedUp.current !== q) return;
         if (!results.length) {
-          setLookupNote("We could not find that address. Tap the map to place the pin.");
+          setLookupNote("We could not find that address. Pick the spot on the map to place the pin.");
           return;
         }
         const [best] = results;
@@ -529,7 +529,7 @@ export default function ListingEditor() {
     }
     if (!termsAccepted && !agreed) {
       fail("Please agree to the Terms of Service and Privacy Policy first.", {
-        terms: "Tick the box to continue.",
+        terms: "Agree to the Terms of Service to publish.",
       });
       return;
     }
@@ -668,7 +668,9 @@ export default function ListingEditor() {
         <p className="draft-note">
           {dirty
             ? "You have unsaved changes."
-            : "Your draft stays private until you publish."}
+            : live
+              ? "This listing is live. Saving updates it right away."
+              : "Your draft stays private until you publish."}
           <Button
             type="button"
             variant="secondary"
@@ -946,7 +948,7 @@ export default function ListingEditor() {
                                   ? pinSource === "auto"
                                     ? "Pin placed from your address. Check it and drag to adjust."
                                     : "Location pin placed"
-                                  : "Type the address and we will place the pin, or tap the map."}
+                                  : "Type the address and we will place the pin, or pick the spot on the map."}
                           </span>
                           <details className="coordinate-fields">
                             <summary>Enter coordinates instead</summary>
@@ -1293,7 +1295,7 @@ export default function ListingEditor() {
                                       }
                                     >
                                       <Star size={14} />
-                                      Make cover
+                                      Make photo {index + 1} the cover
                                     </button>
                                   )}
                                   <button
@@ -1422,15 +1424,42 @@ export default function ListingEditor() {
                             }
                           </dd>
                         </div>
-                        <div>
-                          <dt>Amenities</dt>
-                          <dd>{draft.amenities.length || "None"} listed</dd>
-                        </div>
-                        <div>
-                          <dt>Photos</dt>
-                          <dd>{draft.photos.length} uploaded</dd>
-                        </div>
                       </dl>
+                      <div className="review-block">
+                        <h3>Amenities</h3>
+                        {draft.amenities.length ? (
+                          <ul className="review-amenities">
+                            {draft.amenities.map((a) => (
+                              <li key={a}>
+                                <Check size={13} />
+                                {a}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="muted">None listed.</p>
+                        )}
+                      </div>
+                      <div className="review-block">
+                        <h3>
+                          Photos
+                          <span className="review-count">
+                            {draft.photos.length}
+                          </span>
+                        </h3>
+                        {draft.photos.length ? (
+                          <ul className="review-photos">
+                            {draft.photos.map((url, index) => (
+                              <li key={url}>
+                                <img src={url} alt={`Listing photo ${index + 1}`} />
+                                {index === 0 && <span>Cover</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="muted">No photos yet.</p>
+                        )}
+                      </div>
                       <div className="review-block">
                         <h3>Description</h3>
                         <p className="preserve-lines">{draft.description}</p>

@@ -139,22 +139,6 @@ button.boost-pill:active {
   display: grid;
   gap: var(--s-3);
 }
-.boost-pay {
-  display: grid;
-  gap: var(--s-2);
-  justify-items: center;
-}
-.boost-pay .button[disabled] {
-  background: var(--soft-2);
-  color: var(--muted-2);
-  box-shadow: none;
-  cursor: not-allowed;
-  opacity: 1;
-}
-.boost-caption {
-  font-size: 12.5px;
-  color: var(--muted);
-}
 .boost-free {
   justify-content: center;
 }
@@ -162,7 +146,7 @@ button.boost-pill:active {
   margin: 0;
   text-align: center;
   font-size: 12.5px;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 
 /* Boosted, with stats */
@@ -271,7 +255,7 @@ button.boost-pill:active {
   color: #fff;
   box-shadow:
     0 0 0 2px #fff,
-    0 3px 10px rgb(59 120 215 / 0.35);
+    0 3px 10px rgb(47 104 196 / 0.35);
 }
 .price-marker-wrap.is-boosted.has-savings .price-marker::after {
   box-shadow: 0 0 0 2px var(--blue);
@@ -279,7 +263,7 @@ button.boost-pill:active {
 .legend-swatch.price.boosted {
   background: var(--blue);
   color: #fff;
-  box-shadow: 0 0 0 1px rgb(59 120 215 / 0.35);
+  box-shadow: 0 0 0 1px rgb(47 104 196 / 0.35);
 }
 
 @media (max-width: 760px) {
@@ -291,5 +275,19 @@ button.boost-pill:active {
   }
   .boost-stat strong {
     font-size: 20px;
+  }
+}
+
+/* In the listings row the boost pill is a status marker, not a control. */
+.boost-pill.is-static {
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boost-pill,
+  .boost-stat,
+  .boost-done {
+    animation: none !important;
+    transition: none !important;
   }
 }

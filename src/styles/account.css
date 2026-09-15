@@ -32,13 +32,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
+  min-height: 36px;
   padding: 0 12px;
   border-radius: var(--r-sm);
   white-space: nowrap;
   font-size: 13px;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--ink-2);
   transition: color var(--tabs-dur) var(--tabs-ease);
 }
 .tab::after {
@@ -131,6 +131,7 @@
   gap: var(--s-3);
 }
 .mg-row {
+  position: relative;
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr) auto;
   align-items: center;
@@ -164,6 +165,12 @@
 .mg-row:hover .mg-thumb img {
   transform: scale(1.04);
 }
+.mg-thumb,
+.mg-main,
+.mg-actions {
+  position: relative;
+  z-index: 1;
+}
 .mg-main {
   min-width: 0;
   display: flex;
@@ -181,9 +188,18 @@
   font-weight: 600;
   letter-spacing: -0.01em;
   min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+/* The whole row is the target for the title link, not its 20px text box. */
+.mg-title h2 a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--r-md);
 }
 .mg-title h2 a {
   transition: color var(--duration-quick) var(--ease-out);
@@ -231,7 +247,7 @@
 }
 .mg-updated {
   font-size: 12px;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 .mg-actions {
   display: flex;
@@ -371,7 +387,7 @@
 }
 .rq-head-text em {
   font-style: normal;
-  color: var(--muted-2);
+  color: var(--muted);
   white-space: nowrap;
 }
 .rq-head > .pill {
@@ -393,12 +409,19 @@
   flex-direction: column;
   gap: 4px;
 }
+.rq-quote-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
 .rq-quote p {
   font-size: 14px;
   line-height: 1.55;
   color: var(--ink-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  /* Message bodies keep a measure. */
+  max-width: 66ch;
 }
 .rq-actions {
   display: flex;
@@ -533,6 +556,41 @@
 .pf-verified {
   margin-top: var(--s-2);
 }
+/* Read only values are rows with the reason beside them, not dead inputs. */
+.pf-readonly {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-4);
+  margin: 0;
+}
+.pf-readonly > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--s-3) 0 0;
+  border-top: 1px solid var(--line);
+}
+.pf-readonly dt {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.pf-readonly dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.pf-readonly p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+/* Field hints stay inside the field width. */
+.pf-card .field-hint {
+  max-width: 54ch;
+}
 .pf-note {
   margin-top: var(--s-4);
   padding-top: var(--s-4);
@@ -568,6 +626,9 @@
 
 /* Mobile, single column */
 @media (max-width: 760px) {
+  .pf-readonly {
+    grid-template-columns: 1fr;
+  }
   .tab-bar {
     align-self: stretch;
     margin-bottom: var(--s-4);
@@ -632,10 +693,40 @@
 
 /* The row level delete reads as destructive without shouting. */
 .mg-actions .button.quiet.danger {
-  color: var(--red, #c0392b);
+  color: var(--red-ink);
   background: transparent;
   border-color: transparent;
 }
 .mg-actions .button.quiet.danger:hover:not(:disabled) {
-  background: rgb(192 57 43 / 0.08);
+  background: var(--red-soft);
+}
+
+/* Overflow menu for the secondary row actions */
+.row-menu-anchor {
+  display: inline-flex;
+}
+.row-menu-trigger {
+  position: relative;
+  z-index: 2;
+  min-width: 36px;
+  min-height: 36px;
+}
+.account-menu.row-menu {
+  position: static;
+  width: auto;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  animation: none;
+  background: transparent;
+}
+.account-menu.row-menu > button {
+  min-height: 40px;
+}
+.account-menu.row-menu > button.is-danger {
+  color: var(--red-ink);
+}
+.account-menu.row-menu > button.is-danger:hover {
+  background: var(--red-soft);
+  color: var(--red-ink);
 }

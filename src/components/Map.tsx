@@ -289,7 +289,7 @@ export default function Map({
       type: "circle",
       source: "campus",
       paint: {
-        "circle-color": "#3b78d7",
+        "circle-color": "#2f68c4",
         "circle-opacity": 0.07,
         "circle-blur": 0.6,
         "circle-radius": [
@@ -310,7 +310,7 @@ export default function Map({
       type: "circle",
       source: "campus",
       paint: {
-        "circle-color": "#3b78d7",
+        "circle-color": "#2f68c4",
         "circle-radius": 5,
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 2,
@@ -577,7 +577,7 @@ export default function Map({
         type: "circle",
         source: APPROX_SOURCE,
         paint: {
-          "circle-color": "#3b78d7",
+          "circle-color": "#2f68c4",
           "circle-opacity": 0.14,
           "circle-radius": radius,
         },
@@ -588,7 +588,7 @@ export default function Map({
         source: APPROX_SOURCE,
         paint: {
           "circle-color": "rgba(0,0,0,0)",
-          "circle-stroke-color": "#3b78d7",
+          "circle-stroke-color": "#2f68c4",
           "circle-stroke-width": 1.4,
           "circle-stroke-opacity": 0.45,
           "circle-radius": radius,
@@ -854,9 +854,7 @@ export default function Map({
           The map could not load. Listing details are still available.
         </div>
       )}
-      {onPin && (
-        <div className="map-hint">Tap to place a pin. Drag it to adjust.</div>
-      )}
+
     </div>
   );
 }

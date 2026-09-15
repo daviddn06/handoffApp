@@ -219,14 +219,8 @@ export function BoostModal({
           </ul>
           {error && <ErrorBox message={error} />}
           <div className="boost-actions">
-            <div className="boost-pay">
-              <Button variant="primary" className="full-width" disabled>
-                Pay $9 and boost
-              </Button>
-              <span className="boost-caption">Payments open soon</span>
-            </div>
             <Button
-              variant="secondary"
+              variant="primary"
               className="full-width large boost-free"
               busy={busy}
               onClick={useLaunchBoost}
@@ -236,6 +230,7 @@ export function BoostModal({
             </Button>
             <p className="boost-fineprint">
               One free launch boost per listing, seven days, nothing to pay.
+              Paid boosts open when payments launch.
             </p>
           </div>
         </div>
