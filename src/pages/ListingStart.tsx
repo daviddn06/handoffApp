@@ -62,10 +62,7 @@ export default function ListingStart() {
       <BackLink to="/my-listings">My listings</BackLink>
       <div className="start-head">
         <h1>How do you want to list?</h1>
-        <p>
-          Smart import and the chat helper do the typing. You check the details
-          and publish when it looks right.
-        </p>
+        <p>Smart import and the chat helper do the typing.</p>
       </div>
       <div className="start-grid enter-stagger">
         {CHOICES.map((choice) => {
@@ -110,8 +107,7 @@ export default function ListingStart() {
         })}
       </div>
       <p className="start-foot">
-        Whichever you pick, nothing goes live until you review every step and
-        publish it yourself.
+        Nothing goes live until you review it and publish.
       </p>
     </div>
   );

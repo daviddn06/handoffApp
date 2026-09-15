@@ -110,7 +110,7 @@ function BrowseReplica() {
                     </span>
                     <span className="campus-text">
                       <strong>Near University of Southern California</strong>
-                      <small>Tap to change campus</small>
+                      <small>Change school</small>
                     </span>
                     <ChevronDown size={15} className="chip-chevron" />
                   </span>

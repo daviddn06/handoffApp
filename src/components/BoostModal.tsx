@@ -143,8 +143,7 @@ export function BoostModal({
             Boosted until {dateLabel(boosted.boostUntil || "", true)}
           </h3>
           <p className="muted">
-            Your place is at the top of its map area with a filled pin and a
-            Boosted tag. Come back here to see views and requests.
+            Your place sits at the top of its map area with a Boosted tag.
           </p>
           <div className="modal-actions">
             <Button variant="primary" onClick={onClose}>

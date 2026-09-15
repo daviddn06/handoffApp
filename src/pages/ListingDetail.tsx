@@ -408,8 +408,8 @@ export default function ListingDetail() {
               </div>
             )}
             <p className="field-hint">
-              The pin is placed by the student. Confirm the address and arrange
-              a visit before committing.
+              The pin is placed by the student, so confirm the address before
+              you commit.
             </p>
           </section>
 
@@ -430,8 +430,7 @@ export default function ListingDetail() {
               <strong>A thoughtful handoff starts with a conversation.</strong>
               <p>
                 Visit the place, confirm landlord approval, and review the lease
-                together. Handoff connects students and doesn’t process rent or
-                deposits.
+                together. Handoff does not process rent or deposits.
               </p>
             </div>
           </div>
@@ -486,8 +485,7 @@ export default function ListingDetail() {
             {own ? (
               <>
                 <p className="request-note">
-                  This is your listing. Manage availability and incoming
-                  requests from your dashboard.
+                  This is your listing. Manage it from My listings.
                 </p>
                 <div className="request-actions">
                   {primaryAction("large")}
@@ -684,8 +682,7 @@ export default function ListingDetail() {
         ) : (
           <form className="request-form" onSubmit={sendRequest}>
             <p className="muted">
-              Introduce yourself and share your dates. Your email is shared only
-              if they accept.
+              Your email is shared only if they accept.
             </p>
             <Field label="Your message">
               <textarea
@@ -698,8 +695,7 @@ export default function ListingDetail() {
                 onChange={(e) => setMessage(e.target.value)}
               />
               <span className="field-hint">
-                At least 20 characters. Keep contact details out of this
-                message.
+                At least 20 characters, no contact details.
               </span>
             </Field>
             {preferenceMismatch(listing.genderPreference, user?.gender) && (
@@ -731,8 +727,7 @@ export default function ListingDetail() {
         {!user ? (
           <>
             <p className="muted">
-              Confirm you are a student to submit a report so we can follow up
-              if needed.
+              Confirm you are a student so we can follow up.
             </p>
             <button
               className="button primary full-width"
@@ -748,8 +743,7 @@ export default function ListingDetail() {
         ) : (
           <form className="stack" onSubmit={submitReport}>
             <p className="muted">
-              Help keep Handoff useful for everyone. Tell us what doesn’t look
-              right.
+              Tell us what does not look right.
             </p>
             <Field label="Reason">
               <select

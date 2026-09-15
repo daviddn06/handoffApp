@@ -476,11 +476,7 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
           style={{ "--t-page-from-x": "-8px" } as React.CSSProperties}
         >
           <form className="auth-form" noValidate onSubmit={advance}>
-            <Field
-              label="Student email"
-              hint="Use your school email."
-              error={fieldErrors.email}
-            >
+            <Field label="Student email" error={fieldErrors.email}>
               <input
                 type="email"
                 name="email"

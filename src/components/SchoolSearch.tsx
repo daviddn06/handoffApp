@@ -275,7 +275,7 @@ export function SchoolSearch({
             {!schools && <div className="school-note">Loading schools…</div>}
             {schools && !searching && (
               <div className="school-idle">
-                <p>Start typing your school. Results appear as you type.</p>
+                <p>Start typing your school.</p>
               </div>
             )}
             {schools && searching && rows.length === 0 && (
@@ -370,8 +370,8 @@ export function SchoolSearch({
           ) : (
             <form onSubmit={joinWaitlist} className="stack">
               <p className="muted">
-                Leave your school email and we will tell you the moment students
-                at {waiting?.name || "your school"} can list and browse.
+                We will email you when Handoff opens at{" "}
+                {waiting?.name || "your school"}.
               </p>
               <label className="field">
                 <span className="field-label">School email</span>

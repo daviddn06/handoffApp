@@ -5,7 +5,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   font-style: normal;
   color: var(--blue-ink);
@@ -58,13 +58,13 @@ button.boost-pill:active {
 /* Offer */
 .boost-offer {
   display: grid;
-  gap: 18px;
+  gap: var(--s-5);
 }
 .boost-price-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: var(--s-4);
+  padding: var(--pad-card);
   border-radius: var(--r-lg);
   background: var(--blue-soft);
   box-shadow: inset 0 0 0 1px var(--blue-soft-2);
@@ -88,7 +88,7 @@ button.boost-pill:active {
 }
 .boost-price-copy {
   display: grid;
-  gap: 3px;
+  gap: var(--s-1);
 }
 .boost-price-copy > strong {
   font-size: 15px;
@@ -101,7 +101,7 @@ button.boost-pill:active {
 }
 .boost-benefits {
   display: grid;
-  gap: 13px;
+  gap: var(--s-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -109,7 +109,7 @@ button.boost-pill:active {
 .boost-benefits li {
   display: grid;
   grid-template-columns: 30px 1fr;
-  gap: 11px;
+  gap: var(--s-3);
   align-items: start;
 }
 .boost-benefit-icon {
@@ -137,11 +137,11 @@ button.boost-pill:active {
 }
 .boost-actions {
   display: grid;
-  gap: 12px;
+  gap: var(--s-3);
 }
 .boost-pay {
   display: grid;
-  gap: 6px;
+  gap: var(--s-2);
   justify-items: center;
 }
 .boost-pay .button[disabled] {
@@ -168,25 +168,25 @@ button.boost-pill:active {
 /* Boosted, with stats */
 .boost-live {
   display: grid;
-  gap: 16px;
+  gap: var(--s-5);
 }
 .boost-live-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-3);
   flex-wrap: wrap;
   font-size: 13px;
 }
 .boost-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: var(--s-3);
 }
 .boost-stat {
   display: grid;
   gap: 2px;
   justify-items: center;
-  padding: 14px 8px;
+  padding: var(--s-4) var(--s-2);
   border-radius: var(--r-md);
   background: var(--soft);
   box-shadow: var(--ring);
@@ -211,32 +211,33 @@ button.boost-pill:active {
 /* Success */
 .boost-done {
   display: grid;
-  gap: 8px;
+  gap: var(--s-2);
   justify-items: center;
   text-align: center;
-  padding: 6px 0 0;
+  padding: var(--s-1) 0 0;
 }
 .boost-done .t-success-check {
   color: var(--blue);
 }
 .boost-done h3 {
-  margin: 4px 0 0;
-  font-size: 19px;
+  margin: var(--s-1) 0 0;
+  font-size: 18px;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 .boost-done p {
   margin: 0;
   max-width: 40ch;
-  font-size: 13.5px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 /* Detail page owner callout */
 .boost-callout {
   display: grid;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 16px;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding: var(--pad-card);
   border-radius: var(--r-lg);
   background: var(--blue-soft);
   box-shadow: inset 0 0 0 1px var(--blue-soft-2);
@@ -244,15 +245,15 @@ button.boost-pill:active {
 .boost-callout-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   font-size: 15px;
   font-weight: 600;
   color: var(--blue-ink);
 }
 .boost-callout p {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--ink-2);
 }
 .boost-callout .button {
@@ -283,12 +284,12 @@ button.boost-pill:active {
 
 @media (max-width: 760px) {
   .boost-stats {
-    gap: 8px;
+    gap: var(--s-2);
   }
   .boost-stat {
-    padding: 12px 6px;
+    padding: var(--s-3) var(--s-2);
   }
   .boost-stat strong {
-    font-size: 21px;
+    font-size: 20px;
   }
 }

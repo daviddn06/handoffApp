@@ -1,18 +1,18 @@
 /* Terms and privacy */
 .legal-page {
-  padding-top: 24px;
+  padding-top: var(--s-6);
 }
 .legal-head {
-  margin-bottom: 24px;
+  margin-bottom: var(--s-8);
 }
 .legal-head h1 {
-  font-size: 28px;
-  margin: 14px 0 6px;
+  font-size: 26px;
+  margin: var(--s-4) 0 var(--s-2);
 }
 .legal-tabs {
   display: inline-flex;
-  gap: 4px;
-  padding: 3px;
+  gap: var(--s-1);
+  padding: var(--s-1);
   border-radius: var(--r-pill);
   background: var(--soft-2);
 }
@@ -38,15 +38,15 @@
 .legal-sections {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: var(--s-8);
   counter-reset: legal;
 }
 .legal-sections h2 {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 17px;
-  margin-bottom: 8px;
+  gap: var(--s-3);
+  font-size: 18px;
+  margin-bottom: var(--s-3);
 }
 .legal-number {
   display: inline-grid;
@@ -61,22 +61,22 @@
 }
 .legal-sections p {
   font-size: 15px;
-  line-height: 1.65;
+  line-height: 1.55;
   color: var(--ink-2);
 }
 .legal-sections p + p {
-  margin-top: 8px;
+  margin-top: var(--s-3);
 }
 .legal-contact {
-  margin-top: 28px;
-  padding: 16px 18px;
+  margin-top: var(--s-8);
+  padding: var(--pad-card);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--ink-2);
 }
 .legal-contact strong {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: var(--s-1);
   color: var(--ink);
 }
 .legal-contact a {
@@ -85,7 +85,7 @@
 }
 @media (max-width: 760px) {
   .legal-head h1 {
-    font-size: 24px;
+    font-size: 28px;
   }
   .legal-sections p {
     font-size: 15px;

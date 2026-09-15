@@ -8,7 +8,7 @@
   justify-content: center;
   width: 100%;
   min-height: calc(100dvh - var(--header-h));
-  padding: 32px var(--page-x) 56px;
+  padding: var(--s-8) var(--page-x) var(--s-12);
   background: var(--soft);
 }
 .auth-box {
@@ -29,14 +29,14 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 52px 48px;
+  padding: var(--s-12);
   background: var(--surface);
 }
 .auth-panel-inner {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: var(--s-6);
 }
 .auth-brand {
   font-family: "Plus Jakarta Sans", "Geist", sans-serif;
@@ -50,25 +50,25 @@
 .auth-block {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--s-6);
 }
 .auth-head {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .auth-head h1 {
   font-family: "Plus Jakarta Sans", "Geist", sans-serif;
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  line-height: 1.18;
+  line-height: 1.2;
   text-wrap: balance;
 }
 .auth-head p {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--muted);
   margin: 0;
 }
@@ -84,18 +84,15 @@
   place-items: center;
   background: var(--green-soft);
   color: var(--green);
-  margin-bottom: 4px;
+  margin-bottom: var(--s-1);
 }
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-.auth-panel .field {
-  gap: 8px;
+  gap: var(--s-5);
 }
 .auth-panel .field-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--ink-2);
 }
@@ -111,7 +108,7 @@
 .auth-cta {
   min-height: 46px;
   width: 100%;
-  margin-top: 4px;
+  margin-top: var(--s-1);
   font-size: 15px;
 }
 .auth-hint {
@@ -135,13 +132,13 @@
 }
 .auth-fineprint {
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--muted-2);
   margin: 0;
   max-width: 34ch;
 }
 .auth-switch {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--muted);
   margin: 0;
 }
@@ -164,8 +161,7 @@
 /* Stepped sign up */
 .auth-progress {
   display: flex;
-  gap: 6px;
-  margin-top: -14px;
+  gap: var(--s-2);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -258,7 +254,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: -6px;
+  margin-top: calc(var(--s-2) * -1);
 }
 .auth-meter {
   display: grid;
@@ -310,7 +306,7 @@
 /* Verification */
 .auth-otp {
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .auth-otp input {
   flex: 1 1 0;
@@ -345,7 +341,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 20px;
+  padding: var(--s-5);
   overflow: hidden;
   background:
     radial-gradient(70% 55% at 18% 8%, rgb(255 255 255 / 0.95) 0%, transparent 70%),
@@ -485,7 +481,7 @@
   }
   .auth-page {
     align-items: flex-start;
-    padding: 24px 18px 40px;
+    padding: var(--s-6) var(--page-x) var(--s-10);
     min-height: calc(100dvh - var(--header-h) - var(--mobile-nav-h));
   }
   .auth-box {
@@ -493,13 +489,13 @@
   }
   .auth-panel {
     flex: 1 1 auto;
-    padding: 24px 20px 26px;
+    padding: var(--s-6);
   }
   .auth-head h1 {
-    font-size: 22px;
+    font-size: 26px;
   }
   .auth-otp {
-    gap: 6px;
+    gap: var(--s-2);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -529,7 +525,7 @@
 /* Which part of confirming you are a student this step covers */
 .auth-step-name {
   margin: 0;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;

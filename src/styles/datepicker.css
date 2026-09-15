@@ -106,7 +106,7 @@
   --cal-cell: 36px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
   font-variant-numeric: tabular-nums;
   user-select: none;
 }
@@ -207,7 +207,7 @@
   justify-content: center;
   height: var(--cal-cell);
   border-radius: var(--r-sm);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--ink);
   transition:
@@ -260,14 +260,14 @@
 
 /* ---------- Desktop popover shell ---------- */
 .date-pop {
-  padding: 12px 14px 10px;
+  padding: var(--s-4);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--s-3);
 }
 .date-pop .popover-footer {
-  margin: 2px -14px -10px;
-  padding: 8px 14px 10px;
+  margin: var(--s-1) calc(var(--s-4) * -1) calc(var(--s-4) * -1);
+  padding: var(--s-3) var(--s-4);
   justify-content: space-between;
 }
 
@@ -275,14 +275,14 @@
 .date-range-pop {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--s-3);
 }
 .date-range-summary {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: var(--s-2);
+  padding: var(--s-3);
   background: var(--soft);
   border-radius: var(--r-sm);
   box-shadow: var(--ring);
@@ -300,7 +300,7 @@
 }
 .date-range-summary .dr-value {
   display: block;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
@@ -320,7 +320,7 @@
 @media (max-width: 760px) {
   .cal {
     --cal-cell: 44px;
-    gap: 8px;
+    gap: var(--s-2);
   }
   .cal.is-sheet {
     width: 100%;
@@ -355,22 +355,22 @@
   .date-sheet {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding-bottom: 4px;
+    gap: var(--s-4);
+    padding-bottom: var(--s-1);
   }
   .date-sheet-actions {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--s-3);
     border-top: 1px solid var(--line);
-    padding-top: 12px;
+    padding-top: var(--s-4);
   }
   .date-sheet-actions .button {
     min-width: 120px;
   }
   .date-range-summary {
-    padding: 10px 12px;
+    padding: var(--s-3);
   }
 }
 

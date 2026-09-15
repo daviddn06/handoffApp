@@ -745,7 +745,7 @@ export default function ListingEditor() {
                     <div className="stack">
                       <Field
                         label="Listing title"
-                        hint="Keep it specific. A feature, neighborhood, or building name works well."
+                        hint="Name a feature, a neighborhood, or the building."
                         error={errors.title}
                         className={`${errors.title ? "is-error" : ""}${flag("title")}`}
                       >
@@ -838,7 +838,7 @@ export default function ListingEditor() {
                       <div className="address-wrap" ref={addressWrap}>
                       <Field
                         label="Street address or building"
-                        hint="This is visible on your listing. Leave out your unit number."
+                        hint="Shown on your listing, so leave out your unit number."
                         error={errors.address}
                         className={`${errors.address ? "is-error" : ""}${flag("address")}`}
                       >
@@ -1088,7 +1088,7 @@ export default function ListingEditor() {
                       <div className="savings-field">
                         <Field
                           label="What you pay now (optional)"
-                          hint="Your current rent on the original lease. Students love seeing a deal, and this is what makes Handoff a win for both sides."
+                          hint="Your rent on the original lease, shown as the savings."
                           error={errors.originalPrice}
                           className={errors.originalPrice ? "is-error" : ""}
                         >
@@ -1166,7 +1166,7 @@ export default function ListingEditor() {
                       </fieldset>
                       <Field
                         label="Tell them about the place"
-                        hint="Mention roommates, utilities, lease requirements, and what makes the space work for a student."
+                        hint="Roommates, utilities, and lease requirements."
                         error={errors.description}
                         className={`${errors.description ? "is-error" : ""}${flag("description")}`}
                       >

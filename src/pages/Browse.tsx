@@ -416,7 +416,7 @@ export default function Browse() {
                 <SchoolLogo src={campusLogo(campus)} />
                 <span className="campus-text">
                   <strong>Near {campus.name}</strong>
-                  <small>Tap to change campus</small>
+                  <small>Change school</small>
                 </span>
                 <ChevronDown size={15} className="chip-chevron" />
               </button>
@@ -428,7 +428,7 @@ export default function Browse() {
                     <SchoolLogo src={campusLogo(campus)} />
                     <span className="campus-text">
                       <strong>Near {campus.name}</strong>
-                      <small>Tap to change campus</small>
+                      <small>Change school</small>
                     </span>
                     <ChevronDown size={15} className="chip-chevron" />
                   </button>
@@ -968,9 +968,6 @@ export default function Browse() {
         onClose={() => chooseCampus(campus.id)}
         title="Where are you looking?"
       >
-        <p className="muted">
-          Search your school to see subleases nearby.
-        </p>
         <SchoolSearch
           campuses={campuses}
           current={campus.id}

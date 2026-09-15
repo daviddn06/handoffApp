@@ -1,6 +1,6 @@
 /* Listing detail: gallery, two column content, sticky request card. */
 .detail-page {
-  padding-bottom: 40px;
+  padding-bottom: var(--s-10);
 }
 
 /* Back link row */
@@ -8,14 +8,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
   min-height: 36px;
 }
 .detail-top-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
 }
 
 /* Gallery */
@@ -24,7 +24,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(2, 1fr);
-  gap: 6px;
+  gap: var(--s-2);
   height: clamp(300px, 34vw, 430px);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -102,32 +102,33 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   align-items: stretch;
-  gap: 32px;
-  margin-top: 24px;
+  gap: var(--s-8);
+  margin-top: var(--s-6);
 }
 .detail-main {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  /* 16 here plus 16 inside .detail-section is 32 between sections. */
+  gap: var(--s-4);
 }
 
 /* Heading */
 .detail-head {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .detail-head h1 {
   font-size: 26px;
-  margin-top: 2px;
+  line-height: 1.2;
 }
 .detail-address,
 .detail-distance {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--muted);
 }
 .detail-address svg,
@@ -146,7 +147,7 @@
 .fact-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .fact-strip li {
   display: inline-flex;
@@ -168,20 +169,20 @@
 
 /* Sections */
 .detail-section {
-  padding-top: 20px;
+  padding-top: var(--s-4);
   border-top: 1px solid var(--line);
 }
 .detail-section h2 {
-  font-size: 16px;
-  margin-bottom: 10px;
+  font-size: 18px;
+  margin-bottom: var(--s-3);
 }
 .detail-section > p {
-  font-size: 14.5px;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--ink-2);
 }
 .detail-section > p.field-hint {
-  margin-top: 8px;
+  margin-top: var(--s-2);
   color: var(--muted);
 }
 .preserve-lines {
@@ -191,7 +192,7 @@
 .amenity-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .amenity-grid li {
   display: inline-flex;
@@ -223,8 +224,8 @@
 .host-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--s-3);
+  padding: var(--pad-card);
   border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: var(--shadow-xs), var(--ring);
@@ -236,7 +237,7 @@
   min-width: 0;
 }
 .host-text strong {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
 }
 .host-verified {
@@ -251,11 +252,11 @@
 /* Guidance and report */
 .detail-guidance {
   display: flex;
-  gap: 10px;
+  gap: var(--s-3);
   border-radius: var(--r-md);
   background: var(--soft);
   box-shadow: var(--ring);
-  padding: 14px;
+  padding: var(--pad-card);
   color: var(--muted);
 }
 .detail-guidance > svg {
@@ -263,15 +264,15 @@
   color: var(--blue);
 }
 .detail-guidance strong {
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--ink);
   font-weight: 600;
 }
 .detail-guidance p {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--muted);
-  margin-top: 4px;
+  margin-top: var(--s-1);
 }
 .report-link {
   display: inline-flex;
@@ -293,12 +294,12 @@
 }
 .request-card {
   position: sticky;
-  top: calc(var(--header-h) + 16px);
+  top: calc(var(--header-h) + var(--s-4));
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--s-4);
   border-radius: var(--r-xl);
-  padding: 18px;
+  padding: var(--pad-card);
   background: var(--surface);
   box-shadow: var(--shadow-md), var(--ring);
 }
@@ -320,8 +321,8 @@
 .request-dates {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: var(--s-3);
+  padding: var(--s-3);
   border-radius: var(--r-md);
   background: var(--soft);
   box-shadow: var(--ring);
@@ -341,7 +342,7 @@
   color: var(--muted);
 }
 .request-dates strong {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--ink);
 }
@@ -359,13 +360,13 @@
 }
 .request-note {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--muted);
 }
 .request-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .request-actions > .button,
 .request-actions > a.button {
@@ -380,22 +381,22 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--s-2);
+  padding: var(--s-3);
   border-radius: var(--r-md);
   background: var(--green-soft);
   color: var(--green-ink);
 }
 .request-status p {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 .request-status-note {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--amber-ink);
   background: var(--amber-soft);
   border-radius: var(--r-sm);
-  padding: 8px 10px;
+  padding: var(--s-2) var(--s-3);
   text-align: center;
 }
 
@@ -403,7 +404,7 @@
 .request-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--s-5);
 }
 .request-form .modal-actions .request-fineprint {
   text-align: left;
@@ -414,21 +415,22 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
-  padding-top: 4px;
+  gap: var(--s-2);
+  padding-top: var(--s-1);
 }
 .request-sent h3 {
-  font-size: 17px;
-  margin-top: 6px;
+  font-size: 18px;
+  margin-top: var(--s-2);
 }
 .request-sent p {
-  font-size: 13.5px;
+  font-size: 14px;
+  line-height: 1.55;
   max-width: 340px;
 }
 .request-sent .modal-actions {
   width: 100%;
   justify-content: center;
-  gap: 10px;
+  gap: var(--s-2);
 }
 
 /* Success check wrapper for the sent request state (snippet lives in base.css) */
@@ -459,8 +461,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  margin-top: 14px;
+  gap: var(--s-5);
+  margin-top: var(--s-4);
   color: var(--muted);
   font-size: 13px;
 }
@@ -475,8 +477,8 @@
   z-index: 55;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
   background: rgb(255 255 255 / 0.94);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -488,7 +490,7 @@
 .detail-bar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .detail-bar-actions .button {
   width: auto;
@@ -543,12 +545,12 @@
 @media (max-width: 1024px) {
   .detail-layout {
     grid-template-columns: minmax(0, 1fr) 300px;
-    gap: 24px;
+    gap: var(--s-6);
   }
 }
 @media (max-width: 760px) {
   .detail-page {
-    padding-top: 20px;
+    padding-top: var(--s-5);
     padding-bottom: 88px;
   }
   /* Neutralize leftover legacy ordering and padding for this page. */
@@ -560,7 +562,7 @@
     padding-bottom: 0;
   }
   .detail-top {
-    margin-bottom: 10px;
+    margin-bottom: var(--s-3);
   }
   .gallery {
     display: flex;
@@ -594,15 +596,15 @@
   }
   .detail-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
-    margin-top: 20px;
+    gap: var(--s-6);
+    margin-top: var(--s-5);
   }
   .detail-head h1 {
-    font-size: 22px;
+    font-size: 28px;
   }
   .request-card {
     position: static;
-    padding: 16px;
+    padding: var(--pad-card);
   }
   .detail-bar {
     display: flex;
@@ -625,8 +627,8 @@
 .savings-box {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 12px 14px;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
   border-radius: var(--r-md);
   background: var(--green-soft);
   color: var(--green-ink);
@@ -645,7 +647,7 @@
 .detail-preference {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--s-3);
   margin: 0;
   color: var(--muted);
   font-size: 13px;
@@ -660,5 +662,6 @@
   background: var(--soft-2);
   border-color: var(--line-2);
   color: var(--ink-2);
-  font-size: 13.5px;
+  font-size: 13px;
+  text-align: left;
 }
