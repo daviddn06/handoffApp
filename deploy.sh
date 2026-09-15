@@ -13,7 +13,7 @@ handoff_release="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
 node --input-type=module -e 'import {writeFileSync} from "node:fs"; writeFileSync("dist/release.json", JSON.stringify({release:process.argv[1]}));' "$handoff_release"
 handoff_dest="/opt/handoff/releases/$handoff_release"
 ssh -i "$handoff_key" "$handoff_host" "mkdir -p '$handoff_dest'"
-rsync -az -e "ssh -i $handoff_key" dist server deploy package.json package-lock.json "$handoff_host:$handoff_dest/"
+rsync -az -R -e "ssh -i $handoff_key" dist server deploy src/data package.json package-lock.json "$handoff_host:$handoff_dest/"
 ssh -i "$handoff_key" "$handoff_host" bash -s -- "$handoff_dest" "$handoff_release" <<'REMOTE'
 set -euo pipefail
 handoff_dest=$1
