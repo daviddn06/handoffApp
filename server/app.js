@@ -1456,7 +1456,7 @@ ${button}
   };
   const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { files: 8, fileSize: 8 * 1024 * 1024, fields: 0, parts: 8 },
+    limits: { files: 16, fileSize: 8 * 1024 * 1024, fields: 0, parts: 16 },
     fileFilter: (req, file, cb) => cb(null, true),
   });
   app.post(
@@ -1465,7 +1465,7 @@ ${button}
     limit("upload-hour", 20, HOUR, (req) => req.user.id),
     limit("upload-day", 80, 24 * HOUR, (req) => req.user.id),
     admitUpload,
-    upload.array("photos", 8),
+    upload.array("photos", 16),
     async (req, res) => {
       req.uploadProcessing = true;
       try {
@@ -2086,7 +2086,7 @@ ${button}
           error:
             err.code === "LIMIT_FILE_SIZE"
               ? "Each photo must be 8 MB or smaller."
-              : "Upload up to eight photos using the photos field.",
+              : "Upload up to sixteen photos using the photos field.",
         });
     if (err instanceof HttpError)
       return res

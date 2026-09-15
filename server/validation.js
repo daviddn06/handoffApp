@@ -94,9 +94,9 @@ export const listingSchema = z
     address: text(200).default(""),
     lat: z.number().finite().min(-90).max(90),
     lng: z.number().finite().min(-180).max(180),
-    price: z.number().int().min(0).max(50000).default(0),
-    deposit: z.number().int().min(0).max(100000).default(0),
-    originalPrice: z.number().int().min(0).max(50000).nullable().default(null),
+    price: z.number().min(0).max(50000).multipleOf(0.01).default(0),
+    deposit: z.number().min(0).max(100000).multipleOf(0.01).default(0),
+    originalPrice: z.number().min(0).max(50000).multipleOf(0.01).nullable().default(null),
     bedrooms: z.number().int().min(0).max(20).default(1),
     bathrooms: z.number().min(0).max(20).multipleOf(0.5).default(1),
     roomType: z.enum(["private", "shared", "entire"]).default("private"),
@@ -110,7 +110,7 @@ export const listingSchema = z
       .default([]),
     photos: z
       .array(z.string().regex(/^\/uploads\/[a-f0-9-]{36}\.webp$/))
-      .max(8)
+      .max(16)
       .transform((items) => [...new Set(items)])
       .default([]),
     status: z
@@ -140,8 +140,8 @@ export const listingQuerySchema = z
   .object({
     campusId: campus.optional(),
     query: text(120).optional(),
-    minPrice: z.coerce.number().int().min(0).max(50000).optional(),
-    maxPrice: z.coerce.number().int().min(0).max(50000).optional(),
+    minPrice: z.coerce.number().min(0).max(50000).multipleOf(0.01).optional(),
+    maxPrice: z.coerce.number().min(0).max(50000).multipleOf(0.01).optional(),
     from: date.optional(),
     to: date.optional(),
     roomType: z.enum(["private", "shared", "entire"]).optional(),

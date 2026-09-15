@@ -482,8 +482,8 @@ export default function ListingEditor() {
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setFormError("");
-    if (files.length + draft.photos.length > 8)
-      return fail("Choose up to 8 photos in total.");
+    if (files.length + draft.photos.length > 16)
+      return fail("Choose up to 16 photos in total.");
     if (Array.from(files).some((f) => f.size > 8 * 1024 * 1024))
       return fail("Each photo needs to be under 8 MB.");
     if (
@@ -518,7 +518,7 @@ export default function ListingEditor() {
   function onDrop(e: DragEvent<HTMLElement>) {
     e.preventDefault();
     setDragOver(false);
-    if (uploading || draft.photos.length >= 8) return;
+    if (uploading || draft.photos.length >= 16) return;
     upload(e.dataTransfer.files);
   }
   async function save(status: "draft" | "active") {
@@ -1112,7 +1112,7 @@ export default function ListingEditor() {
                               required
                               min="1"
                               max="20000"
-                              step="1"
+                              step="0.01"
                               value={draft.price}
                               onChange={(e) => update("price", e.target.value)}
                               placeholder="1,200"
@@ -1133,7 +1133,7 @@ export default function ListingEditor() {
                               required
                               min="0"
                               max="50000"
-                              step="1"
+                              step="0.01"
                               value={draft.deposit}
                               onChange={(e) =>
                                 update("deposit", e.target.value)
@@ -1156,7 +1156,7 @@ export default function ListingEditor() {
                               type="number"
                               min="1"
                               max="50000"
-                              step="1"
+                              step="0.01"
                               value={draft.originalPrice}
                               onChange={(e) =>
                                 update("originalPrice", e.target.value)
@@ -1272,7 +1272,7 @@ export default function ListingEditor() {
                         className={`photo-dropzone ${dragOver ? "is-dragover" : ""}`}
                         type="button"
                         onClick={() => fileRef.current?.click()}
-                        disabled={uploading || draft.photos.length >= 8}
+                        disabled={uploading || draft.photos.length >= 16}
                         onDragOver={(e) => {
                           e.preventDefault();
                           setDragOver(true);
@@ -1284,12 +1284,12 @@ export default function ListingEditor() {
                           <ImagePlus size={22} />
                         </span>
                         <strong>
-                          {draft.photos.length >= 8
-                            ? "All 8 photo spots filled"
+                          {draft.photos.length >= 16
+                            ? "All 16 photo spots filled"
                             : "Drag photos here, or choose files"}
                         </strong>
                         <span className="dropzone-hint">
-                          JPG, PNG, or WebP. Up to 8 photos, 8 MB each.
+                          JPG, PNG, or WebP. Up to 16 photos, 8 MB each.
                         </span>
                         <span className="button secondary small">
                           <Upload size={15} />
@@ -1303,7 +1303,7 @@ export default function ListingEditor() {
                       {(draft.photos.length > 0 || uploading) && (
                         <div className="photo-manager">
                           <div className="photo-upload-heading">
-                            <strong>{draft.photos.length} of 8 photos</strong>
+                            <strong>{draft.photos.length} of 16 photos</strong>
                             <span>The first photo is the cover.</span>
                           </div>
                           <div className="uploaded-photos">

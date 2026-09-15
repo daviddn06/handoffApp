@@ -56,10 +56,19 @@ function checkSource(input) {
   for (const key of ["student", "usc"]) {
     if (!post.includes(normalizeText(input.evidence[key])) && !input.authorProfileUrl) throw new HttpError(400, "Student and USC evidence must appear in the source post or cite the recorded public author profile.");
   }
-  if (!/\b(student|undergraduate|graduate|freshman|sophomore|junior|senior)\b/i.test(input.evidence.student)) throw new HttpError(400, "Record explicit evidence that the poster is a student.");
+  if (!/\b(student|undergraduate|graduate|freshman|sophomore|junior|senior|studies|studying)\b/i.test(input.evidence.student)) throw new HttpError(400, "Record explicit evidence that the poster is a student.");
   if (!/\busc\b|university of southern california/i.test(input.evidence.usc)) throw new HttpError(400, "Record explicit USC affiliation evidence.");
   if (!/\bsubleas(?:e|ing|es)\b|\bsublet(?:ting)?\b/i.test(input.evidence.sublease)) throw new HttpError(400, "Record explicit sublease evidence.");
   if (input.authorProfileUrl) canonicalSourceUrl(input.authorProfileUrl);
+}
+// Shared with the filesystem-authorized operator importer so reruns compare the exact stored encoding.
+export async function encodeReferralPhoto(bytes) {
+  try {
+    const decoder = sharp(bytes, { limitInputPixels: 24_000_000, animated: false, failOn: "warning" });
+    const meta = await decoder.metadata();
+    if (!["jpeg", "png", "webp", "heif", "avif"].includes(meta.format) || meta.pages > 1 || meta.width < 100 || meta.height < 100) throw new Error("Invalid raster photo.");
+    return await decoder.rotate().resize({ width: 1800, height: 1800, fit: "inside", withoutEnlargement: true }).webp({ quality: 84 }).toBuffer();
+  } catch { throw new HttpError(400, "Upload valid raster photos between 100 by 100 pixels and 24 megapixels."); }
 }
 function missingFields(listing, photoCount) {
   const required = ["title", "description", "address", "lat", "lng", "price", "deposit", "bedrooms", "bathrooms", "roomType", "availableFrom", "availableTo"];
@@ -170,7 +179,8 @@ export function createReferrals({ db, limit, dataDir, origin, secureCookies, isA
       db.prepare("INSERT INTO referral_visits(referral_id,visitor_hash,first_at,last_at,opens) VALUES(?,?,?,?,1) ON CONFLICT(referral_id,visitor_hash) DO UPDATE SET last_at=excluded.last_at,opens=opens+1").run(row.id, visitorHash, timestamp, timestamp);
       event(row.id, "opened", req.user?.id || null, { uniqueVisit: !exists }, visitorHash);
     })();
-    res.cookie(visitorCookie, visitor, cookieOptions);
+    // Editor/auth refreshes must not race the real page visit's fresh visitor cookie.
+    if (track) res.cookie(visitorCookie, visitor, cookieOptions);
     if (!row.claimed_by) res.cookie(contextCookie, row.token, cookieOptions);
     res.json(response(row, req));
   });
@@ -336,24 +346,16 @@ export function createReferrals({ db, limit, dataDir, origin, secureCookies, isA
     res.once("close", () => { if (!req.referralProcessing) req.releaseReferralUpload(); });
     next();
   };
-  const upload = multer({ storage: multer.memoryStorage(), limits: { files: 8, fileSize: 8 * 1024 * 1024, fields: 0, parts: 8 } }).array("photos", 8);
+  const upload = multer({ storage: multer.memoryStorage(), limits: { files: 16, fileSize: 8 * 1024 * 1024, fields: 0, parts: 16 } }).array("photos", 16);
   adminRouter.post("/:id/photos", limit("referral-photos", 60, HOUR, (req) => req.user.id), admit, upload, async (req, res) => {
     req.referralProcessing = true;
     const written = [];
     try {
       if (!req.files?.length) throw new HttpError(400, "Choose at least one photo.");
       const existing = photoRows(req.params.id);
-      if (existing.length + req.files.length > 8) throw new HttpError(400, "A referral can contain up to eight photos.");
+      if (existing.length + req.files.length > 16) throw new HttpError(400, "A referral can contain up to sixteen photos.");
       const images = [];
-      for (const file of req.files) {
-        try {
-          const decoder = sharp(file.buffer, { limitInputPixels: 24_000_000, animated: false, failOn: "warning" });
-          const meta = await decoder.metadata();
-          if (!["jpeg", "png", "webp", "heif", "avif"].includes(meta.format) || meta.pages > 1 || meta.width < 100 || meta.height < 100) throw new Error("Invalid raster photo.");
-          const buffer = await decoder.rotate().resize({ width: 1800, height: 1800, fit: "inside", withoutEnlargement: true }).webp({ quality: 84 }).toBuffer();
-          images.push({ id: randomUUID(), buffer });
-        } catch { throw new HttpError(400, "Upload valid raster photos between 100 by 100 pixels and 24 megapixels."); }
-      }
+      for (const file of req.files) images.push({ id: randomUUID(), buffer: await encodeReferralPhoto(file.buffer) });
       for (const image of images) {
         const filename = `${image.id}.webp`;
         await writeFile(join(privateDir, filename), image.buffer, { flag: "wx", mode: 0o600 });
@@ -362,7 +364,7 @@ export function createReferrals({ db, limit, dataDir, origin, secureCookies, isA
       db.transaction(() => {
         const fresh = byId(req.params.id);
         if (!fresh || fresh.status !== "pending") throw new HttpError(409, "The referral was claimed or revoked. These photos were not added.");
-        if (photoRows(fresh.id).length + images.length > 8) throw new HttpError(409, "The draft already has eight photos.");
+        if (photoRows(fresh.id).length + images.length > 16) throw new HttpError(409, "The draft already has sixteen photos.");
         for (const image of images) db.prepare("INSERT INTO referral_photos(id,referral_id,filename,bytes,created_at) VALUES(?,?,?,?,?)").run(image.id, fresh.id, `${image.id}.webp`, image.buffer.length, iso());
         event(fresh.id, "photos_uploaded", req.user.id, { count: images.length });
         audit(req.user.id, "referral_photos_uploaded", fresh.id, { count: images.length });

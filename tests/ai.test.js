@@ -107,6 +107,23 @@ test("a pasted Facebook post becomes a typed draft with the gaps flagged", async
   assert.equal(capture.params.text.format.strict, true);
 });
 
+test("smart import preserves stated cents and flags excessive precision without rounding", async () => {
+  const capture = {};
+  const exact = await parseListing({ text: "My USC sublease costs $1,497.50 per month, deposit $99.01, originally $1,600.25.", files: [], campus: null,
+    client: fakeClient({ ...PARSE_ANSWER, draft: { ...PARSE_ANSWER.draft, price: 1497.50, deposit: 99.01, originalPrice: 1600.25 } }, capture) });
+  assert.equal(exact.draft.price, 1497.50);
+  assert.equal(exact.draft.deposit, 99.01);
+  assert.equal(exact.draft.originalPrice, 1600.25);
+  assert.match(JSON.stringify(capture.params), /Preserve any stated cents/);
+  const invalid = await parseListing({ text: FACEBOOK_POST, files: [], campus: null,
+    client: fakeClient({ ...PARSE_ANSWER, draft: { ...PARSE_ANSWER.draft, price: 1497.501, deposit: 99.011, originalPrice: 1600.255 } }) });
+  assert.equal(invalid.draft.price, null);
+  assert.equal(invalid.draft.deposit, null);
+  assert.equal(invalid.draft.originalPrice, null);
+  assert.ok(invalid.missing.includes("price"));
+  assert.ok(invalid.missing.includes("deposit"));
+});
+
 test("a chat turn answers with one question and the merged draft", async () => {
   const answer = {
     reply: "Got it. When would the sublease start and end?",

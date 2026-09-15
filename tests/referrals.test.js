@@ -130,6 +130,68 @@ test("source evidence is explicit, captured in source text and missing factual f
   assert.equal(result.body.referral.outreachDraft, undefined);
 });
 
+test("current studies wording is accepted with recorded profile evidence, while past studied wording is rejected", async (t) => {
+  const f = await setup(t);
+  for (const [index, wording] of ["Studies Business Administration at University of Southern California", "Studying at USC"].entries()) {
+    const result = await f.admin.call("/api/admin/referrals", { method: "POST", body: input({ sourceUrl: `https://www.facebook.com/posts/profile-evidence-${index}`, evidence: { student: wording, usc: "University of Southern California", sublease: "subleasing my furnished room" } }) });
+    assert.equal(result.status, 201, JSON.stringify(result.body));
+    assert.equal(result.body.referral.evidence.student, wording);
+  }
+  const past = await f.admin.call("/api/admin/referrals", { method: "POST", body: input({ evidence: { student: "Studied at USC", usc: "USC", sublease: "subleasing my furnished room" } }) });
+  assert.equal(past.status, 400);
+});
+
+test("nine source photos and exact cents survive owner claim and publication, while photo and money limits remain enforced", async (t) => {
+  const f = await setup(t);
+  const created = await f.create({ listing: { price: 1497.50, deposit: 99.01, originalPrice: 1600.25 } });
+  const buffers = [];
+  for (let index = 0; index < 9; index++) buffers.push(await sharp({ create: { width: 120, height: 100, channels: 3, background: { r: 30 + index * 20, g: 110, b: 200 } } }).jpeg().toBuffer());
+  const multipart = (bytes) => {
+    const body = new FormData();
+    for (const [index, photo] of bytes.entries()) body.append("photos", new Blob([photo], { type: "image/jpeg" }), `source-${index}.jpg`);
+    return body;
+  };
+  const uploaded = await f.admin.call(`/api/admin/referrals/${created.referral.id}/photos`, { method: "POST", body: multipart(buffers) });
+  assert.equal(uploaded.status, 201, JSON.stringify(uploaded.body));
+  assert.equal(uploaded.body.referral.photos.length, 9);
+  const over = await f.admin.call(`/api/admin/referrals/${created.referral.id}/photos`, { method: "POST", body: multipart(buffers.slice(0, 8)) });
+  assert.equal(over.status, 400, "Nine existing plus eight new would exceed sixteen");
+  assert.equal(f.app.locals.db.prepare("SELECT COUNT(*) AS n FROM referral_photos WHERE referral_id=?").get(created.referral.id).n, 9);
+  const owner = f.account("nine-photos@usc.edu");
+  const claim = await owner.user.call(created.path + "/claim", { method: "POST", body: { ownershipConfirmed: true, termsAccepted: true } });
+  assert.equal(claim.status, 200);
+  assert.equal(claim.body.referral.listing.photos.length, 9);
+  assert.equal(claim.body.referral.listing.price, 1497.50);
+  const photos = claim.body.referral.listing.photos;
+  const published = await owner.user.call(created.path + "/listing", { method: "POST", body: listingBody(photos, { status: "active", price: 1497.50, deposit: 99.01, originalPrice: 1600.25 }) });
+  assert.equal(published.status, 201, JSON.stringify(published.body));
+  assert.equal(published.body.listing.price, 1497.50);
+  assert.equal(published.body.listing.deposit, 99.01);
+  assert.equal(published.body.listing.originalPrice, 1600.25);
+  assert.equal(published.body.listing.photos.length, 9);
+  const id = published.body.listing.id;
+  const stored = f.app.locals.db.prepare("SELECT price,deposit,original_price FROM listings WHERE id=?").get(id);
+  assert.deepEqual(stored, { price: 1497.50, deposit: 99.01, original_price: 1600.25 });
+  for (const field of ["price", "deposit", "originalPrice"]) {
+    assert.equal((await owner.user.call(`/api/listings/${id}`, { method: "PATCH", body: { [field]: 1497.501 } })).status, 400);
+    assert.equal((await owner.user.call("/api/listings", { method: "POST", body: listingBody(photos, { [field]: 1497.501 }) })).status, 400);
+    assert.equal((await f.admin.call("/api/admin/referrals", { method: "POST", body: input({ sourceUrl: `https://www.facebook.com/posts/decimal-${field}`, listing: { [field]: 1497.501 } }) })).status, 400);
+  }
+  assert.equal((await owner.user.call(`/api/listings/${id}`, { method: "PATCH", body: { price: 1497.51 } })).body.listing.price, 1497.51);
+  const normal = await owner.user.call("/api/listings", { method: "POST", body: listingBody(photos, { price: 1497.50 }) });
+  assert.equal(normal.status, 201);
+  assert.equal(normal.body.listing.price, 1497.50);
+  const sixteen = await owner.user.call("/api/uploads", { method: "POST", body: multipart([...buffers, ...buffers.slice(0, 7)]) });
+  assert.equal(sixteen.status, 201, JSON.stringify(sixteen.body));
+  assert.equal(sixteen.body.photos.length, 16);
+  const tooMany = await owner.user.call("/api/uploads", { method: "POST", body: multipart([...buffers, ...buffers.slice(0, 8)]) });
+  assert.equal(tooMany.status, 400);
+  const maxListing = await owner.user.call("/api/listings", { method: "POST", body: listingBody(sixteen.body.photos) });
+  assert.equal(maxListing.status, 201);
+  assert.equal(maxListing.body.listing.photos.length, 16);
+  assert.equal((await owner.user.call(`/api/listings/${id}`, { method: "PATCH", body: { photos: [...sixteen.body.photos, photos[0]] } })).status, 400);
+});
+
 test("opens and unique cookie visits are separate; signup and verification attribution uses actual accounts", async (t) => {
   const f = await setup(t);
   const { referral, path, token } = await f.create();
@@ -157,6 +219,16 @@ test("opens and unique cookie visits are separate; signup and verification attri
   assert.match(page.headers.get("cache-control"), /no-store/);
   assert.match(page.headers.get("x-robots-tag"), /noindex/);
   assert.equal(page.headers.get("referrer-policy"), "no-referrer");
+});
+
+test("nontracking initial reads cannot replace a concurrent tracked visit's browser identity", async (t) => {
+  const f = await setup(t);
+  const created = await f.create();
+  const untracked = await f.client().call(created.path + "?track=0");
+  assert.ok(!untracked.headers.getSetCookie().some((value) => value.startsWith("handoff_visitor=")));
+  const tracked = await f.client().call(created.path);
+  assert.ok(tracked.headers.getSetCookie().some((value) => value.startsWith("handoff_visitor=")));
+  assert.equal(f.app.locals.db.prepare("SELECT COUNT(*) AS n FROM referral_visits").get().n, 1);
 });
 
 test("private photos require the capability, strip metadata, transfer to owner only on attested USC claim", async (t) => {
