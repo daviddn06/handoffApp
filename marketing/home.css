@@ -779,6 +779,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   color: var(--muted-2);
 }
 .marquee-track li.is-live { color: var(--ink); }
+.marquee-track li.is-live:not(:first-child) .pill { display: none; }
+.marquee-track li.is-live:not(:first-child)::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .marquee-track li img { width: 12px; height: 18px; }
 
 /* =============================================================
