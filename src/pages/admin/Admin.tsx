@@ -29,11 +29,13 @@ const ReportsPage = lazy(() => import("./Reports"));
 const WaitlistPage = lazy(() => import("./Waitlist"));
 const AiUsagePage = lazy(() => import("./AiUsage"));
 const SystemPage = lazy(() => import("./System"));
+const ReferralsPage = lazy(() => import("./Referrals"));
 const AuditPage = lazy(() => import("./Audit"));
 
 const NAV = [
   { to: "", label: "Overview", icon: Gauge, end: true },
   { to: "users", label: "Users", icon: Users },
+  { to: "referrals", label: "Student outreach", icon: ClipboardList },
   { to: "listings", label: "Listings", icon: House },
   { to: "requests", label: "Requests", icon: Inbox },
   { to: "reports", label: "Reports", icon: Flag },
@@ -82,6 +84,8 @@ export default function Admin() {
           <Routes>
             <Route index element={<Overview />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="referrals" element={<ReferralsPage />} />
+            <Route path="referrals/:id" element={<ReferralsPage />} />
             <Route path="listings" element={<ListingsPage />} />
             <Route path="requests" element={<RequestsPage />} />
             <Route path="reports" element={<ReportsPage />} />

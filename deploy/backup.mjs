@@ -50,11 +50,27 @@ try {
   if (integrity !== "ok")
     throw new Error("SQLite backup failed its integrity check.");
   const schemaVersion = snapshot.pragma("user_version", { simple: true });
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(schemaVersion))
     throw new Error("Backup requires a recognized Handoff database schema.");
   const uploads = snapshot
     .prepare("SELECT filename,bytes FROM uploads ORDER BY filename")
     .all();
+  const privatePhotos = schemaVersion >= 12
+    ? snapshot.prepare("SELECT filename,bytes FROM referral_photos ORDER BY filename").all()
+    : [];
+  for (const photo of privatePhotos) {
+    if (!/^[a-f0-9-]{36}\.webp$/.test(photo.filename)) throw new Error("Unexpected private referral photo filename.");
+    uploads.push({ filename: `referrals/${photo.filename}`, bytes: photo.bytes });
+  }
+  const hasAvatar = snapshot.prepare("PRAGMA table_info(users)").all().some((column) => column.name === "avatar");
+  const avatars = hasAvatar ? snapshot.prepare("SELECT DISTINCT avatar FROM users WHERE avatar IS NOT NULL AND avatar!=''").all() : [];
+  for (const row of avatars) {
+    if (!/^\/avatars\/[a-f0-9-]{36}\.jpg$/.test(row.avatar)) throw new Error("Unexpected profile photo path.");
+    const filename = row.avatar.slice("/avatars/".length);
+    const info = await lstat(join(data, "uploads", filename));
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error("A profile photo is missing or unsafe.");
+    uploads.push({ filename, bytes: info.size });
+  }
   const requiredPhotos = snapshot
     .prepare(
       "SELECT DISTINCT p.value AS path FROM listings l,json_each(l.photos) p",
@@ -73,8 +89,12 @@ try {
   const uploadDirectory = await lstat(join(data, "uploads"));
   if (!uploadDirectory.isDirectory() || uploadDirectory.isSymbolicLink())
     throw new Error("The upload source must be a real directory.");
+  if (privatePhotos.length) {
+    const directory = await lstat(join(data, "uploads", "referrals"));
+    if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error("The referral photo directory is unsafe.");
+  }
   for (const file of uploads) {
-    if (!/^[a-f0-9-]{36}\.webp$/.test(file.filename))
+    if (!/^(?:[a-f0-9-]{36}\.(?:webp|jpg)|referrals\/[a-f0-9-]{36}\.webp)$/.test(file.filename))
       throw new Error("Unexpected filename in the upload registry.");
     let metadata;
     // Upload rows reserve storage immediately before immutable photo files are written.
@@ -101,6 +121,7 @@ try {
   // Files are immutable. Select the exact database snapshot's files, avoiding a moving directory archive.
   const members = [
     "uploads",
+    ...(privatePhotos.length ? ["uploads/referrals"] : []),
     ...uploads.map((file) => `uploads/${file.filename}`),
   ];
   await writeFile(listFile, `${members.join("\0")}\0`, {
@@ -154,6 +175,8 @@ try {
       bytes: archiveStats.size,
       sha256: archiveHash,
       count: uploads.length,
+      referralPhotos: privatePhotos.length,
+      avatars: avatars.length,
       imageBytes: uploads.reduce((sum, file) => sum + file.bytes, 0),
     },
     fileList: "uploads.files",

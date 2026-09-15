@@ -1088,7 +1088,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 11);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 12);
   assert.throws(
     () =>
       createApp({
@@ -1393,12 +1393,12 @@ test("photo concurrency admission occurs before body buffering and releases abor
   assert.equal((await env.upload(third)).length, 1);
 });
 
-test("version one upgrade makes a consistent backup before preserving data in schema two", async (t) => {
+test("version one upgrade makes consistent backups before preserving data in the current schema", async (t) => {
   const dataDir = await mkdtemp(join(tmpdir(), "handoff-migrate-"));
   t.after(() => rm(dataDir, { recursive: true, force: true }));
   const initial = createApp({ dataDir, mailTransport: null, origin: ORIGIN });
   initial.locals.db.exec(
-    "ALTER TABLE listings DROP COLUMN moderation_locked; ALTER TABLE listings DROP COLUMN original_price; DROP TABLE waitlist; ALTER TABLE users DROP COLUMN terms_accepted_at; PRAGMA user_version=1;",
+    "DROP TABLE referral_events; DROP TABLE referral_attributions; DROP TABLE referral_visits; DROP TABLE referral_photos; DROP TABLE referrals; ALTER TABLE listings DROP COLUMN moderation_locked; ALTER TABLE listings DROP COLUMN original_price; DROP TABLE waitlist; ALTER TABLE users DROP COLUMN terms_accepted_at; PRAGMA user_version=1;",
   );
   initial.locals.db
     .prepare(
@@ -1418,23 +1418,22 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      11,
+      12,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
       "Preserved Student",
     );
     const files = (await readdir(join(dataDir, "backups"))).sort();
-    assert.equal(files.length, 3);
-    assert.match(files[0], /^before-schema-2-/);
-    assert.match(files[1], /^before-schema-3-/);
-    assert.match(files[2], /^before-schema-7-/);
+    assert.equal(files.length, 5);
+    for (const version of [2, 3, 7, 12]) assert.ok(files.some((file) => file.startsWith(`before-schema-${version}-`)));
+    const originalBackup = files.find((file) => file.startsWith("before-schema-2-"));
     assert.ok(
       migrated.locals.db
         .prepare("SELECT name FROM sqlite_master WHERE name='waitlist'")
         .get(),
     );
-    const backup = new Database(join(dataDir, "backups", files[0]), {
+    const backup = new Database(join(dataDir, "backups", originalBackup), {
       readonly: true,
     });
     assert.equal(backup.pragma("user_version", { simple: true }), 1);

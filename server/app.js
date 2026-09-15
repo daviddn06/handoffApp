@@ -20,6 +20,7 @@ import {
   disabledError,
 } from "./admin.js";
 import { openDatabase } from "./database.js";
+import { createReferrals } from "./referrals.js";
 import { geocode } from "./geocode.js";
 import {
   AiInputError,
@@ -404,6 +405,12 @@ export function createApp({
       "school_not_live",
     );
   };
+  const referrals = createReferrals({
+    db, limit, dataDir: resolve(dataDir), origin, secureCookies: useSecureCookies, isAllowedAdmin,
+    getListing: (id) => getListing(id),
+    serializeListing: (row, userId) => serializeListing(row, userId),
+    validatePhotos: (photos, userId) => validatePhotos(photos, userId),
+  });
   const setSession = (res, userId) => {
     const value = randomToken();
     db.prepare(
@@ -759,6 +766,7 @@ ${button}
           "account_exists",
         );
       }
+      referrals.attributeSignup(req, user.id);
       await sendToken(user, "verify");
       if (req.sessionHash)
         db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
@@ -797,6 +805,7 @@ ${button}
           req.sessionHash,
         );
       setSession(res, currentUser.id);
+      if (req.surface !== "internal") referrals.attributeLogin(req, currentUser.id);
       res.json({ user: serializeUser(currentUser) });
     },
   );
@@ -816,6 +825,7 @@ ${button}
         "UPDATE users SET verified_at=COALESCE(verified_at,?),updated_at=? WHERE id=?",
       ).run(iso(), iso(), found.user_id);
       invalidateTokens(found.user_id, "verify");
+      referrals.verified(found.user_id);
       // Any session opened before verification, including a stranger's, ends here.
       db.prepare("DELETE FROM sessions WHERE user_id=?").run(found.user_id);
       setSession(res, found.user_id);
@@ -853,6 +863,7 @@ ${button}
           "UPDATE users SET verified_at=COALESCE(verified_at,?),updated_at=? WHERE id=?",
         ).run(iso(), iso(), req.user.id);
         invalidateTokens(req.user.id, "verify");
+        referrals.verified(req.user.id);
         db.prepare("DELETE FROM sessions WHERE user_id=?").run(req.user.id);
         setSession(res, req.user.id);
         return db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id);
@@ -1308,6 +1319,7 @@ ${button}
           row.id,
           req.user.id,
         );
+        referrals.listingChanged(row.id, input.status, req.user.id, row.status);
         if (input.status !== "active" && input.status !== "draft") {
           db.prepare(
             "UPDATE handoff_requests SET status='declined',updated_at=? WHERE listing_id=? AND status='pending'",
@@ -2014,9 +2026,11 @@ ${button}
   );
   app.use(
     "/api/admin",
-    adminRouter({ db, limit, dataDir, staticDir, emailReady, isAllowedAdmin }),
+    adminRouter({ db, limit, dataDir, staticDir, emailReady, isAllowedAdmin, referralsRouter: referrals.adminRouter }),
   );
 
+  app.use("/api/referrals", referrals.publicRouter);
+  app.use("/referral", referrals.privateHeaders);
   app.use("/api", (req, res, next) =>
     next(new HttpError(404, "Endpoint not found.")),
   );
@@ -2056,7 +2070,7 @@ ${button}
     app.get("/{*path}", (req, res) => {
       if (req.path.startsWith("/uploads/") || /\.[a-z0-9]+$/i.test(req.path))
         return res.status(404).send("Not found");
-      res.set("Cache-Control", "no-cache");
+      res.set("Cache-Control", req.path.startsWith("/referral/") ? "private, no-store" : "no-cache");
       if (req.surface === "internal")
         return res.type("html").send(internalIndex());
       res.sendFile(join(staticDir, "index.html"));

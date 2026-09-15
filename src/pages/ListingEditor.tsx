@@ -61,6 +61,7 @@ import { MobileAccount } from "../components/AccountButton";
 import { SchoolNotLive } from "../components/SchoolNotLive";
 import { DateField } from "../components/DateField";
 import { FIELD_STEP, takeImport } from "../lib/import";
+import { referralPath, type ReferralResponse } from "../lib/referrals";
 const Map = lazy(() => import("../components/Map"));
 type AddressMatch = { line: string; place: string; lat: number; lng: number };
 type Draft = {
@@ -74,7 +75,7 @@ type Draft = {
   originalPrice: string;
   bedrooms: string;
   bathrooms: string;
-  roomType: Listing["roomType"];
+  roomType: Listing["roomType"] | "";
   genderPreference: Listing["genderPreference"];
   availableFrom: string;
   availableTo: string;
@@ -300,6 +301,42 @@ export default function ListingEditor() {
   // Smart import and the chat helper hand the draft over in sessionStorage.
   // It is read once, on the way in, and the gaps are marked for the lister.
   const [params] = useSearchParams();
+  const referralToken = params.get("referral");
+  const [referralLoading, setReferralLoading] = useState(Boolean(referralToken && !id));
+  const [referralError, setReferralError] = useState("");
+  useEffect(() => {
+    if (!referralToken || id) return;
+    let active = true;
+    setReferralLoading(true);
+    api<ReferralResponse>(`${referralPath(referralToken)}?track=0`).then(({referral:r}) => {
+      if (!active) return;
+      if (!r.claimedByMe) {
+        navigate(`/referral/${encodeURIComponent(referralToken)}`, {replace:true});
+        return;
+      }
+      if (r.listingId) {
+        navigate(`/listings/${r.listingId}/edit`, {replace:true});
+        return;
+      }
+      const d = r.listing;
+      const text = (value: unknown) => value == null ? "" : String(value);
+      setDraft(current => ({...current,
+        title:text(d.title), description:text(d.description), address:text(d.address),
+        price:text(d.price), deposit:text(d.deposit), originalPrice:text(d.originalPrice),
+        bedrooms:text(d.bedrooms), bathrooms:text(d.bathrooms), roomType:d.roomType || "",
+        genderPreference:d.genderPreference || "any", availableFrom:text(d.availableFrom),
+        availableTo:text(d.availableTo), amenities:d.amenities || [], photos:d.photos || [],
+        lat:typeof d.lat === "number" ? d.lat : current.lat,
+        lng:typeof d.lng === "number" ? d.lng : current.lng,
+      }));
+      const located = typeof d.lat === "number" && typeof d.lng === "number";
+      setPinPlaced(located); placedRef.current = located;
+      if (located) { setPinSource("auto"); lookedUp.current = text(d.address).trim(); }
+      setImported(r.missing); setBannerOpen(true); setDirty(false);
+    }).catch(e => { if(active) setReferralError(errorMessage(e)); })
+      .finally(() => { if(active) setReferralLoading(false); });
+    return () => { active = false; };
+  }, [referralToken, id, navigate]);
   useEffect(() => {
     if (id || params.get("from") !== "import") return;
     const stored = takeImport();
@@ -364,6 +401,11 @@ export default function ListingEditor() {
       original = Number(draft.originalPrice);
     if (part === 0 && draft.title.trim().length < 8)
       found.title = "Give your listing a clear title of at least 8 characters.";
+    if (part === 0 && referralToken) {
+      if (!draft.roomType) found.roomType = "Choose the kind of space you are subleasing.";
+      if (draft.bedrooms === "") found.bedrooms = "Confirm the number of bedrooms.";
+      if (draft.bathrooms === "") found.bathrooms = "Confirm the number of bathrooms.";
+    }
     if (part === 1) {
       if (draft.address.trim().length < 5)
         found.address = "Add the street address or building name.";
@@ -380,7 +422,7 @@ export default function ListingEditor() {
     if (part === 2) {
       if (!draft.price || price < 1 || price > 20000)
         found.price = "Enter a monthly rent between $1 and $20,000.";
-      if (deposit < 0 || deposit > 50000)
+      if ((referralToken && draft.deposit === "") || deposit < 0 || deposit > 50000)
         found.deposit = "Enter a deposit between $0 and $50,000.";
       if (draft.originalPrice && (original < 1 || original > 50000))
         found.originalPrice =
@@ -480,6 +522,16 @@ export default function ListingEditor() {
     upload(e.dataTransfer.files);
   }
   async function save(status: "draft" | "active") {
+    if (referralToken && !id) {
+      for (let i = 0; i < 4; i++) {
+        const found = checkStep(i);
+        if (Object.keys(found).length) {
+          setStep(i);
+          fail(`${firstMessage(found)} Your original invitation is safely saved and remains private.`, found);
+          return;
+        }
+      }
+    }
     setSaving(true);
     try {
       const payload = {
@@ -495,7 +547,7 @@ export default function ListingEditor() {
         status,
       };
       const result = await api<{ listing: Listing }>(
-        id ? `/listings/${id}` : "/listings",
+        id ? `/listings/${id}` : referralToken ? `${referralPath(referralToken)}/listing` : "/listings",
         { method: id ? "PATCH" : "POST", body: json(payload) },
       );
       setDirty(false);
@@ -557,7 +609,8 @@ export default function ListingEditor() {
         <SchoolNotLive />
       </div>
     );
-  if (loading) return <Loading label="Loading your listing…" />;
+  if (loading || referralLoading) return <Loading label="Loading your listing…" />;
+  if (referralError) return <div className="page-container narrow"><ErrorBox message={referralError}/><Link to={`/referral/${encodeURIComponent(referralToken || "")}`}>Return to your invitation</Link></div>;
   if (error)
     return (
       <div className="page-container narrow">
@@ -799,7 +852,7 @@ export default function ListingEditor() {
                         </div>
                       </fieldset>
                       <PreferenceChoice
-                        roomType={draft.roomType}
+                        roomType={draft.roomType || "private"}
                         value={draft.genderPreference}
                         onChange={(value) =>
                           update("genderPreference", value)
@@ -1369,7 +1422,7 @@ export default function ListingEditor() {
                               <span>/mo</span>
                             </div>
                             <span className="pill blue">
-                              {ROOM_LABELS[draft.roomType]}
+                              {draft.roomType ? ROOM_LABELS[draft.roomType] : "Confirm room type"}
                             </span>
                           </div>
                           <div className="card-title">{draft.title}</div>

@@ -13,6 +13,7 @@ import { safeNext } from "./lib/api";
 import { Layout, RequireAuth } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
 import Browse from "./pages/Browse";
+const Referral = lazy(() => import("./pages/Referral"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ListingDetail = lazy(() => import("./pages/ListingDetail"));
 const ListingEditor = lazy(() => import("./pages/ListingEditor"));
@@ -79,6 +80,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route index element={<Navigate to="/browse" replace />} />
               <Route path="browse" element={<Browse />} />
+              <Route path="referral/:token" element={<Referral />} />
               <Route path="listings/:id" element={<ListingDetail />} />
               {(["sign-in", "sign-up"] as const).map((mode) => (
                 <Route
