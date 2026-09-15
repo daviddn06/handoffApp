@@ -327,6 +327,14 @@
 .segment-grid.four {
   grid-template-columns: repeat(4, 1fr);
 }
+/* Roommate preference labels are words, not numbers, so they get two columns. */
+.segment-grid.preference-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+.preference-grid .segment {
+  padding: 0 8px;
+  font-size: 13px;
+}
 .segment {
   min-height: 36px;
   border-radius: var(--r-sm);

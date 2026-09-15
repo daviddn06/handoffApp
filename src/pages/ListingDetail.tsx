@@ -47,6 +47,11 @@ import {
 import { useApp } from "../lib/context";
 import { BackLink, Button, ErrorBox, Field, Loading, Modal } from "../components/ui";
 import { SaveButton } from "../components/ListingCard";
+import {
+  GenderTag,
+  preferenceMismatch,
+  preferenceSentence,
+} from "../components/Gender";
 import { BoostModal, daysLeft } from "../components/BoostModal";
 import { milesBetween, tripLabel } from "../lib/dps";
 const Map = lazy(() => import("../components/Map"));
@@ -89,7 +94,7 @@ function DetailSkeleton() {
 
 export default function ListingDetail() {
   const { id } = useParams(),
-    { user, campuses, notify } = useApp();
+    { user, campuses, notify, openAuth } = useApp();
   const { data, error, loading, refresh } = useResource<{ listing: Listing }>(
     `/listings/${id}`,
   );
@@ -222,7 +227,6 @@ export default function ListingDetail() {
       .map((n) => n[0])
       .slice(0, 2)
       .join("") || "S";
-  const signInTo = `/sign-in?next=${encodeURIComponent("/listings/" + id)}`;
 
   function primaryAction(size: "large" | "small") {
     if (!listing) return null;
@@ -243,10 +247,10 @@ export default function ListingDetail() {
       );
     if (!user)
       return (
-        <Link className={cls} to={signInTo}>
-          Sign in to request
-          <ArrowRight size={17} />
-        </Link>
+        <button className={cls} onClick={() => openAuth()}>
+          <MessageSquare size={17} />
+          Request handoff
+        </button>
       );
     return (
       <button className={cls} onClick={() => setRequestOpen(true)}>
@@ -356,6 +360,17 @@ export default function ListingDetail() {
               </li>
             ))}
           </ul>
+
+          {listing.genderPreference !== "any" && (
+            <p className="detail-preference">
+              <GenderTag preference={listing.genderPreference} />
+              <span>
+                The lister asked for {preferenceSentence(listing.genderPreference)}.
+                This is a shared home, so the people already living there set
+                who they share it with.
+              </span>
+            </p>
+          )}
 
           <section className="detail-section">
             <h2>About the place</h2>
@@ -548,7 +563,7 @@ export default function ListingDetail() {
                 <p className="request-note">
                   {user
                     ? "Introduce yourself and share your dates. Your email is shared only if they accept."
-                    : "Sign in with your student account to ask about the place and connect."}
+                    : "Confirm you are a student to ask about the place and connect."}
                 </p>
                 <div className="request-actions">
                   {primaryAction("large")}
@@ -687,6 +702,13 @@ export default function ListingDetail() {
                 message.
               </span>
             </Field>
+            {preferenceMismatch(listing.genderPreference, user?.gender) && (
+              <p className="notice request-preference-note">
+                This lister asked for{" "}
+                {preferenceSentence(listing.genderPreference)}. You can still
+                send a request, the lister decides.
+              </p>
+            )}
             {requestError && <ErrorBox message={requestError} />}
             <div className="modal-actions">
               <span className="request-fineprint">
@@ -709,12 +731,19 @@ export default function ListingDetail() {
         {!user ? (
           <>
             <p className="muted">
-              Sign in to submit a report so we can follow up if needed.
+              Confirm you are a student to submit a report so we can follow up
+              if needed.
             </p>
-            <Link className="button primary full-width" to={signInTo}>
-              Sign in
+            <button
+              className="button primary full-width"
+              onClick={() => {
+                setReportOpen(false);
+                openAuth();
+              }}
+            >
+              Confirm you are a student
               <ArrowRight size={17} />
-            </Link>
+            </button>
           </>
         ) : (
           <form className="stack" onSubmit={submitReport}>

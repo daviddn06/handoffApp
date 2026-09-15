@@ -1077,7 +1077,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 7);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 10);
   assert.throws(
     () =>
       createApp({
@@ -1390,7 +1390,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      7,
+      10,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
@@ -1702,4 +1702,249 @@ test("password rules reject weak, personal and common choices", async (t) => {
     body: { token, password: "Copper harbor lantern 915" },
   });
   assert.equal(reset.status, 200, JSON.stringify(reset.body));
+});
+
+test("an entire place is always open to anyone, a shared home keeps its roommate preference", async (t) => {
+  const env = await setup(t);
+  const lister = await env.verified("preference@usc.edu", "Preference Lister");
+  // Fair housing. A whole home carries no preference whatever the client sends.
+  const whole = await env.publish(lister, {
+    roomType: "entire",
+    genderPreference: "women_only",
+  });
+  assert.equal(whole.genderPreference, "any");
+  const room = await env.publish(lister, {
+    roomType: "private",
+    genderPreference: "women_only",
+  });
+  assert.equal(room.genderPreference, "women_only");
+  // Turning a room into a whole home drops the preference with it.
+  const converted = await lister.call(`/api/listings/${room.id}`, {
+    method: "PATCH",
+    body: { roomType: "entire" },
+  });
+  assert.equal(converted.status, 200, JSON.stringify(converted.body));
+  assert.equal(converted.body.listing.genderPreference, "any");
+  // A preference the student never set stays at any.
+  const plain = await env.publish(lister, { roomType: "shared" });
+  assert.equal(plain.genderPreference, "any");
+  const rejected = await lister.call(`/api/listings/${plain.id}`, {
+    method: "PATCH",
+    body: { genderPreference: "women" },
+  });
+  assert.equal(rejected.status, 400);
+});
+
+test("the roommate preference filter keeps open listings and drops the ones asking for someone else", async (t) => {
+  const env = await setup(t);
+  const lister = await env.verified("filters@usc.edu", "Filter Lister");
+  const open = await env.publish(lister, { roomType: "private" });
+  const womenOnly = await env.publish(lister, {
+    roomType: "private",
+    genderPreference: "women_only",
+  });
+  const womenPreferred = await env.publish(lister, {
+    roomType: "shared",
+    genderPreference: "women_preferred",
+  });
+  const menOnly = await env.publish(lister, {
+    roomType: "private",
+    genderPreference: "men_only",
+  });
+  const ids = async (query) => {
+    const result = await lister.call(`/api/listings?${query}`);
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    return result.body.listings.map((listing) => listing.id).sort();
+  };
+  assert.deepEqual(
+    await ids("gender=women"),
+    [open.id, womenOnly.id, womenPreferred.id].sort(),
+  );
+  assert.ok(!(await ids("gender=women")).includes(menOnly.id));
+  assert.deepEqual(await ids("gender=men"), [open.id, menOnly.id].sort());
+  assert.deepEqual(await ids("gender=women_only"), [womenOnly.id]);
+  assert.deepEqual(await ids("gender=men_only"), [menOnly.id]);
+  assert.equal((await ids("")).length, 4);
+  const unknown = await lister.call("/api/listings?gender=everyone");
+  assert.equal(unknown.status, 400);
+});
+
+test("gender is optional at signup, stays private, and the profile can change it", async (t) => {
+  const env = await setup(t);
+  const student = await env.verified("gender@usc.edu", "Gender Student");
+  // Nothing was asked, so nothing was assumed.
+  assert.equal((await student.call("/api/session")).body.user.gender, "unspecified");
+  const saved = await student.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "Gender Student", bio: "Third year.", gender: "woman" },
+  });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.user.gender, "woman");
+  assert.equal((await student.call("/api/session")).body.user.gender, "woman");
+  // An update that leaves gender out keeps what the student already chose.
+  const kept = await student.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "Gender Student", bio: "Fourth year." },
+  });
+  assert.equal(kept.body.user.gender, "woman");
+  const bad = await student.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "Gender Student", bio: "", gender: "female" },
+  });
+  assert.equal(bad.status, 400);
+  // A signup may state it, and the value never reaches a public listing view.
+  const picked = env.client();
+  const signed = await picked.call("/api/auth/signup", {
+    method: "POST",
+    body: {
+      name: "Picked Student",
+      email: "picked@usc.edu",
+      password: PASSWORD,
+      gender: "nonbinary",
+    },
+  });
+  assert.equal(signed.status, 201, JSON.stringify(signed.body));
+  assert.equal(signed.body.user.gender, "nonbinary");
+  const lister = await env.verified("listerg@usc.edu", "Lister Gender");
+  const listing = await env.publish(lister, { roomType: "private" });
+  const view = await student.call(`/api/listings/${listing.id}`);
+  assert.equal(view.status, 200);
+  assert.ok(!JSON.stringify(view.body).includes("unspecified"));
+});
+
+test("a request carries the requester's gender to the lister only when it was shared", async (t) => {
+  const env = await setup(t);
+  const lister = await env.verified("owner-g@usc.edu", "Owner Gender");
+  const listing = await env.publish(lister, {
+    roomType: "private",
+    genderPreference: "women_preferred",
+  });
+  const quiet = await env.verified("quiet-g@usc.edu", "Quiet Student");
+  const shared = await env.verified("shared-g@usc.edu", "Shared Student");
+  await shared.call("/api/profile", {
+    method: "PATCH",
+    body: { name: "Shared Student", bio: "", gender: "woman" },
+  });
+  for (const student of [quiet, shared]) {
+    const sent = await student.call("/api/requests", {
+      method: "POST",
+      body: {
+        listingId: listing.id,
+        message: "Hello, I would like to take over this room in January.",
+      },
+    });
+    // A preference never blocks a request. The lister decides.
+    assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  }
+  const incoming = (await lister.call("/api/requests")).body.incoming;
+  assert.equal(incoming.length, 2);
+  const byName = Object.fromEntries(
+    incoming.map((row) => [row.requesterName, row.requesterGender]),
+  );
+  assert.equal(byName["Shared Student"], "woman");
+  assert.equal(byName["Quiet Student"], undefined);
+  // The requester's own copy never carries it back to them.
+  const outgoing = (await shared.call("/api/requests")).body.outgoing;
+  assert.equal(outgoing[0].requesterGender, undefined);
+});
+
+test("the admin dashboard is invisible to a student and complete for an admin", async (t) => {
+  const f = await setup(t);
+  const student = await f.verified("student.admin.case@usc.edu", "Regular Student");
+  // Every admin path answers 404, the same as a route that does not exist.
+  for (const path of [
+    "/api/admin/overview",
+    "/api/admin/users",
+    "/api/admin/listings",
+    "/api/admin/system",
+    "/api/admin/audit",
+  ]) {
+    const denied = await student.call(path);
+    assert.equal(denied.status, 404, path);
+    assert.equal(denied.body.error, "Endpoint not found.");
+  }
+  const anonymous = f.client();
+  assert.equal((await anonymous.call("/api/admin/overview")).status, 404);
+  // A student never sees an admin flag on their own session.
+  assert.equal((await student.call("/api/session")).body.user.isAdmin, false);
+
+  const operator = await f.verified("operator.case@usc.edu", "Ops Student");
+  // The script's own function is what an operator runs on the VPS.
+  const { setAdmin } = await import("../scripts/make-admin.js");
+  const promoted = setAdmin(f.app.locals.db, "operator.case@usc.edu");
+  assert.equal(promoted.is_admin, 1);
+  assert.equal((await operator.call("/api/session")).body.user.isAdmin, true);
+
+  const overview = await operator.call("/api/admin/overview");
+  assert.equal(overview.status, 200);
+  assert.ok(overview.body.totals.users >= 2);
+  assert.equal(typeof overview.body.totals.listingsByStatus, "object");
+  assert.equal(overview.body.series.signups.length, 30);
+  assert.equal(overview.body.series.listings.length, 30);
+  assert.equal(overview.body.series.requests.length, 30);
+  assert.ok(Array.isArray(overview.body.usersBySchool));
+
+  const users = await operator.call("/api/admin/users?query=student.admin.case");
+  assert.equal(users.status, 200);
+  assert.equal(users.body.users.length, 1);
+  assert.equal(users.body.users[0].email, "student.admin.case@usc.edu");
+  assert.equal(users.body.pageSize, 25);
+  assert.ok(users.body.users[0].lastSignIn);
+
+  const detail = await operator.call(`/api/admin/users/${users.body.users[0].id}`);
+  assert.equal(detail.status, 200);
+  assert.ok(Array.isArray(detail.body.sessions));
+
+  const listing = await f.publish(student);
+  const listings = await operator.call("/api/admin/listings?status=active");
+  assert.equal(listings.body.listings[0].id, listing.id);
+  assert.equal(listings.body.listings[0].ownerEmail, "student.admin.case@usc.edu");
+  for (const path of ["/api/admin/requests", "/api/admin/reports", "/api/admin/waitlist", "/api/admin/ai-usage", "/api/admin/system"])
+    assert.equal((await operator.call(path)).status, 200, path);
+
+  // An admin write is recorded, and the disabled student cannot sign in again.
+  const disabled = await operator.call(
+    `/api/admin/users/${users.body.users[0].id}/disable`,
+    { method: "POST" },
+  );
+  assert.equal(disabled.status, 200);
+  const audit = await operator.call("/api/admin/audit");
+  assert.equal(audit.status, 200);
+  assert.equal(audit.body.audit[0].action, "user.disable");
+  assert.equal(audit.body.audit[0].targetId, users.body.users[0].id);
+  assert.equal(JSON.parse(audit.body.audit[0].details).email, "student.admin.case@usc.edu");
+
+  const blocked = f.client();
+  const signIn = await blocked.call("/api/auth/login", {
+    method: "POST",
+    body: { email: "student.admin.case@usc.edu", password: PASSWORD },
+  });
+  assert.equal(signIn.status, 403);
+  assert.equal(signIn.body.error, "This account is disabled.");
+  // Their existing session is gone too, and anything it reaches for refuses.
+  assert.equal((await student.call("/api/saved")).status, 401);
+
+  await operator.call(`/api/admin/users/${users.body.users[0].id}/enable`, {
+    method: "POST",
+  });
+  const back = f.client();
+  assert.equal(
+    (
+      await back.call("/api/auth/login", {
+        method: "POST",
+        body: { email: "student.admin.case@usc.edu", password: PASSWORD },
+      })
+    ).status,
+    200,
+  );
+
+  // An admin may never lock themselves out of the dashboard.
+  const self = await operator.call("/api/admin/users");
+  const me = self.body.users.find((row) => row.email === "operator.case@usc.edu");
+  const revoked = await operator.call(`/api/admin/users/${me.id}/admin`, {
+    method: "POST",
+    body: { on: false },
+  });
+  assert.equal(revoked.status, 400);
+  assert.match(revoked.body.error, /cannot remove your own admin access/);
 });

@@ -640,3 +640,25 @@
 .detail-bar .savings-tag {
   margin-left: 8px;
 }
+
+/* ---------- Roommate preference ---------- */
+.detail-preference {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.detail-preference .gender-tag {
+  flex: none;
+  margin-top: 1px;
+}
+.request-preference-note {
+  display: block;
+  background: var(--soft-2);
+  border-color: var(--line-2);
+  color: var(--ink-2);
+  font-size: 13.5px;
+}

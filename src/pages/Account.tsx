@@ -39,12 +39,15 @@ import {
 } from "../lib/api";
 import { useApp } from "../lib/context";
 import {
+  GENDER_LABELS,
   ROOM_LABELS,
   STATUS_LABELS,
+  type Gender,
   type HandoffRequest,
   type Listing,
   type User,
 } from "../types";
+import { GenderChoice } from "../components/Gender";
 import {
   Button,
   EmptyState,
@@ -669,6 +672,9 @@ export function Requests() {
                       )}
                     </span>
                     {tab === "incoming" ? r.requesterName : r.ownerName}
+                    {tab === "incoming" && r.requesterGender && (
+                      <em>· {GENDER_LABELS[r.requesterGender]}</em>
+                    )}
                     <em>· {dateLabel(r.createdAt, true)}</em>
                   </p>
                 </div>
@@ -835,6 +841,7 @@ export function Profile() {
   const navigate = useNavigate();
   const [name, setName] = useState(user?.name || ""),
     [bio, setBio] = useState(user?.bio || ""),
+    [gender, setGender] = useState<Gender>(user?.gender || "unspecified"),
     [busy, setBusy] = useState(false),
     [signingOut, setSigningOut] = useState(false),
     [error, setError] = useState("");
@@ -842,6 +849,7 @@ export function Profile() {
   useEffect(() => {
     setName(user?.name || "");
     setBio(user?.bio || "");
+    setGender(user?.gender || "unspecified");
   }, [user]);
   async function signOut() {
     setSigningOut(true);
@@ -863,7 +871,7 @@ export function Profile() {
     try {
       const r = await api<{ user: User }>("/profile", {
         method: "PATCH",
-        body: json({ name, bio }),
+        body: json({ name, bio, gender }),
       });
       setUser(r.user);
       notify("Your profile is up to date.");
@@ -924,6 +932,11 @@ export function Profile() {
                 onChange={(e) => setBio(e.target.value)}
               />
             </Field>
+            <GenderChoice
+              name="profile-gender"
+              value={gender}
+              onChange={setGender}
+            />
             <div className="field-row">
               <Field label="Student email" hint="Verified, and never public.">
                 <input value={user?.email || ""} readOnly disabled />
@@ -941,7 +954,11 @@ export function Profile() {
             </Link>
             <Button
               busy={busy}
-              disabled={name === user?.name && bio === (user?.bio || "")}
+              disabled={
+                name === user?.name &&
+                bio === (user?.bio || "") &&
+                gender === (user?.gender || "unspecified")
+              }
             >
               Save changes
               <Check size={16} />

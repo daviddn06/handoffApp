@@ -1637,3 +1637,99 @@ html:has(.verify-banner) .browse-page {
     width: 100%;
   }
 }
+
+/* ---------- Gender and roommate preference ---------- */
+.gender-field {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.gender-field legend {
+  float: left;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.gender-field legend svg {
+  color: var(--muted);
+  flex: none;
+}
+.gender-options {
+  clear: both;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gender-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    border-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.gender-option:hover {
+  background: var(--soft);
+}
+.gender-option input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+.gender-option:has(:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.gender-option.is-on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.gender-field .field-hint {
+  margin: 6px 0 0;
+}
+.preference-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.gender-tag {
+  color: var(--muted-2);
+}
+.card-body > .gender-tag,
+.map-preview-meta > .gender-tag {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.gender-tag svg {
+  color: var(--muted);
+  flex: none;
+}
+@media (max-width: 520px) {
+  .gender-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

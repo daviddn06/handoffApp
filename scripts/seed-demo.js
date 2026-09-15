@@ -48,6 +48,7 @@ const users = [
     key: "owner",
     name: "Maya Chen",
     email: "demo.owner@usc.edu",
+    gender: "woman",
     campusId: "usc",
     bio: "Third year business major. Subletting my place near campus while I am away for a co-op.",
   },
@@ -55,6 +56,7 @@ const users = [
     key: "jordan",
     name: "Jordan Alvarez",
     email: "demo.jordan@usc.edu",
+    gender: "man",
     campusId: "usc",
     bio: "Viterbi junior, quiet, clean, and usually in the library past midnight.",
   },
@@ -62,6 +64,7 @@ const users = [
     key: "priya",
     name: "Priya Raman",
     email: "demo.priya@usc.edu",
+    gender: "woman",
     campusId: "usc",
     bio: "Annenberg grad student looking for a spring sublease close to campus.",
   },
@@ -69,6 +72,7 @@ const users = [
     key: "marcus",
     name: "Marcus Webb",
     email: "demo.marcus@usc.edu",
+    gender: "man",
     campusId: "usc",
     bio: "Senior, plays intramural soccer, easy to reach by text.",
   },
@@ -76,6 +80,7 @@ const users = [
     key: "sofia",
     name: "Sofia Delgado",
     email: "demo.sofia@ucla.edu",
+    gender: "woman",
     campusId: "ucla",
     bio: "Second year in Westwood, studying abroad next term.",
   },
@@ -83,6 +88,7 @@ const users = [
     key: "ethan",
     name: "Ethan Nakamura",
     email: "demo.ethan@ucla.edu",
+    gender: "man",
     campusId: "ucla",
     bio: "Grad student, north campus, keeps a very tidy kitchen.",
   },
@@ -90,6 +96,7 @@ const users = [
     key: "alina",
     name: "Alina Moreau",
     email: "demo.alina@lmu.edu",
+    gender: "unspecified",
     campusId: "lmu",
     bio: "Film major on the bluff, subletting for the summer session.",
   },
@@ -118,6 +125,7 @@ const listings = [
   {
     owner: "owner",
     title: "Private room on West 30th, 5 min walk to Leavey",
+    genderPreference: "women_only",
     description:
       "Front bedroom in a four bedroom house on West 30th between Hoover and Orchard. It is a five minute walk to Leavey and about eight to Marshall. My three roommates are all juniors, quiet on weeknights, and the street parking is manageable if you get the permit.",
     address: "1245 W 30th St, Los Angeles, CA 90007",
@@ -161,6 +169,7 @@ const listings = [
   {
     owner: "priya",
     title: "Shared room at University Gateway, steps to campus",
+    genderPreference: "women_preferred",
     description:
       "Shared bedroom in a two bed at University Gateway, directly across Figueroa from campus. Trader Joe's is downstairs and the front desk takes packages. My roommate is a senior in Annenberg and keeps normal hours.",
     address: "3335 S Figueroa St, Los Angeles, CA 90007",
@@ -265,6 +274,7 @@ const listings = [
   {
     owner: "marcus",
     title: "Hoover St room, one block from Village",
+    genderPreference: "men_preferred",
     description:
       "Bedroom in a three bed apartment on Hoover near 30th. You can walk to the Village in about four minutes for groceries and the gym. Furnished with a full bed, dresser and desk that all stay.",
     address: "2925 S Hoover St, Los Angeles, CA 90007",
@@ -993,7 +1003,7 @@ db.transaction(() => {
     userIds[user.key] = id;
     const school = schoolForEmail(user.email);
     db.prepare(
-      "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,verified_at,bio,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+      "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,verified_at,bio,gender,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
     ).run(
       id,
       user.name,
@@ -1006,6 +1016,7 @@ db.transaction(() => {
       passwordHash,
       daysAgo(60 - index),
       user.bio,
+      user.gender,
       daysAgo(60 - index),
       now,
     );
@@ -1048,7 +1059,7 @@ for (const [index, item] of all.entries()) {
   listingIds.push({ id: listingId, owner: item.owner, status: item.status });
   const created = daysAgo(30 - (index % 25));
   db.prepare(
-    `INSERT INTO listings(id,owner_id,campus_id,title,description,address,lat,lng,price,deposit,original_price,bedrooms,bathrooms,room_type,available_from,available_to,amenities,photos,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO listings(id,owner_id,campus_id,title,description,address,lat,lng,price,deposit,original_price,bedrooms,bathrooms,room_type,gender_preference,available_from,available_to,amenities,photos,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(
     listingId,
     ownerId,
@@ -1064,6 +1075,8 @@ for (const [index, item] of all.entries()) {
     item.bedrooms,
     item.bathrooms,
     item.roomType,
+    // Fair housing. Only shared living can carry a roommate preference.
+    item.roomType === "entire" ? "any" : (item.genderPreference ?? "any"),
     item.term[0],
     item.term[1],
     JSON.stringify(item.amenities.filter((a) => AMENITIES.includes(a))),

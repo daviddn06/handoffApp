@@ -1,8 +1,9 @@
 import { useState, type MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Heart, Image, Zap } from "lucide-react";
 import type { Campus, Listing } from "../types";
 import { ROOM_LABELS } from "../types";
+import { GenderTag } from "./Gender";
 import { api, dateLabel, errorMessage, money, savings } from "../lib/api";
 import { useApp } from "../lib/context";
 import { distanceLabel, milesBetween, travelLabel } from "../lib/dps";
@@ -18,8 +19,7 @@ export function SaveButton({
   large?: boolean;
   size?: "default" | "large";
 }) {
-  const { user, notify } = useApp(),
-    navigate = useNavigate();
+  const { user, notify, openAuth } = useApp();
   const [saved, setSaved] = useState(!!listing.saved),
     [busy, setBusy] = useState(false),
     [pop, setPop] = useState(false);
@@ -27,9 +27,8 @@ export function SaveButton({
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      navigate(
-        `/sign-in?next=${encodeURIComponent("/listings/" + listing.id)}`,
-      );
+      // Signed out, confirm who they are without leaving the page.
+      openAuth();
       return;
     }
     setBusy(true);
@@ -219,6 +218,7 @@ export function ListingCard({
             </>
           )}
         </p>
+        <GenderTag preference={listing.genderPreference} />
       </div>
     </article>
   );

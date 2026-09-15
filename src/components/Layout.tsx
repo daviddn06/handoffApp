@@ -17,12 +17,14 @@ import {
   Plus,
   ChevronDown,
   UserRound,
+  Gauge,
   LogOut,
   Check,
 } from "lucide-react";
 import { useApp } from "../lib/context";
 import { api, errorMessage } from "../lib/api";
 import { ErrorBox, Loading } from "./ui";
+import { AuthModal } from "./AuthModal";
 const links = [
   { to: "/browse", label: "Browse", icon: Search },
   { to: "/saved", label: "Saved", icon: Heart },
@@ -53,8 +55,16 @@ const AUTH_ROUTES = new Set([
   "/reset-password",
 ]);
 
+/** Links a signed out visitor cannot use yet. They open the auth modal. */
+const GUARDED = new Set([
+  "/saved",
+  "/requests",
+  "/my-listings",
+  "/listings/new",
+]);
+
 export function Layout() {
-  const { user, setUser, loading, error, retry, notify } = useApp(),
+  const { user, setUser, loading, error, retry, notify, openAuth } = useApp(),
     navigate = useNavigate(),
     location = useLocation();
   const embed = isEmbed();
@@ -76,6 +86,14 @@ export function Layout() {
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
   }, [embed]);
+  /* Signed out, these never navigate. They confirm you are a student here. */
+  const guard = (to: string) =>
+    user || !GUARDED.has(to)
+      ? undefined
+      : (e: React.MouseEvent) => {
+          e.preventDefault();
+          openAuth({ next: to });
+        };
   const [menu, setMenu] = useState(false),
     [loggingOut, setLoggingOut] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -84,6 +102,7 @@ export function Layout() {
     window.scrollTo(0, 0);
     const names: Record<string, string> = {
       "/browse": "Browse",
+      "/admin": "Admin",
       "/saved": "Saved places",
       "/requests": "Requests",
       "/my-listings": "My listings",
@@ -97,7 +116,10 @@ export function Layout() {
       "/privacy": "Privacy Policy",
       "/listings/new": "List your place",
     };
-    document.title = `${names[location.pathname] || "Your next place"} · Handoff`;
+    const name =
+      names[location.pathname] ||
+      (location.pathname.startsWith("/admin") ? "Admin" : "Your next place");
+    document.title = `${name} · Handoff`;
   }, [location.pathname]);
   useEffect(() => {
     if (!menu) return;
@@ -138,14 +160,18 @@ export function Layout() {
           <Brand />
           <nav className="desktop-nav" aria-label="Main navigation">
             {links.map(({ to, label }) => (
-              <NavLink key={to} to={to}>
+              <NavLink key={to} to={to} onClick={guard(to)}>
                 {label}
               </NavLink>
             ))}
           </nav>
           <div className="header-actions">
             {!onAuthRoute && !onEditor && (
-              <Link to="/listings/new" className="button primary list-place">
+              <Link
+                to="/listings/new"
+                className="button primary list-place"
+                onClick={guard("/listings/new")}
+              >
                 <Plus size={17} />
                 <span>List your place</span>
               </Link>
@@ -184,6 +210,12 @@ export function Layout() {
                       <UserRound size={16} />
                       Your profile
                     </Link>
+                    {user.isAdmin && (
+                      <Link to="/admin">
+                        <Gauge size={16} />
+                        Admin
+                      </Link>
+                    )}
                     <button onClick={logout} disabled={loggingOut}>
                       <LogOut size={16} />
                       {loggingOut ? "Signing out…" : "Sign out"}
@@ -196,7 +228,17 @@ export function Layout() {
                 )}
               </div>
             ) : onAuthRoute ? null : (
-              <Link to="/sign-in" className="button ghost sign-in-link">
+              <Link
+                to="/sign-in"
+                className="button ghost sign-in-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openAuth({
+                    mode: "signin",
+                    next: location.pathname + location.search,
+                  });
+                }}
+              >
                 Sign in <ArrowUpRight size={16} />
               </Link>
             )}
@@ -217,24 +259,29 @@ export function Layout() {
       </main>
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {links.slice(0, 2).map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to}>
+          <NavLink key={to} to={to} onClick={guard(to)}>
             <Icon size={20} />
             <span>{label}</span>
           </NavLink>
         ))}
-        <Link to="/listings/new" className="mobile-list-action">
+        <Link
+          to="/listings/new"
+          className="mobile-list-action"
+          onClick={guard("/listings/new")}
+        >
           <span className="mobile-list-button">
             <Plus size={22} strokeWidth={2.4} />
           </span>
           <span>List</span>
         </Link>
         {links.slice(2).map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to}>
+          <NavLink key={to} to={to} onClick={guard(to)}>
             <Icon size={20} />
             <span>{label}</span>
           </NavLink>
         ))}
       </nav>
+      <AuthModal />
     </>
   );
 }
@@ -243,17 +290,14 @@ export function Layout() {
  * listing routes send them to create an account. Everything else still opens
  * sign in, where a returning student expects to land.
  */
-export function RequireAuth({ to = "/sign-in" }: { to?: string } = {}) {
-  const { user } = useApp(),
+export function RequireAuth(_props: { to?: string } = {}) {
+  const { user, openAuth } = useApp(),
     location = useLocation();
-  return user ? (
-    <Outlet />
-  ) : (
-    <Navigate
-      to={`${to}?next=${encodeURIComponent(location.pathname + location.search)}`}
-      replace
-    />
-  );
+  const target = location.pathname + location.search;
+  useEffect(() => {
+    if (!user) openAuth({ next: target });
+  }, [user, target, openAuth]);
+  return user ? <Outlet /> : <Navigate to="/browse" replace />;
 }
 
 /** Reminder strip for signed in students who have not verified their email. */

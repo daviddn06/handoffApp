@@ -1,3 +1,36 @@
+/** How a student describes themselves. Never required, never public. */
+export type Gender = "woman" | "man" | "nonbinary" | "unspecified";
+/**
+ * A lister's roommate preference. Offered only on private and shared rooms,
+ * where the lister or their roommates live in the home.
+ */
+export type GenderPreference =
+  | "any"
+  | "women_only"
+  | "women_preferred"
+  | "men_only"
+  | "men_preferred";
+export const GENDERS: Gender[] = ["woman", "man", "nonbinary", "unspecified"];
+export const GENDER_LABELS: Record<Gender, string> = {
+  woman: "Woman",
+  man: "Man",
+  nonbinary: "Non-binary",
+  unspecified: "Prefer not to say",
+};
+export const GENDER_PREFERENCES: GenderPreference[] = [
+  "any",
+  "women_preferred",
+  "women_only",
+  "men_preferred",
+  "men_only",
+];
+export const GENDER_PREFERENCE_LABELS: Record<GenderPreference, string> = {
+  any: "Anyone",
+  women_preferred: "Women preferred",
+  women_only: "Women only",
+  men_preferred: "Men preferred",
+  men_only: "Men only",
+};
 export type Campus = {
   id: string;
   name: string;
@@ -25,6 +58,10 @@ export type User = {
   verified: boolean;
   termsAccepted: boolean;
   bio: string;
+  /** Shared with listers only through roommate preferences. */
+  gender: Gender;
+  /** Opens the internal dashboard at /admin. False for every student. */
+  isAdmin: boolean;
 };
 export type Listing = {
   id: string;
@@ -43,6 +80,8 @@ export type Listing = {
   bedrooms: number;
   bathrooms: number;
   roomType: "private" | "shared" | "entire";
+  /** Roommate preference. Always "any" for an entire place. */
+  genderPreference: GenderPreference;
   availableFrom: string;
   availableTo: string;
   amenities: string[];
@@ -75,6 +114,8 @@ export type HandoffRequest = {
   createdAt: string;
   updatedAt: string;
   contact?: { name: string; email: string };
+  /** Only sent to the lister, and only when the requester shared it. */
+  requesterGender?: Gender;
 };
 export const AMENITIES = [
   "Furnished",

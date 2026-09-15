@@ -37,6 +37,18 @@ try {
       )
       .all();
     console.log(JSON.stringify(rows, null, 2));
+  } else if (command === "ai-usage") {
+    // Smart import spend, newest day first. Tokens only, no prompt content.
+    const days = Math.min(Math.max(Number(argument || 30), 1), 365);
+    const rows = db
+      .prepare(
+        `SELECT substr(created_at,1,10) AS day, kind, model, COUNT(*) AS calls,
+           SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens
+         FROM ai_usage WHERE created_at >= ?
+         GROUP BY day, kind, model ORDER BY day DESC, kind`,
+      )
+      .all(new Date(Date.now() - days * 86400000).toISOString());
+    console.table(rows);
   } else if (command === "resolve-report") {
     requireId();
     const result = db
@@ -87,7 +99,7 @@ try {
     );
   } else {
     throw new Error(
-      "Commands: reports [open|all], resolve-report UUID, archive-listing UUID, unlock-listing UUID, backup FILE",
+      "Commands: reports [open|all], ai-usage [DAYS], resolve-report UUID, archive-listing UUID, unlock-listing UUID, backup FILE",
     );
   }
 } finally {

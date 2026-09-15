@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { Campus, Listing } from "../types";
 import { ROOM_LABELS } from "../types";
+import { GenderTag } from "./Gender";
 import { dateLabel, money, savings } from "../lib/api";
 import {
   PATROL_ZONES,
@@ -632,6 +633,7 @@ export default function Map({
             {dateLabel(preview.listing.availableTo)} ·{" "}
             <b>{travelLabel(milesBetween(campus, preview.listing))}</b>
           </span>
+          <GenderTag preference={preview.listing.genderPreference} />
         </div>
       </div>
     </Link>

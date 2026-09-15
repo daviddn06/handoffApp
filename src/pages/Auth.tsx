@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type ClipboardEvent,
@@ -10,7 +9,6 @@ import {
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  ArrowLeft,
   ArrowRight,
   BedDouble,
   CalendarDays,
@@ -27,77 +25,21 @@ import { api, errorMessage, json, safeNext } from "../lib/api";
 import { useApp } from "../lib/context";
 import { Button, ErrorBox, Field, Loading } from "../components/ui";
 import type { User } from "../types";
-import { liveCampuses, loadSchools, schoolForEmail, type School } from "../lib/schools";
-import { passwordCheck, type PasswordCheck } from "../lib/password";
-import { SchoolLogo } from "../components/SchoolSearch";
+import { liveCampuses } from "../lib/schools";
+import { passwordCheck } from "../lib/password";
+import {
+  ForgotForm,
+  PasswordMeter,
+  SignInForm,
+  SignUpForm,
+  SuccessCheck,
+} from "../components/AuthForms";
 type Mode =
   | "sign-in"
   | "sign-up"
   | "forgot-password"
   | "reset-password"
   | "verify";
-
-/** Signing up is a student confirming who they are, so the steps say that. */
-const STEP_NAMES = ["Your school email", "Your name", "A password"];
-const STEPS = STEP_NAMES.length;
-
-function SuccessCheck() {
-  const path = useRef<SVGPathElement>(null);
-  useEffect(() => {
-    const p = path.current;
-    if (!p) return;
-    const len = Math.ceil(p.getTotalLength());
-    p.style.strokeDasharray = String(len);
-    p.style.strokeDashoffset = String(len);
-  }, []);
-  return (
-    <span className="auth-check t-success-check" data-state="in">
-      <svg viewBox="0 0 48 48" width="26" height="26" fill="none">
-        <path
-          ref={path}
-          d="M13 24.5 20.5 32 35 17"
-          stroke="currentColor"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </span>
-  );
-}
-
-/**
- * Four segments that fill as the estimate rises, plus the single most useful
- * next step. The colour carries the level: red for weak, blue for good, green
- * for strong.
- */
-function PasswordMeter({ check }: { check: PasswordCheck }) {
-  return (
-    <div className="auth-meter-block">
-      <div
-        className="auth-meter"
-        data-level={check.level}
-        role="img"
-        aria-label={
-          check.level === "empty"
-            ? "Password strength not measured yet"
-            : `Password strength ${check.label}`
-        }
-      >
-        {[1, 2, 3, 4].map((segment) => (
-          <span key={segment} data-on={check.score >= segment ? "yes" : "no"} />
-        ))}
-      </div>
-      <p className="auth-meter-note" data-level={check.level}>
-        {check.label && <strong>{check.label}</strong>}
-        {check.hint && <span>{check.hint}</span>}
-        {!check.hint && check.crack && (
-          <span>Would take {check.crack} to guess.</span>
-        )}
-      </p>
-    </div>
-  );
-}
 
 /** One card in the replica, the same markup and classes the browse list uses. */
 function ReplicaCard({
@@ -339,9 +281,6 @@ function BrowseReplica() {
           </div>
         </div>
       </div>
-      <p className="auth-preview-caption">
-        Browsing near University of Southern California
-      </p>
     </aside>
   );
 }
@@ -436,20 +375,6 @@ function OtpInput({
   );
 }
 
-/** The live campus for an email, used only to tell a student what to expect. */
-function liveCampusFor(
-  email: string,
-  campuses: Array<{ id: string; domain: string }>,
-) {
-  const domain = email.trim().toLowerCase().split("@")[1] || "";
-  if (!domain) return null;
-  return (
-    campuses.find(
-      (c) => domain === c.domain || domain.endsWith(`.${c.domain}`),
-    ) || null
-  );
-}
-
 export default function Auth({ mode }: { mode: Mode }) {
   const { user, setUser, campuses: allCampuses, emailReady, notify } = useApp(),
     navigate = useNavigate(),
@@ -458,48 +383,27 @@ export default function Auth({ mode }: { mode: Mode }) {
     [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
     [email, setEmail] = useState(""),
-    [name, setName] = useState(""),
     [password, setPassword] = useState(""),
     [showPassword, setShowPassword] = useState(false),
     [shake, setShake] = useState(0),
-    [step, setStep] = useState(1),
     [signedUp, setSignedUp] = useState(false),
     [verified, setVerified] = useState(false),
     [digits, setDigits] = useState(["", "", "", "", "", ""]),
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({}),
     [cooldown, setCooldown] = useState(0);
   const campuses = liveCampuses(allCampuses);
-  // The school list is only needed by sign up, so it loads with the page.
-  const [schools, setSchools] = useState<School[] | null>(null);
-  useEffect(() => {
-    if (mode === "sign-up") loadSchools().then(setSchools);
-  }, [mode]);
   const verifiedToken = useRef("");
   const shakeRef = useRef<HTMLDivElement>(null);
-  const slideRef = useRef<HTMLDivElement>(null);
-  const [slideHeight, setSlideHeight] = useState<number>();
   const next = safeNext(params.get("next"));
   const resetToken = params.get("token");
   const code = digits.join("");
-  // The school is read from the email as the student types. There is nothing
-  // to pick: their email decides it, and listing opens when Handoff does.
-  const found = schools ? schoolForEmail(email, schools) : null;
-  const detected = found
-    ? {
-        name: found.school.n,
-        domain: found.domain,
-        live: Boolean(liveCampusFor(email, campuses)),
-      }
-    : null;
-  const listingNext = next === "/listings/new";
-  const strength = passwordCheck(password, { email, name });
+  const strength = passwordCheck(password, { email });
 
   useEffect(() => {
     setError("");
     setSuccess("");
     setPassword("");
     setBusy(false);
-    setStep(1);
     setSignedUp(false);
     setFieldErrors({});
   }, [mode]);
@@ -540,27 +444,16 @@ export default function Auth({ mode }: { mode: Mode }) {
   }, [mode, params, setUser]);
 
   /* Our own validation, so the browser never shows its native bubble. */
-  function validate(fields: Array<"email" | "name" | "password" | "newPassword">) {
-    const next: Record<string, string> = {};
+  function validateEmail() {
     const address = email.trim();
-    if (fields.includes("email")) {
-      if (!address) next.email = "Enter your student email.";
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))
-        next.email = "That does not look like an email address.";
-    }
-    if (fields.includes("name") && name.trim().length < 2)
-      next.name = "Tell us the name other students will see.";
-    if (fields.includes("password") && !password)
-      next.password = "Enter your password.";
-    if (fields.includes("newPassword")) {
-      const check = passwordCheck(password, { email, name });
-      if (!check.valid)
-        next.password = check.problem || "Choose a stronger password.";
-    }
-    setFieldErrors(next);
-    const ok = Object.keys(next).length === 0;
-    if (!ok) setShake((s) => s + 1);
-    return ok;
+    const problem = !address
+      ? "Enter your student email."
+      : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)
+        ? "That does not look like an email address."
+        : "";
+    setFieldErrors(problem ? { email: problem } : {});
+    if (problem) setShake((s) => s + 1);
+    return !problem;
   }
   const clearField = (key: string) =>
     setFieldErrors((current) =>
@@ -616,111 +509,32 @@ export default function Auth({ mode }: { mode: Mode }) {
     }
   }
 
-  async function submit(e: FormEvent) {
+  /* Reset password, the only form still unique to the full page. */
+  async function submitReset(e: FormEvent) {
     e.preventDefault();
-    const needs: Array<"email" | "name" | "password" | "newPassword"> =
-      mode === "sign-in"
-        ? ["email", "password"]
-        : mode === "forgot-password"
-          ? ["email"]
-          : ["newPassword"];
-    if (!validate(needs)) return;
+    const check = passwordCheck(password, { email });
+    if (!check.valid) {
+      setFieldErrors({
+        password: check.problem || "Choose a stronger password.",
+      });
+      setShake((s) => s + 1);
+      return;
+    }
     setError("");
     setBusy(true);
     try {
-      if (mode === "sign-in") {
-        const r = await api<{ user: User }>("/auth/login", {
-          method: "POST",
-          body: json({ email, password }),
-        });
-        setUser(r.user);
-        if (r.user.verified) {
-          navigate(next, { replace: true });
-          notify("Welcome back.");
-        }
-      } else if (mode === "sign-up") {
-        const r = await api<{ user: User | null; message: string }>(
-          "/auth/signup",
-          {
-            method: "POST",
-            body: json({ name, email, password }),
-          },
-        );
-        if (r.user) {
-          setUser(r.user);
-          setSignedUp(true);
-          setCooldown(30);
-        } else {
-          setSuccess(
-            "If that email is new you are in, otherwise sign in with the password you already have.",
-          );
-        }
-      } else if (mode === "forgot-password") {
-        const r = await api<{ message: string }>("/auth/forgot", {
-          method: "POST",
-          body: json({ email }),
-        });
-        setSuccess(r.message);
-      } else if (mode === "reset-password") {
-        const r = await api<{ message: string }>("/auth/reset", {
-          method: "POST",
-          body: json({ token: resetToken, password }),
-        });
-        setUser(null);
-        setSuccess(r.message);
-      }
+      const r = await api<{ message: string }>("/auth/reset", {
+        method: "POST",
+        body: json({ token: resetToken, password }),
+      });
+      setUser(null);
+      setSuccess(r.message);
     } catch (e) {
       failed(e);
     } finally {
       setBusy(false);
     }
   }
-
-  /* Sign up steps. Enter advances, the last step submits. */
-  async function advance(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (step === 1) {
-      if (!validate(["email"])) return;
-      // The school list may still be in flight on a fast first keystroke.
-      setBusy(true);
-      const list = schools || (await loadSchools());
-      setSchools(list);
-      setBusy(false);
-      if (!schoolForEmail(email, list)) {
-        setError("Use your school email. We could not find that school yet.");
-        setShake((s) => s + 1);
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      if (!validate(["name"])) return;
-      setStep(3);
-    }
-  }
-
-  /* Keep the sliding step container as tall as the step on screen. */
-  useLayoutEffect(() => {
-    const root = slideRef.current;
-    if (!root) return;
-    const panel = root.querySelector<HTMLElement>(
-      `.t-page[data-page-id="${step}"]`,
-    );
-    if (!panel) return;
-    const measure = () => setSlideHeight(panel.offsetHeight);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, [step, error, mode, emailReady, detected]);
-  useEffect(() => {
-    if (mode !== "sign-up" || signedUp) return;
-    const root = slideRef.current;
-    const first = root?.querySelector<HTMLElement>(
-      `.t-page[data-page-id="${step}"] input`,
-    );
-    if (step > 1) first?.focus();
-  }, [step, mode, signedUp]);
 
   const verifyingUser = user && !user.verified;
   const showVerify =
@@ -799,7 +613,7 @@ export default function Auth({ mode }: { mode: Mode }) {
             className="auth-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!validate(["email"])) return;
+              if (!validateEmail()) return;
               resend();
             }}
           >
@@ -874,63 +688,17 @@ export default function Auth({ mode }: { mode: Mode }) {
     );
   }
 
-  /* Sign in. */
+  /* Sign in, the shared form inside the full page shell. */
   if (mode === "sign-in")
     return shell(
-      <div className="auth-block">
-        <header className="auth-head">
-          <h1>Welcome back.</h1>
-          <p>Sign in to pick up where you left off.</p>
-        </header>
-        {error && <ErrorBox message={error} />}
-        <form className="auth-form" noValidate onSubmit={submit}>
-          <Field label="Student email" error={fieldErrors.email}>
-            <input
-              type="email"
-              name="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                clearField("email");
-              }}
-              placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
-            />
-          </Field>
-          <Field label="Password" error={fieldErrors.password}>
-            <div className="password-input">
-              <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                minLength={1}
-                maxLength={128}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  clearField("password");
-                }}
-              />
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </Field>
-          <Link to="/forgot-password" className="forgot-link">
-            Forgot password?
-          </Link>
-          <Button type="submit" busy={busy} className="auth-cta">
-            Sign in
-            <ArrowRight size={17} />
-          </Button>
-        </form>
-      </div>,
+      <SignInForm
+        next={next}
+        onDone={(signedIn) => {
+          if (!signedIn.verified) return;
+          navigate(next, { replace: true });
+          notify("Welcome back.");
+        }}
+      />,
       <>
         New here?{" "}
         <Link to={`/sign-up?next=${encodeURIComponent(next)}`}>
@@ -939,240 +707,38 @@ export default function Auth({ mode }: { mode: Mode }) {
       </>,
     );
 
-  /* Sign up, three steps. */
-  if (mode === "sign-up") {
-    if (success)
-      return shell(
-        <div className="auth-block">
-          <header className="auth-head">
-            <SuccessCheck />
-            <h1>Check your inbox.</h1>
-            <p>{success}</p>
-          </header>
-          <Link className="button primary full-width auth-cta" to="/sign-in">
-            Go to sign in
-            <ArrowRight size={17} />
-          </Link>
-        </div>,
-      );
+  /* Sign up, the shared three step form inside the full page shell. */
+  if (mode === "sign-up")
     return shell(
-      <div className="auth-block">
-        <header className="auth-head">
-          <h1>
-            {listingNext
-              ? "Confirm you are a student to list your place."
-              : "Confirm you are a student."}
-          </h1>
-          <p>Your school email is all it takes.</p>
-        </header>
-        <p className="auth-step-name">
-          Step {step} of {STEPS} · {STEP_NAMES[step - 1]}
-        </p>
-        <ol className="auth-progress" aria-label={`Step ${step} of ${STEPS}`}>
-          {[1, 2, 3].map((n) => (
-            <li
-              key={n}
-              className={n < step ? "is-done" : n === step ? "is-active" : ""}
-            />
-          ))}
-        </ol>
-        {error && <ErrorBox message={error} />}
-        <div
-          className="auth-slide t-page-slide"
-          ref={slideRef}
-          data-step={step}
-          style={slideHeight ? { height: `${slideHeight}px` } : undefined}
-        >
-          <section
-            className="t-page"
-            data-page-id="1"
-            aria-hidden={step !== 1}
-            style={{ "--t-page-from-x": "-8px" } as React.CSSProperties}
-          >
-            <form className="auth-form" noValidate onSubmit={advance}>
-              <Field
-                label="Student email"
-                hint="Use your school email."
-                error={fieldErrors.email}
-              >
-                <input
-                  type="email"
-                  name="email"
-                  autoComplete="email"
-                  required
-                  tabIndex={step === 1 ? undefined : -1}
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    clearField("email");
-                  }}
-                  placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
-                />
-              </Field>
-              {error && !detected && (
-                <p className="auth-hint">
-                  Not seeing your school?{" "}
-                  <Link to="/browse" tabIndex={step === 1 ? undefined : -1}>
-                    Join the waitlist
-                  </Link>{" "}
-                  and we will tell you when it opens.
-                </p>
-              )}
-              <Button
-                type="submit"
-                busy={busy && step === 1}
-                className="auth-cta"
-                tabIndex={step === 1 ? undefined : -1}
-              >
-                Continue
-                <ArrowRight size={17} />
-              </Button>
-            </form>
-          </section>
-          <section
-            className="t-page"
-            data-page-id="2"
-            aria-hidden={step !== 2}
-            style={
-              { "--t-page-from-x": step > 2 ? "-8px" : "8px" } as React.CSSProperties
-            }
-          >
-            <form className="auth-form" noValidate onSubmit={advance}>
-              <Field
-                label="Your name"
-                hint="First and last, the way students will see it."
-                error={fieldErrors.name}
-              >
-                <input
-                  name="name"
-                  autoComplete="name"
-                  minLength={2}
-                  maxLength={80}
-                  required
-                  tabIndex={step === 2 ? undefined : -1}
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    clearField("name");
-                  }}
-                  placeholder="First and last name"
-                />
-              </Field>
-              {detected && (
-                <p className="auth-school-line">
-                  <SchoolLogo
-                    src={`/api/logo/${encodeURIComponent(detected.domain)}`}
-                  />
-                  <span>{detected.name}</span>
-                  {!detected.live && (
-                    <small>Browsing only for now, listings open soon</small>
-                  )}
-                </p>
-              )}
-              <Button
-                type="submit"
-                className="auth-cta"
-                tabIndex={step === 2 ? undefined : -1}
-              >
-                Continue
-                <ArrowRight size={17} />
-              </Button>
-              <button
-                type="button"
-                className="auth-back text-button"
-                tabIndex={step === 2 ? undefined : -1}
-                onClick={() => setStep(1)}
-              >
-                <ArrowLeft size={15} />
-                Back
-              </button>
-            </form>
-          </section>
-          <section
-            className="t-page"
-            data-page-id="3"
-            aria-hidden={step !== 3}
-            style={{ "--t-page-from-x": "8px" } as React.CSSProperties}
-          >
-            <form className="auth-form" noValidate onSubmit={submit}>
-              <Field label="Password" error={fieldErrors.password}>
-                <div className="password-input">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    required
-                    minLength={10}
-                    maxLength={128}
-                    tabIndex={step === 3 ? undefined : -1}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      clearField("password");
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="icon-button"
-                    tabIndex={step === 3 ? undefined : -1}
-                    aria-label={
-                      showPassword ? "Hide password" : "Show password"
-                    }
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </Field>
-              <PasswordMeter check={strength} />
-              {!emailReady && (
-                <p className="auth-hint">
-                  Email delivery is paused on this server, so the code may not
-                  arrive.
-                </p>
-              )}
-              <Button
-                type="submit"
-                busy={busy}
-                className="auth-cta"
-                disabled={!strength.valid}
-                tabIndex={step === 3 ? undefined : -1}
-              >
-                Confirm and continue
-                <ArrowRight size={17} />
-              </Button>
-              <button
-                type="button"
-                className="auth-back text-button"
-                tabIndex={step === 3 ? undefined : -1}
-                onClick={() => setStep(2)}
-              >
-                <ArrowLeft size={15} />
-                Back
-              </button>
-            </form>
-          </section>
-        </div>
-        <p className="auth-fineprint">
-          By confirming you agree to our{" "}
-          <Link to="/terms">Terms of Service</Link> and{" "}
-          <Link to="/privacy">Privacy Policy</Link>.
-        </p>
-      </div>,
+      <SignUpForm
+        next={next}
+        onDone={() => {
+          setSignedUp(true);
+          setCooldown(30);
+        }}
+      />,
       <>
         Already have an account?{" "}
         <Link to={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link>
       </>,
     );
-  }
 
-  /* Forgot and reset password. */
-  const forgot = mode === "forgot-password";
+  /* Forgot password, the shared form inside the full page shell. */
+  if (mode === "forgot-password")
+    return shell(
+      <ForgotForm next={next} />,
+      <>
+        Remembered it? <Link to="/sign-in">Sign in</Link>
+      </>,
+    );
+
+  /* Reset password. */
   if (success)
     return shell(
       <div className="auth-block">
         <header className="auth-head">
           <SuccessCheck />
-          <h1>{forgot ? "Check your inbox." : "Password updated."}</h1>
+          <h1>Password updated.</h1>
           <p>{success}</p>
         </header>
         <Link className="button primary full-width auth-cta" to="/sign-in">
@@ -1184,72 +750,51 @@ export default function Auth({ mode }: { mode: Mode }) {
   return shell(
     <div className="auth-block">
       <header className="auth-head">
-        <h1>{forgot ? "Let’s get you back in." : "A fresh start."}</h1>
-        <p>
-          {forgot
-            ? "We will send a link to reset your password."
-            : "Choose a new password for your Handoff account."}
-        </p>
+        <h1>A fresh start.</h1>
+        <p>Choose a new password for your Handoff account.</p>
       </header>
       {error && <ErrorBox message={error} />}
-      <form className="auth-form" noValidate onSubmit={submit}>
-        {forgot ? (
-          <Field label="Student email" error={fieldErrors.email}>
+      <form className="auth-form" noValidate onSubmit={submitReset}>
+        <Field label="New password" error={fieldErrors.password}>
+          <div className="password-input">
             <input
-              type="email"
-              name="email"
-              autoComplete="email"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
               required
-              value={email}
+              minLength={10}
+              maxLength={128}
+              value={password}
               onChange={(e) => {
-                setEmail(e.target.value);
-                clearField("email");
+                setPassword(e.target.value);
+                clearField("password");
               }}
-              placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
             />
-          </Field>
-        ) : (
-          <Field label="New password" error={fieldErrors.password}>
-            <div className="password-input">
-              <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                required
-                minLength={10}
-                maxLength={128}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  clearField("password");
-                }}
-              />
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </Field>
-        )}
-        {!forgot && <PasswordMeter check={strength} />}
-        {forgot && !emailReady && (
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </Field>
+        <PasswordMeter check={strength} />
+        {!emailReady && (
           <p className="auth-hint">
             Email delivery is paused on this server, so the link may not arrive.
           </p>
         )}
-        {!forgot && !resetToken && (
+        {!resetToken && (
           <ErrorBox message="This reset link is incomplete. Request a new link from the forgot password page." />
         )}
         <Button
           type="submit"
           busy={busy}
           className="auth-cta"
-          disabled={!forgot && (!resetToken || !strength.valid)}
+          disabled={!resetToken || !strength.valid}
         >
-          {forgot ? "Send reset link" : "Update password"}
+          Update password
           <ArrowRight size={17} />
         </Button>
       </form>

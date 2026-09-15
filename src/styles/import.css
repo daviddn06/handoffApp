@@ -1,0 +1,596 @@
+/* Smart import. The chooser at /listings/new, the paste and drop screen, the
+   chat helper, and the highlighting the editor uses for imported fields.
+   Self contained, including its own responsive rules. */
+:root {
+  /* Amber ring for a field the import could not fill. Local to this feature,
+     base.css keeps its own amber for pills. */
+  --amber-ring: #e6a23c;
+  --amber-ring-soft: rgb(230 162 60 / 0.16);
+}
+
+/* ── Chooser ─────────────────────────────────────────────────── */
+.start-page {
+  padding-block: 28px 40px;
+}
+.start-head {
+  max-width: 640px;
+  margin: 0 0 24px;
+}
+.start-head h1 {
+  font-family: "Plus Jakarta Sans", "Geist", system-ui, sans-serif;
+  font-size: 26px;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+.start-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+.start-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.start-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 210px;
+  padding: 18px;
+  text-align: left;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-sm), var(--ring);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--duration-quick) var(--ease-smooth-out),
+    box-shadow var(--duration-quick) var(--ease-out),
+    background var(--duration-quick) var(--ease-out);
+}
+.start-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), var(--ring);
+}
+.start-card:active {
+  transform: scale(0.98);
+}
+.start-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.start-card .start-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-md);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.start-card.plain .start-icon {
+  background: var(--soft-2);
+  color: var(--ink-2);
+}
+.start-card h2 {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 600;
+}
+.start-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.start-card .start-go {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--blue);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.start-card .start-go svg {
+  transition: transform var(--learn-in) var(--learn-ease);
+}
+.start-card:hover .start-go svg {
+  transform: translateX(var(--learn-shift));
+}
+.start-card[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.85;
+}
+.start-card[aria-disabled="true"]:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm), var(--ring);
+}
+.start-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.start-foot {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── Import screen ───────────────────────────────────────────── */
+.import-page {
+  padding-block: 28px 40px;
+}
+.import-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm), var(--ring);
+}
+.import-card textarea {
+  min-height: 190px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 132px;
+  padding: 18px;
+  text-align: center;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-quick) var(--ease-out),
+    background var(--duration-quick) var(--ease-out);
+}
+.import-drop:hover,
+.import-drop.is-over {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+.import-drop:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.import-drop strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.import-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.import-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--soft-2);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+.import-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.import-thumb .thumb-doc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 8px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  text-align: center;
+  word-break: break-all;
+}
+.import-thumb button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgb(27 35 48 / 0.72);
+  color: #fff;
+  cursor: pointer;
+  transition: background var(--duration-quick) var(--ease-out);
+}
+.import-thumb button::after {
+  /* Keeps the visible 26px control inside a 40px touch target. */
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+.import-thumb button:hover {
+  background: rgb(27 35 48 / 0.9);
+}
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.import-actions .import-note {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ── Thinking states, transitions.dev 28 ─────────────────────── */
+.t-think {
+  position: relative;
+  display: inline-block;
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.t-think-sizer {
+  display: block;
+  visibility: hidden;
+  white-space: nowrap;
+}
+.t-think-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: block;
+  color: var(--muted);
+  white-space: nowrap;
+  transform: translateY(0);
+  filter: blur(0);
+  opacity: 1;
+  transition:
+    transform var(--think-swap) var(--think-ease),
+    filter var(--think-swap) var(--think-ease),
+    opacity var(--think-swap) var(--think-ease);
+  will-change: transform, filter, opacity;
+}
+.t-think-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    var(--ink) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: t-think-shimmer var(--think-shimmer) var(--ease-linear) infinite;
+}
+@keyframes t-think-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+.t-think-text.is-exit {
+  transform: translateY(calc(var(--think-distance) * -1));
+  filter: blur(var(--think-blur));
+  opacity: 0;
+}
+.t-think-text.is-enter-start {
+  transition: none;
+  transform: translateY(var(--think-distance));
+  filter: blur(var(--think-blur));
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-think-text {
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .t-think-text::before {
+    display: none !important;
+  }
+}
+
+/* ── Streaming text, transitions.dev 30 ──────────────────────── */
+.t-stream-w {
+  opacity: 0;
+  filter: blur(var(--stream-blur));
+  transition:
+    opacity var(--stream-fade) var(--stream-ease),
+    filter var(--stream-fade) var(--stream-ease);
+}
+.t-stream-w.is-in {
+  opacity: 1;
+  filter: blur(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-stream-w {
+    transition: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ── Chat helper ─────────────────────────────────────────────── */
+.chat-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+  padding-block: 28px 40px;
+}
+.chat-column {
+  display: flex;
+  flex-direction: column;
+  min-height: min(620px, calc(100dvh - var(--header-h) - 120px));
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm), var(--ring);
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.chat-head h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+}
+.chat-head .chat-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.chat-log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  overflow-y: auto;
+}
+.chat-bubble {
+  max-width: 82%;
+  padding: 11px 14px;
+  border-radius: var(--r-lg);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.chat-bubble.assistant {
+  align-self: flex-start;
+  background: var(--soft);
+  color: var(--ink);
+  border-bottom-left-radius: var(--r-xs);
+}
+.chat-bubble.user {
+  align-self: flex-end;
+  background: var(--blue);
+  color: #fff;
+  border-bottom-right-radius: var(--r-xs);
+}
+.chat-thinking {
+  align-self: flex-start;
+  padding: 4px 2px;
+}
+.chat-composer {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.chat-composer input {
+  flex: 1;
+  min-width: 0;
+}
+.chat-open {
+  padding: 0 18px 14px;
+}
+.chat-side {
+  position: sticky;
+  top: calc(var(--header-h) + 20px);
+  padding: 16px 18px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm), var(--ring);
+}
+.chat-side h2 {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+}
+.draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.draft-list li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-size: 13px;
+}
+.draft-list li .draft-mark {
+  display: grid;
+  place-items: center;
+  height: 18px;
+  color: var(--muted-2);
+}
+.draft-list li.is-filled .draft-mark {
+  color: var(--green);
+}
+.draft-list li small {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.draft-list li strong {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.draft-list li.is-missing strong {
+  color: var(--muted-2);
+  font-weight: 400;
+}
+
+/* ── Editor integration ──────────────────────────────────────── */
+.import-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 11px 12px;
+  border-radius: var(--r-md);
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.import-banner svg {
+  flex: none;
+  margin-top: 1px;
+}
+.import-banner p {
+  margin: 0;
+  flex: 1;
+}
+.import-banner .icon-button {
+  flex: none;
+  color: inherit;
+}
+.field.is-missing > input,
+.field.is-missing > select,
+.field.is-missing > textarea,
+.field.is-missing .input-prefix > input,
+.field.is-missing .date-field-control {
+  box-shadow: 0 0 0 1px var(--amber-ring), 0 0 0 4px var(--amber-ring-soft);
+  border-color: var(--amber-ring);
+}
+.field-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--amber-ink);
+}
+.mobile-progress span.has-missing,
+.step-item .step-dot .missing-dot {
+  position: relative;
+}
+.step-item .step-dot .missing-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--amber-ring);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.mobile-progress span.has-missing::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: var(--r-pill);
+  background: var(--amber-ring);
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 1000px) {
+  .chat-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chat-side {
+    position: static;
+  }
+}
+@media (max-width: 860px) {
+  .start-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .start-card {
+    min-height: 0;
+  }
+}
+@media (max-width: 760px) {
+  .start-page,
+  .import-page,
+  .chat-page {
+    padding-block: 20px 32px;
+  }
+  .start-head h1 {
+    font-size: 22px;
+  }
+  .import-card {
+    padding: 16px;
+    border-radius: var(--r-md);
+  }
+  .import-card textarea {
+    min-height: 150px;
+  }
+  .import-actions .button {
+    width: 100%;
+  }
+  .chat-column {
+    min-height: calc(100dvh - var(--header-h) - var(--mobile-nav-h) - 60px);
+    border-radius: var(--r-md);
+  }
+  .chat-bubble {
+    max-width: 90%;
+  }
+  .chat-side {
+    border-radius: var(--r-md);
+  }
+}

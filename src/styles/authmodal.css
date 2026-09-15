@@ -1,0 +1,192 @@
+/* The overlay auth dialog. A signed out student who taps Saved, Requests,
+   List your place or a save heart confirms who they are right here, over the
+   page they were on, with browse still readable (blurred) behind the sheet.
+   Self contained, phone rules included. */
+.auth-modal {
+  border: 0;
+  margin: auto;
+  padding: 24px;
+  width: calc(100% - 32px);
+  max-width: 440px;
+  max-height: calc(100dvh - 48px);
+  /* The box never scrolls, its body does, so the close button stays put. */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg), var(--ring);
+  transform-origin: center;
+  transform: scale(var(--modal-scale));
+  opacity: 0;
+  transition:
+    transform var(--modal-open-dur) var(--modal-ease),
+    opacity var(--modal-open-dur) var(--modal-ease),
+    overlay var(--modal-open-dur) allow-discrete,
+    display var(--modal-open-dur) allow-discrete;
+}
+.auth-modal[open] {
+  transform: scale(1);
+  opacity: 1;
+}
+@starting-style {
+  .auth-modal[open] {
+    transform: scale(var(--modal-scale));
+    opacity: 0;
+  }
+}
+/* Everything behind stays visible, just out of focus. */
+.auth-modal::backdrop {
+  background: rgb(16 24 40 / 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    background-color var(--modal-open-dur) var(--modal-ease),
+    backdrop-filter var(--modal-open-dur) var(--modal-ease),
+    overlay var(--modal-open-dur) allow-discrete,
+    display var(--modal-open-dur) allow-discrete;
+}
+@starting-style {
+  .auth-modal[open]::backdrop {
+    background: rgb(16 24 40 / 0);
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+  }
+}
+.auth-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  color: var(--muted);
+}
+.auth-modal-body {
+  /* The parked step pages sit 8px off to the side, never show that. */
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* The shared auth forms, tightened for the smaller box */
+.auth-modal .auth-block.is-compact {
+  gap: 18px;
+}
+.auth-modal .auth-head h1 {
+  font-size: 22px;
+  padding-right: 32px;
+}
+.auth-modal .auth-form {
+  gap: 16px;
+}
+.auth-modal .field {
+  gap: 8px;
+}
+.auth-modal .field-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.auth-modal input,
+.auth-modal select {
+  font-size: 15px;
+  min-height: 46px;
+}
+.auth-modal .field-hint {
+  font-size: 12.5px;
+  color: var(--muted-2);
+}
+.auth-modal .auth-cta {
+  min-height: 46px;
+  width: 100%;
+  margin-top: 2px;
+  font-size: 15px;
+}
+.auth-modal .auth-switch {
+  text-align: center;
+  margin-top: 2px;
+}
+.auth-modal .auth-switch .text-button,
+.auth-modal .forgot-link.text-button {
+  font-weight: 500;
+  color: var(--blue);
+  min-height: 0;
+  text-decoration: none;
+}
+.auth-modal .auth-switch .text-button:hover,
+.auth-modal .forgot-link.text-button:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth-modal .forgot-link.text-button {
+  align-self: flex-end;
+  margin-top: -6px;
+  font-size: 12.5px;
+}
+.auth-modal .auth-fineprint {
+  max-width: none;
+}
+
+/* Phones get the same bottom sheet as every other modal */
+@media (max-width: 760px) {
+  .auth-modal {
+    width: 100%;
+    max-width: none;
+    margin: auto auto 0;
+    padding: 0 var(--gutter) calc(20px + env(safe-area-inset-bottom));
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    max-height: 92dvh;
+    opacity: 1;
+    transform: translateY(100%);
+    transition:
+      transform var(--modal-open-dur) var(--modal-ease),
+      overlay var(--modal-open-dur) allow-discrete,
+      display var(--modal-open-dur) allow-discrete;
+  }
+  .auth-modal[open] {
+    transform: translateY(0);
+  }
+  @starting-style {
+    .auth-modal[open] {
+      transform: translateY(100%);
+      opacity: 1;
+    }
+  }
+  .auth-modal .sheet-grip {
+    display: grid;
+  }
+  .auth-modal-close {
+    top: 24px;
+    right: 10px;
+  }
+  .auth-modal-body {
+    padding-top: 6px;
+  }
+  .auth-modal .auth-head h1 {
+    font-size: 21px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-modal,
+  .auth-modal::backdrop {
+    transition: none !important;
+  }
+}
+
+/* The browse sign in strip is a button now (it opens the modal), so it needs
+   the plain button reset the anchor got for free. */
+.signin-banner {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--blue-soft-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}

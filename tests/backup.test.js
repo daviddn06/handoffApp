@@ -43,7 +43,7 @@ test("current schema backup restores original lease data and its matched photo a
   assert.equal(result.status, 0, result.stderr);
   const completed = JSON.parse(result.stdout);
   const manifest = JSON.parse(readFileSync(completed.manifest, "utf8"));
-  assert.equal(manifest.schemaVersion, 7);
+  assert.equal(manifest.schemaVersion, 10);
   assert.equal(manifest.uploads.count, 1);
   for (const item of [manifest.database, manifest.uploads])
     assert.equal(createHash("sha256").update(readFileSync(join(completed.directory, item.file))).digest("hex"), item.sha256);
@@ -59,7 +59,7 @@ test("current schema backup restores original lease data and its matched photo a
 
 test("backup still rejects an unknown future database schema", (t) => {
   const f = fixture(t);
-  f.db.pragma("user_version = 9");
+  f.db.pragma("user_version = 11");
   f.db.close();
   const result = backup(f);
   assert.equal(result.status, 1);

@@ -7,7 +7,12 @@ import {
   type DragEvent,
   type FormEvent,
 } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,7 +38,14 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { AMENITIES, ROOM_LABELS, type Listing, type User } from "../types";
+import {
+  AMENITIES,
+  GENDER_PREFERENCE_LABELS,
+  ROOM_LABELS,
+  type Listing,
+  type User,
+} from "../types";
+import { PreferenceChoice } from "../components/Gender";
 import {
   api,
   dateLabel,
@@ -47,6 +59,7 @@ import { useApp } from "../lib/context";
 import { Button, ErrorBox, Field, Loading } from "../components/ui";
 import { SchoolNotLive } from "../components/SchoolNotLive";
 import { DateField } from "../components/DateField";
+import { FIELD_STEP, takeImport } from "../lib/import";
 const Map = lazy(() => import("../components/Map"));
 type AddressMatch = { line: string; place: string; lat: number; lng: number };
 type Draft = {
@@ -61,6 +74,7 @@ type Draft = {
   bedrooms: string;
   bathrooms: string;
   roomType: Listing["roomType"];
+  genderPreference: Listing["genderPreference"];
   availableFrom: string;
   availableTo: string;
   amenities: string[];
@@ -138,6 +152,7 @@ export default function ListingEditor() {
       bedrooms: "1",
       bathrooms: "1",
       roomType: "private",
+      genderPreference: "any",
       availableFrom: "",
       availableTo: "",
       amenities: [],
@@ -159,6 +174,8 @@ export default function ListingEditor() {
     [agreed, setAgreed] = useState(false),
     [published, setPublished] = useState(false),
     [errors, setErrors] = useState<Errors>({}),
+    [imported, setImported] = useState<string[]>([]),
+    [bannerOpen, setBannerOpen] = useState(false),
     [formError, setFormError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null),
     bodyRef = useRef<HTMLDivElement>(null),
@@ -267,6 +284,7 @@ export default function ListingEditor() {
         bedrooms: String(l.bedrooms),
         bathrooms: String(l.bathrooms),
         roomType: l.roomType,
+        genderPreference: l.genderPreference,
         availableFrom: l.availableFrom,
         availableTo: l.availableTo,
         amenities: l.amenities,
@@ -278,6 +296,44 @@ export default function ListingEditor() {
       setDirty(false);
     }
   }, [data]);
+  // Smart import and the chat helper hand the draft over in sessionStorage.
+  // It is read once, on the way in, and the gaps are marked for the lister.
+  const [params] = useSearchParams();
+  useEffect(() => {
+    if (id || params.get("from") !== "import") return;
+    const stored = takeImport();
+    if (!stored) return;
+    const d = stored.draft;
+    const text = (value: unknown) => (value == null ? "" : String(value));
+    setDraft((current) => ({
+      ...current,
+      title: text(d.title) || current.title,
+      description: text(d.description) || current.description,
+      address: text(d.address) || current.address,
+      lat: typeof d.lat === "number" ? d.lat : current.lat,
+      lng: typeof d.lng === "number" ? d.lng : current.lng,
+      price: text(d.price),
+      deposit: text(d.deposit),
+      originalPrice: text(d.originalPrice),
+      bedrooms: d.bedrooms == null ? current.bedrooms : String(d.bedrooms),
+      bathrooms: d.bathrooms == null ? current.bathrooms : String(d.bathrooms),
+      roomType: d.roomType || current.roomType,
+      availableFrom: text(d.availableFrom),
+      availableTo: text(d.availableTo),
+      amenities: Array.isArray(d.amenities) ? d.amenities : current.amenities,
+    }));
+    if (typeof d.lat === "number" && typeof d.lng === "number") {
+      setPinPlaced(true);
+      placedRef.current = true;
+      setPinSource("auto");
+      lookedUp.current = text(d.address).trim();
+    }
+    setImported(stored.missing);
+    setBannerOpen(stored.missing.length > 0);
+    setDirty(true);
+    // Read once on the way in, so a refresh does not import it twice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -427,6 +483,9 @@ export default function ListingEditor() {
     try {
       const payload = {
         ...draft,
+        // Entire places are open to anyone. The server enforces this too.
+        genderPreference:
+          draft.roomType === "entire" ? "any" : draft.genderPreference,
         price: Number(draft.price) || 0,
         deposit: Number(draft.deposit) || 0,
         originalPrice: draft.originalPrice ? Number(draft.originalPrice) : null,
@@ -516,6 +575,25 @@ export default function ListingEditor() {
     );
   const live = data?.listing.status === "active";
   const current = STEPS[step];
+  /** A field the import left empty, cleared as soon as the lister fills it. */
+  const fieldFilled = (key: string) => {
+    if (key === "photos") return draft.photos.length > 0;
+    const value = (draft as unknown as Record<string, unknown>)[key];
+    if (Array.isArray(value)) return value.length > 0;
+    return String(value ?? "").trim() !== "";
+  };
+  const stillMissing = imported.filter((key) => !fieldFilled(key));
+  const miss = (key: string) => stillMissing.includes(key);
+  const flag = (key: string) => (miss(key) ? " is-missing" : "");
+  const addHint = (key: string) =>
+    miss(key) ? (
+      <span className="field-add">
+        <Sparkles size={12} aria-hidden="true" />
+        Add this
+      </span>
+    ) : null;
+  const stepHasMissing = (index: number) =>
+    stillMissing.some((key) => FIELD_STEP[key] === index);
   const savingsAmount =
     Number(draft.originalPrice) > Number(draft.price) && Number(draft.price) > 0
       ? Number(draft.originalPrice) - Number(draft.price)
@@ -571,6 +649,9 @@ export default function ListingEditor() {
                     ) : (
                       <Icon size={14} strokeWidth={2} aria-hidden="true" />
                     )}
+                    {stepHasMissing(i) && (
+                      <span className="missing-dot" aria-hidden="true" />
+                    )}
                   </span>
                   <span className="step-text">
                     <strong>
@@ -620,10 +701,29 @@ export default function ListingEditor() {
             {STEPS.map((s, i) => (
               <span
                 key={s.key}
-                className={`${i === step ? "is-current" : ""} ${i < step ? "is-done" : ""}`}
+                className={`${i === step ? "is-current" : ""} ${i < step ? "is-done" : ""} ${stepHasMissing(i) ? "has-missing" : ""}`}
               />
             ))}
           </div>
+          {bannerOpen && (
+            <div className="import-banner" role="status">
+              <Sparkles size={16} aria-hidden="true" />
+              <p>
+                Imported. Check the highlighted fields.{" "}
+                {stillMissing.length
+                  ? `${stillMissing.length} still to add.`
+                  : "Everything is filled in."}
+              </p>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Dismiss the import note"
+                onClick={() => setBannerOpen(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
           <div
             className="editor-body"
             data-dir={dir}
@@ -647,7 +747,7 @@ export default function ListingEditor() {
                         label="Listing title"
                         hint="Keep it specific. A feature, neighborhood, or building name works well."
                         error={errors.title}
-                        className={errors.title ? "is-error" : ""}
+                        className={`${errors.title ? "is-error" : ""}${flag("title")}`}
                       >
                         <input
                           required
@@ -657,6 +757,7 @@ export default function ListingEditor() {
                           onChange={(e) => update("title", e.target.value)}
                           placeholder="Sunny private room near campus"
                         />
+                        {addHint("title")}
                       </Field>
                       <fieldset className="room-type-field">
                         <legend>
@@ -695,6 +796,13 @@ export default function ListingEditor() {
                           ))}
                         </div>
                       </fieldset>
+                      <PreferenceChoice
+                        roomType={draft.roomType}
+                        value={draft.genderPreference}
+                        onChange={(value) =>
+                          update("genderPreference", value)
+                        }
+                      />
                       <div className="field-row">
                         <Field label="Bedrooms in the home">
                           <select
@@ -732,7 +840,7 @@ export default function ListingEditor() {
                         label="Street address or building"
                         hint="This is visible on your listing. Leave out your unit number."
                         error={errors.address}
-                        className={errors.address ? "is-error" : ""}
+                        className={`${errors.address ? "is-error" : ""}${flag("address")}`}
                       >
                         <input
                           required
@@ -755,6 +863,7 @@ export default function ListingEditor() {
                           }}
                           placeholder="123 West 30th Street, Los Angeles"
                         />
+                        {addHint("address")}
                       </Field>
                       {matches.length > 1 && (
                         <div
@@ -881,7 +990,7 @@ export default function ListingEditor() {
                     <div className="stack">
                       <div className="field-row">
                         <div
-                          className={`field ${errors.availableFrom ? "is-error" : ""}`}
+                          className={`field ${errors.availableFrom ? "is-error" : ""}${flag("availableFrom")}`}
                         >
                           <label
                             className="field-label"
@@ -903,9 +1012,10 @@ export default function ListingEditor() {
                               {errors.availableFrom}
                             </span>
                           )}
+                          {addHint("availableFrom")}
                         </div>
                         <div
-                          className={`field ${errors.availableTo ? "is-error" : ""}`}
+                          className={`field ${errors.availableTo ? "is-error" : ""}${flag("availableTo")}`}
                         >
                           <label
                             className="field-label"
@@ -928,13 +1038,14 @@ export default function ListingEditor() {
                               {errors.availableTo}
                             </span>
                           )}
+                          {addHint("availableTo")}
                         </div>
                       </div>
                       <div className="field-row">
                         <Field
                           label="Monthly rent"
                           error={errors.price}
-                          className={errors.price ? "is-error" : ""}
+                          className={`${errors.price ? "is-error" : ""}${flag("price")}`}
                         >
                           <div className="input-prefix">
                             <span>$</span>
@@ -949,12 +1060,13 @@ export default function ListingEditor() {
                               placeholder="1,200"
                             />
                           </div>
+                          {addHint("price")}
                         </Field>
                         <Field
                           label="Security deposit"
                           hint="Enter 0 if there is no deposit."
                           error={errors.deposit}
-                          className={errors.deposit ? "is-error" : ""}
+                          className={`${errors.deposit ? "is-error" : ""}${flag("deposit")}`}
                         >
                           <div className="input-prefix">
                             <span>$</span>
@@ -970,6 +1082,7 @@ export default function ListingEditor() {
                               }
                             />
                           </div>
+                          {addHint("deposit")}
                         </Field>
                       </div>
                       <div className="savings-field">
@@ -1055,7 +1168,7 @@ export default function ListingEditor() {
                         label="Tell them about the place"
                         hint="Mention roommates, utilities, lease requirements, and what makes the space work for a student."
                         error={errors.description}
-                        className={errors.description ? "is-error" : ""}
+                        className={`${errors.description ? "is-error" : ""}${flag("description")}`}
                       >
                         <textarea
                           required
@@ -1068,6 +1181,7 @@ export default function ListingEditor() {
                           }
                           placeholder="The room gets morning light and comes furnished. You would be living with…"
                         />
+                        {addHint("description")}
                       </Field>
                     </div>
                   )}
@@ -1110,6 +1224,7 @@ export default function ListingEditor() {
                           Choose photos
                         </span>
                       </button>
+                      {addHint("photos")}
                       {errors.photos && (
                         <span className="field-error">{errors.photos}</span>
                       )}
@@ -1276,6 +1391,18 @@ export default function ListingEditor() {
                             {savingsAmount > 0
                               ? `${money(savingsAmount)} a month`
                               : "Not shared"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Roommates</dt>
+                          <dd>
+                            {
+                              GENDER_PREFERENCE_LABELS[
+                                draft.roomType === "entire"
+                                  ? "any"
+                                  : draft.genderPreference
+                              ]
+                            }
                           </dd>
                         </div>
                         <div>

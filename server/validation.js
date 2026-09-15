@@ -38,6 +38,19 @@ export const password = z
   });
 export const email = z.string().trim().toLowerCase().email().max(254);
 export const campus = z.enum(CAMPUSES.map((item) => item.id));
+/** Optional, defaults to unspecified, and never required to use Handoff. */
+export const gender = z.enum(["woman", "man", "nonbinary", "unspecified"]);
+/**
+ * Roommate preference. Lawful only for shared living where the lister or their
+ * roommates live in the home, so the server forces "any" on an entire place.
+ */
+export const genderPreference = z.enum([
+  "any",
+  "women_only",
+  "women_preferred",
+  "men_only",
+  "men_preferred",
+]);
 export const token = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const date = z
   .string()
@@ -54,7 +67,12 @@ export const date = z
  * student can never claim a campus that is not theirs.
  */
 export const signupSchema = z
-  .object({ name: text(80).min(2), email, password: z.string().max(128) })
+  .object({
+    name: text(80).min(2),
+    email,
+    password: z.string().max(128),
+    gender: gender.default("unspecified"),
+  })
   .strict()
   .superRefine((data, ctx) => {
     const problem = passwordProblem(data.password, {
@@ -72,7 +90,11 @@ export const loginSchema = z
   .object({ email, password: z.string().min(1).max(128) })
   .strict();
 export const profileSchema = z
-  .object({ name: text(80).min(2), bio: text(600) })
+  .object({
+    name: text(80).min(2),
+    bio: text(600),
+    gender: gender.optional(),
+  })
   .strict();
 export const listingSchema = z
   .object({
@@ -87,6 +109,7 @@ export const listingSchema = z
     bedrooms: z.number().int().min(0).max(20).default(1),
     bathrooms: z.number().min(0).max(20).multipleOf(0.5).default(1),
     roomType: z.enum(["private", "shared", "entire"]).default("private"),
+    genderPreference: genderPreference.default("any"),
     availableFrom: z.union([date, z.literal("")]).default(""),
     availableTo: z.union([date, z.literal("")]).default(""),
     amenities: z
@@ -131,6 +154,7 @@ export const listingQuerySchema = z
     from: date.optional(),
     to: date.optional(),
     roomType: z.enum(["private", "shared", "entire"]).optional(),
+    gender: z.enum(["women", "men", "women_only", "men_only"]).optional(),
     bedrooms: z.coerce.number().int().min(0).max(20).optional(),
     amenities: text(1000).optional(),
     sort: z
@@ -183,6 +207,15 @@ export function today() {
   return new Date().toLocaleDateString("en-CA", {
     timeZone: "America/Los_Angeles",
   });
+}
+/**
+ * Fair housing. A roommate preference is lawful only for shared living where
+ * the lister or their roommates live in the home, so an entire place is always
+ * open to anyone whatever the client sent.
+ */
+export function enforceGenderPreference(data) {
+  if (data.roomType === "entire") data.genderPreference = "any";
+  return data;
 }
 export function validateListing(data) {
   if (

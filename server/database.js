@@ -14,7 +14,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 7) {
+  if (version > 10) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -41,7 +41,9 @@ export function openDatabase(dataDir) {
       CREATE TABLE users (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE COLLATE NOCASE,
         campus_id TEXT, school_domain TEXT, school_name TEXT, password_hash TEXT NOT NULL, verified_at TEXT,
-        bio TEXT NOT NULL DEFAULT '', terms_accepted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        bio TEXT NOT NULL DEFAULT '', terms_accepted_at TEXT,
+        gender TEXT NOT NULL DEFAULT 'unspecified',
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE TABLE sessions (
         token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -73,6 +75,7 @@ export function openDatabase(dataDir) {
         moderation_locked INTEGER NOT NULL DEFAULT 0,
         original_price INTEGER,
         boost_until TEXT,
+        gender_preference TEXT NOT NULL DEFAULT 'any',
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE INDEX listings_discovery ON listings(status, campus_id, available_to);
@@ -111,7 +114,7 @@ export function openDatabase(dataDir) {
         created_at TEXT NOT NULL, PRIMARY KEY(listing_id, viewer_key, hour)
       );
       CREATE INDEX listing_views_listing ON listing_views(listing_id, created_at);
-      PRAGMA user_version = 7;
+      PRAGMA user_version = 8;
     `);
     })();
   if (version === 1) {
@@ -251,6 +254,79 @@ export function openDatabase(dataDir) {
     } finally {
       db.pragma("foreign_keys = ON");
     }
+  }
+  if (db.pragma("user_version", { simple: true }) === 7) {
+    db.transaction(() => {
+      // Gender is optional for students and defaults to unspecified. A listing
+      // roommate preference defaults to any, and the server keeps it at any
+      // for an entire place, where fair housing rules leave no room for one.
+      const userColumns = db
+        .prepare("PRAGMA table_info(users)")
+        .all()
+        .map((column) => column.name);
+      if (!userColumns.includes("gender"))
+        db.exec(
+          "ALTER TABLE users ADD COLUMN gender TEXT NOT NULL DEFAULT 'unspecified'",
+        );
+      const listingColumns = db
+        .prepare("PRAGMA table_info(listings)")
+        .all()
+        .map((column) => column.name);
+      if (!listingColumns.includes("gender_preference"))
+        db.exec(
+          "ALTER TABLE listings ADD COLUMN gender_preference TEXT NOT NULL DEFAULT 'any'",
+        );
+      db.exec(
+        "UPDATE listings SET gender_preference='any' WHERE room_type='entire'",
+      );
+      db.pragma("user_version = 8");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 8) {
+    db.transaction(() => {
+      // Smart import records what each AI call cost, so the operator can see
+      // tokens per day. No prompt text and no listing content is stored.
+      db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id),
+        kind TEXT NOT NULL CHECK(kind IN ('parse','chat')),
+        input_tokens INTEGER NOT NULL DEFAULT 0, output_tokens INTEGER NOT NULL DEFAULT 0,
+        model TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL
+      )`);
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS ai_usage_created ON ai_usage(created_at)",
+      );
+      db.exec("CREATE INDEX IF NOT EXISTS ai_usage_user ON ai_usage(user_id, created_at)");
+      db.pragma("user_version = 9");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 9) {
+    db.transaction(() => {
+      // The internal dashboard. is_admin opens it, disabled_at closes an
+      // account without deleting anything, and admin_audit keeps a permanent
+      // record of every write an admin makes.
+      const userColumns = db
+        .prepare("PRAGMA table_info(users)")
+        .all()
+        .map((column) => column.name);
+      if (!userColumns.includes("is_admin"))
+        db.exec(
+          "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
+        );
+      if (!userColumns.includes("disabled_at"))
+        db.exec("ALTER TABLE users ADD COLUMN disabled_at TEXT");
+      db.exec(`CREATE TABLE IF NOT EXISTS admin_audit (
+        id TEXT PRIMARY KEY, admin_id TEXT NOT NULL REFERENCES users(id),
+        action TEXT NOT NULL, target_type TEXT NOT NULL, target_id TEXT NOT NULL,
+        details TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
+      )`);
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS admin_audit_created ON admin_audit(created_at)",
+      );
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS admin_audit_target ON admin_audit(target_id, created_at)",
+      );
+      db.pragma("user_version = 10");
+    })();
   }
   return db;
 }

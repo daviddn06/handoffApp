@@ -21,9 +21,34 @@ sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js re
 
 Review the report, archive the listing if needed, then mark the report resolved. Archiving retains the listing and its report history, removes it from discovery, and declines pending requests. Accepted contacts stay available to the involved students. An operator archive also sets a moderation lock that the owner cannot remove. After review, `unlock-listing LISTING_UUID` removes the lock while leaving the listing archived for its owner to republish.
 
+## Smart import
+
+`OPENAI_API_KEY` in `/etc/handoff/app.env` turns Smart import and the listing chat helper on. `OPENAI_MODEL` is optional and defaults to `gpt-5.6-luna`. Without a key `GET /api/config` reports `aiReady:false`, the two import routes answer 503 with code `ai_unavailable`, and the six step form is unaffected. The key is only ever read on the server. Both routes need a verified student on a live campus and are rate limited per account, 20 imports and 120 chat turns per hour. Uploaded screenshots are resized and re-encoded before they leave the VPS, and no prompt text, screenshot or listing content is stored.
+
+`HANDOFF_AI_MOCK=1` is a development only switch that returns a canned import and canned chat turns without a key. It refuses to start when `NODE_ENV=production`. Never set it on the VPS.
+
+Every call writes one row to `ai_usage` with the token counts and the model, and nothing else.
+
+```bash
+sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js ai-usage 30
+```
+
+## Internal dashboard
+
+The dashboard at `/admin` replaces most of the operator commands above for day to day work. It is invisible without the admin flag: `/api/admin/*` answers 404 for everyone else, and the UI shows the normal 404 page. Grant it on the VPS to an account that already exists.
+
+```bash
+runuser -u handoff -- env HANDOFF_SEED_CONFIRM=production HANDOFF_DATA_DIR=/var/lib/handoff node scripts/make-admin.js david@usc.edu
+runuser -u handoff -- env HANDOFF_SEED_CONFIRM=production HANDOFF_DATA_DIR=/var/lib/handoff node scripts/make-admin.js david@usc.edu --revoke
+```
+
+The script refuses production data directories unless `HANDOFF_SEED_CONFIRM=production` is set on purpose, the same guard `scripts/seed-demo.js` uses. Locally it is just `HANDOFF_DATA_DIR=./data node scripts/make-admin.js demo.owner@usc.edu`.
+
+Every admin write lands in `admin_audit` and is visible on the dashboard's Audit page. Disabling an account sets `users.disabled_at`, ends every session for it, and refuses both login and every authenticated route with 403. Nothing is deleted. The System page reads the release marker, the schema version, host memory and load, `df -k` on the data directory, the backups directory, and `journalctl -u handoff -n 50 --no-pager` when the service user can read it. The dashboard shows private student details, so treat an open browser tab the same as an operator shell.
+
 ## Backup and recovery
 
-Use SQLite's backup API rather than copying the main database file while it is live. Run before deploying any schema migration. Copy uploads into the same dated backup set. New schema versions must add an explicit migration with backup and rollback instructions; startup creates schema version 2 for fresh databases. Version 1 upgrades to version 2 only after a consistent SQLite backup is written under `HANDOFF_DATA_DIR/backups/`. Unknown newer schemas and unversioned populated databases are refused.
+Use SQLite's backup API rather than copying the main database file while it is live. Run before deploying any schema migration. Copy uploads into the same dated backup set. New schema versions must add an explicit migration with backup and rollback instructions; startup creates the current schema for fresh databases and migrates older ones in order, most recently schema 9 which adds the `ai_usage` table. Version 1 upgrades to version 2 only after a consistent SQLite backup is written under `HANDOFF_DATA_DIR/backups/`. Unknown newer schemas and unversioned populated databases are refused.
 
 ```bash
 sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js backup /var/lib/handoff-backups/2026-09-14/handoff.sqlite

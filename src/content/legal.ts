@@ -36,6 +36,14 @@ export const TERMS: LegalSection[] = [
     ],
   },
   {
+    title: "Roommate preferences",
+    body: [
+      "A listing for a private or shared room may state a roommate preference, such as women preferred or women only. Fair housing law allows this only for shared living, where the lister or their roommates live in the home and share its spaces. Handoff limits the choice to those listings for that reason.",
+      "A listing for an entire place is always open to anyone. You may not advertise or apply a gender preference, or any other protected characteristic, when you are handing over a whole home, and Handoff removes listings that try to.",
+      "Your own gender is optional, it defaults to prefer not to say, and it is never shown publicly. A preference is a preference, not a filter that blocks anyone. Any student can still send a request, and the lister decides.",
+    ],
+  },
+  {
     title: "No guarantees",
     body: [
       "Handoff is provided as is and as available. We do not promise that a listing is real, that a student is who they say they are, that a place is habitable, safe, or as described, that a sublease is permitted under the original lease, or that any handoff will complete.",

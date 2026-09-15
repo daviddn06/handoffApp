@@ -45,8 +45,16 @@ const filterKeys = [
   "from",
   "to",
   "roomType",
+  "gender",
   "bedrooms",
   "amenities",
+] as const;
+const GENDER_FILTERS = [
+  ["", "Any"],
+  ["women", "Open to women"],
+  ["men", "Open to men"],
+  ["women_only", "Women only"],
+  ["men_only", "Men only"],
 ] as const;
 const PRICE_PRESETS = [
   { label: "Under $1,000", min: "", max: "1000" },
@@ -90,7 +98,7 @@ function readPanelWidth() {
 }
 
 export default function Browse() {
-  const { campuses, user } = useApp(),
+  const { campuses, user, openAuth, auth } = useApp(),
     navigate = useNavigate(),
     [params, setParams] = useSearchParams();
   const remembered = readCampus();
@@ -117,6 +125,13 @@ export default function Browse() {
     }
     return true;
   });
+  // The auth modal takes over the screen, so the campus picker steps aside.
+  useEffect(() => {
+    if (auth.open) {
+      setPickCampus(false);
+      setSwitchCampus(false);
+    }
+  }, [auth.open]);
   const chooseCampus = (id: string) => {
     rememberCampus(id);
     try {
@@ -336,6 +351,7 @@ export default function Browse() {
     to = params.get("to") || "",
     roomType = params.get("roomType") || "",
     bedrooms = params.get("bedrooms") || "",
+    genderFilter = params.get("gender") || "",
     amenities = (params.get("amenities") || "").split(",").filter(Boolean);
   const priceLabel =
     minPrice && maxPrice
@@ -353,12 +369,15 @@ export default function Browse() {
         : to
           ? `Until ${shortDate(to)}`
           : "Dates";
-  const roomsLabel = [
+  // Bedrooms, type of place and roommate preference share one chip, so the
+  // chip names the first one set and counts the rest.
+  const roomsParts = [
     bedrooms ? (bedrooms === "0" ? "Studio+" : `${bedrooms}+ bd`) : "",
     roomType ? ROOM_LABELS[roomType as keyof typeof ROOM_LABELS] : "",
-  ]
-    .filter(Boolean)
-    .join(", ");
+    GENDER_FILTERS.find(([value]) => value && value === genderFilter)?.[1] ||
+      "",
+  ].filter(Boolean);
+  const roomsLabel = roomsParts[0] || "";
   const amenityLabel =
     amenities.length === 0
       ? "Amenities"
@@ -591,11 +610,16 @@ export default function Browse() {
               trigger={(props) => (
                 <button
                   type="button"
-                  className={`chip ${bedrooms || roomType ? "is-active" : ""}`}
+                  className={`chip ${
+                    bedrooms || roomType || genderFilter ? "is-active" : ""
+                  }`}
                   {...props}
                 >
                   <BedDouble size={14} />
                   {roomsLabel || "Rooms"}
+                  {roomsParts.length > 1 && (
+                    <span className="count-pill">{roomsParts.length}</span>
+                  )}
                   <ChevronDown size={14} className="chip-chevron" />
                 </button>
               )}
@@ -639,11 +663,27 @@ export default function Browse() {
                     ),
                   )}
                 </div>
+                <div className="popover-title">Roommate preference</div>
+                <div className="segment-grid preference-grid">
+                  {GENDER_FILTERS.map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`segment ${genderFilter === value ? "is-on" : ""}`}
+                      aria-pressed={genderFilter === value}
+                      onClick={() => setParam("gender", value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <div className="popover-footer">
                   <button
                     type="button"
                     className="text-button"
-                    onClick={() => setMany({ bedrooms: "", roomType: "" })}
+                    onClick={() =>
+                      setMany({ bedrooms: "", roomType: "", gender: "" })
+                    }
                   >
                     Clear
                   </button>
@@ -723,13 +763,17 @@ export default function Browse() {
         </div>
         <div className="panel-scroll" ref={scrollRef}>
           {!user && (
-            <Link to="/sign-in" className="signin-banner">
+            <button
+              type="button"
+              className="signin-banner"
+              onClick={() => openAuth()}
+            >
               <LogIn size={14} />
               <span>
                 <strong>Sign in with your .edu</strong> to save places and
                 request handoffs.
               </span>
-            </Link>
+            </button>
           )}
           <div className="results-toolbar">
             <span className="results-count">

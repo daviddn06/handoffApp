@@ -13,8 +13,17 @@ import {
   liveCampusForEmail,
   schoolForEmail,
 } from "./schools.js";
+import { adminRouter, disabledError } from "./admin.js";
 import { openDatabase } from "./database.js";
 import { geocode } from "./geocode.js";
+import {
+  AiInputError,
+  AiUnavailableError,
+  chatListing,
+  importChatSchema,
+  mockEnabled,
+  parseListing,
+} from "./ai.js";
 import {
   hashToken,
   randomToken,
@@ -36,6 +45,7 @@ import {
   createListingSchema,
   patchListingSchema,
   listingQuerySchema,
+  enforceGenderPreference,
   listingSchema,
   requestSchema,
   boostSchema,
@@ -144,7 +154,29 @@ export function createApp({
   secureCookies,
   mailFrom = process.env.MAIL_FROM || "Handoff <hello@handofflease.com>",
   staticDir = resolve(dirname(fileURLToPath(import.meta.url)), "../dist"),
+  // Smart import's model client. Undefined means read the environment, null
+  // means there is no model, and a fake is injected by the tests.
+  aiClient: injectedAiClient,
 } = {}) {
+  const aiReady = () =>
+    injectedAiClient !== undefined
+      ? Boolean(injectedAiClient)
+      : Boolean(process.env.OPENAI_API_KEY) || mockEnabled();
+  let aiClientPromise;
+  const aiClient = () => {
+    if (injectedAiClient !== undefined) return Promise.resolve(injectedAiClient);
+    if (!process.env.OPENAI_API_KEY) return Promise.resolve(null);
+    // Imported on first use so a deployment without a key never loads the SDK.
+    aiClientPromise ||= import("openai").then(
+      ({ OpenAI }) =>
+        new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+          timeout: 90_000,
+          maxRetries: 1,
+        }),
+    );
+    return aiClientPromise;
+  };
   const parsedOrigin = new URL(origin);
   if (
     !["https:", "http:"].includes(parsedOrigin.protocol) ||
@@ -246,15 +278,17 @@ export function createApp({
   // Any signed in student, verified or not. Browsing, saving, drafts, profile.
   const requireUser = (req, res, next) =>
     req.user
-      ? next()
+      ? next(disabledError(req.user))
       : next(new HttpError(401, "Sign in with your student account to continue."));
   // Verified students only. Publishing, requesting a handoff, reporting.
   const requireVerified = (req, res, next) =>
     !req.user
       ? next(new HttpError(401, "Sign in with your student account to continue."))
-      : req.user.verified_at
-        ? next()
-        : next(
+      : disabledError(req.user)
+        ? next(disabledError(req.user))
+        : req.user.verified_at
+          ? next()
+          : next(
             new HttpError(
               403,
               "Verify your student email to do this. Check your inbox for the link, or resend it from your profile.",
@@ -291,6 +325,8 @@ export function createApp({
     verified: Boolean(user.verified_at),
     termsAccepted: Boolean(user.terms_accepted_at),
     bio: user.bio,
+    gender: user.gender || "unspecified",
+    isAdmin: Boolean(user.is_admin),
   });
   /**
    * Listing is the one thing a live campus unlocks. Browsing, saving and
@@ -526,7 +562,7 @@ ${button}
     },
   );
   app.get("/api/config", (req, res) =>
-    res.json({ emailReady, campuses: CAMPUSES }),
+    res.json({ emailReady, aiReady: aiReady(), campuses: CAMPUSES }),
   );
   app.get("/api/session", (req, res) =>
     res.json({ user: req.user ? serializeUser(req.user) : null }),
@@ -556,13 +592,14 @@ ${button}
         if (existing) {
           // A legitimate signup must never activate a password chosen by a prior unverified registrant.
           db.prepare(
-            "UPDATE users SET name=?,campus_id=?,school_domain=?,school_name=?,password_hash=?,updated_at=? WHERE id=? AND verified_at IS NULL",
+            "UPDATE users SET name=?,campus_id=?,school_domain=?,school_name=?,password_hash=?,gender=?,updated_at=? WHERE id=? AND verified_at IS NULL",
           ).run(
             input.name,
             campusId,
             school.domain,
             school.name,
             passwordHash,
+            input.gender,
             timestamp,
             existing.id,
           );
@@ -571,7 +608,7 @@ ${button}
         } else {
           const id = randomUUID();
           db.prepare(
-            "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO users(id,name,email,campus_id,school_domain,school_name,password_hash,gender,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
           ).run(
             id,
             input.name,
@@ -580,6 +617,7 @@ ${button}
             school.domain,
             school.name,
             passwordHash,
+            input.gender,
             timestamp,
             timestamp,
           );
@@ -619,6 +657,7 @@ ${button}
         currentUser.password_hash !== user.password_hash
       )
         throw new HttpError(401, "Email or password is incorrect.");
+      if (currentUser.disabled_at) throw disabledError(currentUser);
       if (req.sessionHash)
         db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
           req.sessionHash,
@@ -742,9 +781,12 @@ ${button}
     limit("profile", 30, HOUR, (req) => req.user.id),
     (req, res) => {
       const input = parse(profileSchema, req.body);
-      db.prepare("UPDATE users SET name=?,bio=?,updated_at=? WHERE id=?").run(
+      db.prepare(
+        "UPDATE users SET name=?,bio=?,gender=?,updated_at=? WHERE id=?",
+      ).run(
         input.name,
         input.bio,
+        input.gender ?? req.user.gender ?? "unspecified",
         iso(),
         req.user.id,
       );
@@ -772,6 +814,7 @@ ${button}
     bedrooms: row.bedrooms,
     bathrooms: row.bathrooms,
     roomType: row.room_type,
+    genderPreference: row.gender_preference || "any",
     availableFrom: row.available_from,
     availableTo: row.available_to,
     amenities: JSON.parse(row.amenities),
@@ -857,6 +900,20 @@ ${button}
       clauses.push("l.room_type=?");
       parameters.push(query.roomType);
     }
+    // "Open to women" keeps listings with no preference, women only and women
+    // preferred. The only-* values narrow to exactly that preference.
+    if (query.gender) {
+      const allowed = {
+        women: ["any", "women_only", "women_preferred"],
+        men: ["any", "men_only", "men_preferred"],
+        women_only: ["women_only"],
+        men_only: ["men_only"],
+      }[query.gender];
+      clauses.push(
+        `l.gender_preference IN (${allowed.map(() => "?").join(",")})`,
+      );
+      parameters.push(...allowed);
+    }
     if (query.bedrooms !== undefined) {
       clauses.push("l.bedrooms>=?");
       parameters.push(query.bedrooms);
@@ -919,7 +976,7 @@ ${button}
     requireUser,
     limit("listing-create", 20, HOUR, (req) => req.user.id),
     (req, res) => {
-      const input = parse(createListingSchema, req.body);
+      const input = enforceGenderPreference(parse(createListingSchema, req.body));
       const campusId = requirePostingCampus(req);
       if (input.status === "active" && !req.user.verified_at)
         throw new HttpError(
@@ -936,7 +993,7 @@ ${button}
       const id = randomUUID();
       const timestamp = iso();
       db.prepare(
-        `INSERT INTO listings(id,owner_id,campus_id,title,description,address,lat,lng,price,deposit,original_price,bedrooms,bathrooms,room_type,available_from,available_to,amenities,photos,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO listings(id,owner_id,campus_id,title,description,address,lat,lng,price,deposit,original_price,bedrooms,bathrooms,room_type,gender_preference,available_from,available_to,amenities,photos,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       ).run(
         id,
         req.user.id,
@@ -952,6 +1009,7 @@ ${button}
         input.bedrooms,
         input.bathrooms,
         input.roomType,
+        input.genderPreference,
         input.availableFrom,
         input.availableTo,
         JSON.stringify(input.amenities),
@@ -988,6 +1046,7 @@ ${button}
         bedrooms: old.bedrooms,
         bathrooms: old.bathrooms,
         roomType: old.roomType,
+        genderPreference: old.genderPreference,
         availableFrom: old.availableFrom,
         availableTo: old.availableTo,
         amenities: old.amenities,
@@ -995,6 +1054,7 @@ ${button}
         status: old.status,
         ...patch,
       });
+      enforceGenderPreference(input);
       if (input.status === "active" && row.status !== "active")
         requirePostingCampus(req);
       if (
@@ -1024,7 +1084,7 @@ ${button}
       validatePhotos(input.photos, req.user.id);
       db.transaction(() => {
         db.prepare(
-          `UPDATE listings SET title=?,description=?,address=?,lat=?,lng=?,price=?,deposit=?,original_price=?,bedrooms=?,bathrooms=?,room_type=?,available_from=?,available_to=?,amenities=?,photos=?,status=?,updated_at=? WHERE id=? AND owner_id=?`,
+          `UPDATE listings SET title=?,description=?,address=?,lat=?,lng=?,price=?,deposit=?,original_price=?,bedrooms=?,bathrooms=?,room_type=?,gender_preference=?,available_from=?,available_to=?,amenities=?,photos=?,status=?,updated_at=? WHERE id=? AND owner_id=?`,
         ).run(
           input.title,
           input.description,
@@ -1037,6 +1097,7 @@ ${button}
           input.bedrooms,
           input.bathrooms,
           input.roomType,
+          input.genderPreference,
           input.availableFrom,
           input.availableTo,
           JSON.stringify(input.amenities),
@@ -1288,6 +1349,109 @@ ${button}
       }
     },
   );
+  // Smart import. The model reads a pasted post, screenshots or a PDF and
+  // fills the wizard for the lister. Nothing here publishes anything: the
+  // answer is a draft the student reviews step by step, and the usual listing
+  // validation still runs when they save.
+  const importUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { files: 5, fileSize: 8 * 1024 * 1024, fields: 4, parts: 9 },
+  });
+  // Listing is the thing a live campus unlocks, and a missing key is a normal
+  // state, so both are answered before any file is buffered.
+  const requireAi = async (req, res, next) => {
+    try {
+      requirePostingCampus(req);
+      req.aiClient = await aiClient();
+      if (!req.aiClient && !mockEnabled())
+        return res
+          .status(503)
+          .json({
+            error: "Smart import is being set up.",
+            code: "ai_unavailable",
+          });
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+  const aiRoute = (handler) => async (req, res, next) => {
+    try {
+      const campus = CAMPUSES.find((c) => c.id === req.user.campus_id);
+      await handler(req, res, { client: req.aiClient, campus });
+    } catch (error) {
+      if (error instanceof AiInputError)
+        return next(new HttpError(400, error.message));
+      if (error instanceof AiUnavailableError)
+        return next(
+          new HttpError(
+            502,
+            "Smart import could not read that. Try again, or fill the form in yourself.",
+          ),
+        );
+      next(error);
+    }
+  };
+  const recordUsage = (userId, kind, usage) => {
+    try {
+      db.prepare(
+        "INSERT INTO ai_usage(id,user_id,kind,input_tokens,output_tokens,model,created_at) VALUES(?,?,?,?,?,?,?)",
+      ).run(
+        randomUUID(),
+        userId,
+        kind,
+        Number(usage?.inputTokens || 0),
+        Number(usage?.outputTokens || 0),
+        String(usage?.model || ""),
+        iso(),
+      );
+    } catch {
+      // Accounting must never fail the student's import.
+    }
+  };
+  app.post(
+    "/api/import/parse",
+    requireVerified,
+    limit("import-user", 20, HOUR, (req) => req.user.id),
+    requireAi,
+    importUpload.array("files", 5),
+    aiRoute(async (req, res, { client, campus }) => {
+      const result = await parseListing({
+        text: String(req.body?.text || ""),
+        files: req.files || [],
+        campus,
+        client,
+      });
+      recordUsage(req.user.id, "parse", result.usage);
+      res.json({
+        draft: result.draft,
+        missing: result.missing,
+        notes: result.notes,
+      });
+    }),
+  );
+  app.post(
+    "/api/import/chat",
+    requireVerified,
+    limit("import-chat-user", 120, HOUR, (req) => req.user.id),
+    requireAi,
+    aiRoute(async (req, res, { client, campus }) => {
+      const input = parse(importChatSchema, req.body ?? {});
+      const result = await chatListing({
+        messages: input.messages,
+        draft: input.draft,
+        campus,
+        client,
+      });
+      recordUsage(req.user.id, "chat", result.usage);
+      res.json({
+        reply: result.reply,
+        draft: result.draft,
+        missing: result.missing,
+        done: result.done,
+      });
+    }),
+  );
   app.get("/uploads/:filename", (req, res) => {
     if (!/^[a-f0-9-]{36}\.webp$/.test(req.params.filename))
       throw new HttpError(404, "Photo not found.");
@@ -1346,7 +1510,7 @@ ${button}
   });
 
   // This query intentionally excludes email. Contacts are fetched only after authorization and acceptance.
-  const requestSelect = `SELECT r.*,l.title AS listing_title,l.photos AS listing_photos,l.owner_id,l.status AS listing_status,l.available_to,requester.name AS requester_name,owner.name AS owner_name FROM handoff_requests r JOIN listings l ON l.id=r.listing_id JOIN users requester ON requester.id=r.requester_id JOIN users owner ON owner.id=l.owner_id`;
+  const requestSelect = `SELECT r.*,l.title AS listing_title,l.photos AS listing_photos,l.owner_id,l.status AS listing_status,l.available_to,requester.name AS requester_name,requester.gender AS requester_gender,owner.name AS owner_name FROM handoff_requests r JOIN listings l ON l.id=r.listing_id JOIN users requester ON requester.id=r.requester_id JOIN users owner ON owner.id=l.owner_id`;
   const getRequest = (id) =>
     db.prepare(`${requestSelect} WHERE r.id=?`).get(id);
   const serializeRequest = (row, viewerId) => {
@@ -1366,6 +1530,14 @@ ${button}
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+    // The lister sees how the requester described themselves, but only when
+    // the student chose to share it.
+    if (
+      viewerId === row.owner_id &&
+      row.requester_gender &&
+      row.requester_gender !== "unspecified"
+    )
+      result.requesterGender = row.requester_gender;
     if (row.status === "accepted") {
       const person = db
         .prepare("SELECT name,email FROM users WHERE id=?")
@@ -1528,6 +1700,8 @@ ${button}
       res.status(201).json({ ok: true });
     },
   );
+
+  app.use("/api/admin", adminRouter({ db, limit, dataDir, staticDir, emailReady }));
 
   app.use("/api", (req, res, next) =>
     next(new HttpError(404, "Endpoint not found.")),

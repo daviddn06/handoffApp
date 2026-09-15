@@ -32,6 +32,12 @@ Everything about Boost is built and visible. The "Pay $9" button is grayed out w
 
 Stripe Checkout with a one time price. Webhook marks the boost paid and starts the 7 days. Refund policy: full refund within 24 hours if the listing has had no views, otherwise no refunds, stated on the terms page.
 
+## AI listing help
+
+Smart import and the chat helper are free, for the same reason listing is free. The point is to remove the blank form, which is the moment most listers give up, so more rooms reach the map. They are a cost line, not a product.
+
+The cost is small enough to ignore at this size. One real text import measured 1,010 input and 438 output tokens, which at the published `gpt-5.6-luna` rate ($0.20 per million input, $1.20 per million output) is well under a cent. Screenshots cost more than text and are capped at four per import, resized before sending. A hundred imports a week stays in the low single dollars a month. Usage is recorded per call in `ai_usage` and reported with `node server/operator.js ai-usage`, so if it ever stops being a rounding error we will see it before the bill does. The per account limits (20 imports and 120 chat turns an hour, verified students only) put a ceiling on abuse.
+
 ## Later options, not built
 
 - Boost bundle, $19 for 21 days, for full lease takeovers that take longer.

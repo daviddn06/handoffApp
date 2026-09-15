@@ -21,6 +21,7 @@
     "maplibre-gl": "^6.9.1",
     "multer": "^2.0.2",
     "nodemailer": "^10.0.10",
+    "openai": "^7.15.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-router-dom": "^7.9.1",
