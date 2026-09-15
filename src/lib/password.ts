@@ -191,12 +191,10 @@ export function passwordProblem(
   value: string,
   { email = "", name = "" }: { email?: string; name?: string } = {},
 ) {
-  if (value.length < 10) return "Use a password with at least 10 characters.";
-  if (value.length > 128) return "Use a password with at most 128 characters.";
   void email;
   void name;
-  if (isCommonPassword(value))
-    return "That password is one of the most common ones. Choose something only you would pick.";
+  if (value.length < 8) return "Use a password with at least 8 characters.";
+  if (value.length > 128) return "Use a password with at most 128 characters.";
   return "";
 }
 

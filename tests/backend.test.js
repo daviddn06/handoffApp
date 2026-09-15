@@ -1679,7 +1679,7 @@ test("a student at any known school can sign up, browse, save and request, but n
   assert.equal(alumni.school.name, "University of Southern California");
 });
 
-test("password rules reject short and common choices", async (t) => {
+test("password rules reject short choices", async (t) => {
   const env = await setup(t);
   const user = env.client();
   const attempt = (overrides) =>
@@ -1692,11 +1692,7 @@ test("password rules reject short and common choices", async (t) => {
         ...overrides,
       },
     });
-  const cases = [
-    ["short1234", /at least 10 characters/],
-    ["password12345", /most common ones/],
-    ["Tr0jans2026", /most common ones/],
-  ];
+  const cases = [["short12", /at least 8 characters/]];
   for (const [password, expected] of cases) {
     const result = await attempt({ password });
     assert.equal(result.status, 400, password);
@@ -1717,10 +1713,10 @@ test("password rules reject short and common choices", async (t) => {
   const token = env.tokenFor("dana@usc.edu", "reset");
   const weak = await user.call("/api/auth/reset", {
     method: "POST",
-    body: { token, password: "qwertyuiop12" },
+    body: { token, password: "short12" },
   });
   assert.equal(weak.status, 400);
-  assert.match(weak.body.error, /most common ones/);
+  assert.match(weak.body.error, /at least 8 characters/);
   const reset = await user.call("/api/auth/reset", {
     method: "POST",
     body: { token, password: "Copper harbor lantern 915" },

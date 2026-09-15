@@ -646,6 +646,36 @@ ${button}
       .prepare("SELECT 1 FROM sessions WHERE user_id=? LIMIT 1")
       .get(row.id);
   };
+  // Step one of signup asks whether the email is free before any other step.
+  app.post(
+    "/api/auth/check-email",
+    limit("check-email-ip", 60, HOUR),
+    (req, res) => {
+      const input = parse(
+        z.object({ email: z.string().trim().toLowerCase().email().max(254) }),
+        req.body,
+      );
+      const school = schoolForEmail(input.email);
+      if (!school)
+        throw new HttpError(
+          400,
+          "Use your school email. We could not find that school yet.",
+          "school_unknown",
+        );
+      const claimed = db
+        .prepare("SELECT * FROM users WHERE email=?")
+        .get(input.email);
+      const exists = Boolean(claimed && !abandonedRegistration(claimed));
+      res.json({
+        exists,
+        school: {
+          name: school.name,
+          domain: school.domain,
+          live: Boolean(liveCampusForEmail(input.email)),
+        },
+      });
+    },
+  );
   app.post(
     "/api/auth/signup",
     limit("signup-ip", 10, HOUR),

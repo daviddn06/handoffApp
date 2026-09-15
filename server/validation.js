@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { CAMPUSES } from "./config.js";
 import { HttpError } from "./security.js";
-import { isCommonPassword } from "./common-passwords.js";
 
 const text = (max) => z.string().trim().max(max);
 
@@ -12,14 +11,11 @@ const text = (max) => z.string().trim().max(max);
  */
 export function passwordProblem(value, { email: address = "", name = "" } = {}) {
   const raw = String(value ?? "");
-  if (raw.length < 10) return "Use a password with at least 10 characters.";
-  if (raw.length > 128) return "Use a password with at most 128 characters.";
-  // Ten characters is the bar. The only other refusal is a password on the
-  // common list, which costs students nothing to avoid.
+  // Eight characters is the whole rule. The meter advises, nothing else refuses.
   void address;
   void name;
-  if (isCommonPassword(raw))
-    return "That password is one of the most common ones. Choose something only you would pick.";
+  if (raw.length < 8) return "Use a password with at least 8 characters.";
+  if (raw.length > 128) return "Use a password with at most 128 characters.";
   return "";
 }
 
