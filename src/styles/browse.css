@@ -1979,7 +1979,10 @@
    ------------------------------------------------------------------ */
 .school-search {
   position: relative;
-  overflow: clip;
+  /* A clip path rather than overflow, so the panel's ring survives on iOS
+     Safari, which ignores overflow-clip-margin. */
+  overflow: visible;
+  clip-path: inset(-4px -10px);
 }
 /* The page in view sits in the flow and sets the height, the one leaving
    overlays it, so an empty query leaves nothing but the search field. */

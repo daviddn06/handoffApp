@@ -172,8 +172,9 @@
 }
 
 .auth-modal .auth-slide {
-  /* Clip the parked steps, but let the 3px focus ring on an input paint
-     past the edge, which is what was cutting the ring off at both sides. */
-  overflow: clip;
-  overflow-clip-margin: 6px;
+  /* Hide the parked steps with a clip path that reaches 10px past each side,
+     so a full width field keeps its ring and rounded corners. Safari on iOS
+     ignores overflow-clip-margin, which is what cut the sides off there. */
+  overflow: visible;
+  clip-path: inset(-6px -10px);
 }

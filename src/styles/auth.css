@@ -255,8 +255,8 @@
   /* The off screen steps are laid out beside the visible one, so the track
      clips instead of widening the card. clip with a 6px margin keeps the
      focus rings visible without adding width to the card. */
-  overflow: clip;
-  overflow-clip-margin: 6px;
+  overflow: visible;
+  clip-path: inset(-6px -10px);
   /* Animated on a step change with the card resize tokens, then released
      back to auto so nothing is ever held at a stale height. */
   transition: height var(--resize-dur) var(--resize-ease);
