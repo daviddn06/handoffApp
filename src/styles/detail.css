@@ -814,14 +814,3 @@
   }
 }
 
-/* The map key's approximate location note. It belongs in browse.css beside
-   the rest of the legend, which another pass owns, so it lives here for now
-   and should move with the legend styles. */
-.map-legend-note {
-  margin: var(--s-2) 0 0;
-  padding-top: var(--s-2);
-  border-top: 1px solid var(--line);
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--muted-2);
-}

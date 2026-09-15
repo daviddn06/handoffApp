@@ -771,6 +771,7 @@ export default function Map({
             <ChevronDown size={14} className="legend-chevron" />
           </button>
           <div className="map-legend-body">
+            <div className="map-legend-inner">
             <ul>
               <li>
                 <span className="legend-swatch price" aria-hidden="true">
@@ -817,6 +818,7 @@ export default function Map({
                 Locations are approximate until you confirm
               </p>
             )}
+            </div>
           </div>
         </div>
       )}
