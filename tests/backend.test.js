@@ -1651,7 +1651,7 @@ test("a student at any known school can sign up, browse, save and request, but n
   assert.equal(alumni.school.name, "University of Southern California");
 });
 
-test("password rules reject weak, personal and common choices", async (t) => {
+test("password rules reject short and common choices", async (t) => {
   const env = await setup(t);
   const user = env.client();
   const attempt = (overrides) =>
@@ -1666,10 +1666,6 @@ test("password rules reject weak, personal and common choices", async (t) => {
     });
   const cases = [
     ["short1234", /at least 10 characters/],
-    ["lanternparade", /at least one number/],
-    ["1234567890123", /at least one letter/],
-    ["dana is here 12", /email address in your password/],
-    ["fielding house 42", /name in your password/],
     ["password12345", /most common ones/],
     ["Tr0jans2026", /most common ones/],
   ];
@@ -1685,7 +1681,7 @@ test("password rules reject weak, personal and common choices", async (t) => {
     body: { token: env.tokenFor("dana@usc.edu") },
   });
 
-  // A reset holds the same line, including the account's own name and email.
+  // A reset holds the same line.
   await user.call("/api/auth/forgot", {
     method: "POST",
     body: { email: "dana@usc.edu" },
@@ -1693,10 +1689,10 @@ test("password rules reject weak, personal and common choices", async (t) => {
   const token = env.tokenFor("dana@usc.edu", "reset");
   const weak = await user.call("/api/auth/reset", {
     method: "POST",
-    body: { token, password: "Fielding harbor 2026" },
+    body: { token, password: "qwertyuiop12" },
   });
   assert.equal(weak.status, 400);
-  assert.match(weak.body.error, /name in your password/);
+  assert.match(weak.body.error, /most common ones/);
   const reset = await user.call("/api/auth/reset", {
     method: "POST",
     body: { token, password: "Copper harbor lantern 915" },

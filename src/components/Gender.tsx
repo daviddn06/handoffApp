@@ -1,4 +1,12 @@
-import { Users } from "lucide-react";
+import {
+  Users,
+  User as UserIcon,
+  Sparkles,
+  EyeOff,
+  Heart,
+  UsersRound,
+} from "lucide-react";
+import type { ComponentType } from "react";
 import {
   GENDERS,
   GENDER_LABELS,
@@ -9,6 +17,32 @@ import {
   type Listing,
   type User,
 } from "../types";
+
+const GENDER_ICONS: Record<Gender, ComponentType<{ size?: number }>> = {
+  woman: UserIcon,
+  man: UserIcon,
+  nonbinary: Sparkles,
+  unspecified: EyeOff,
+};
+const PREFERENCE_ICONS: Record<GenderPreference, ComponentType<{ size?: number }>> = {
+  any: UsersRound,
+  women_preferred: Heart,
+  women_only: UserIcon,
+  men_preferred: Heart,
+  men_only: UserIcon,
+};
+/** Tone class so each option carries its own soft color when chosen. */
+const TONE: Record<string, string> = {
+  woman: "tone-rose",
+  women_preferred: "tone-rose",
+  women_only: "tone-rose",
+  man: "tone-blue",
+  men_preferred: "tone-blue",
+  men_only: "tone-blue",
+  nonbinary: "tone-violet",
+  any: "tone-green",
+  unspecified: "tone-gray",
+};
 
 /**
  * The student's own gender. Always optional, four calm options, and the last
@@ -33,22 +67,26 @@ export function GenderChoice({
     <fieldset className="gender-field">
       <legend>{label}</legend>
       <div className="gender-options" role="radiogroup" aria-label={label}>
-        {GENDERS.map((option) => (
-          <label
-            key={option}
-            className={`gender-option ${value === option ? "is-on" : ""}`}
-          >
-            <input
-              type="radio"
-              name={name}
-              value={option}
-              checked={value === option}
-              tabIndex={tabIndex}
-              onChange={() => onChange(option)}
-            />
-            <span>{GENDER_LABELS[option]}</span>
-          </label>
-        ))}
+        {GENDERS.map((option) => {
+          const Icon = GENDER_ICONS[option];
+          return (
+            <label
+              key={option}
+              className={`gender-option ${TONE[option]} ${value === option ? "is-on" : ""}`}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={option}
+                checked={value === option}
+                tabIndex={tabIndex}
+                onChange={() => onChange(option)}
+              />
+              <Icon size={15} />
+              <span>{GENDER_LABELS[option]}</span>
+            </label>
+          );
+        })}
       </div>
       {hint && <p className="field-hint">{hint}</p>}
     </fieldset>
@@ -72,8 +110,7 @@ export function PreferenceChoice({
   if (roomType === "entire")
     return (
       <p className="preference-note">
-        Entire places are open to anyone. Roommate preferences apply to shared
-        homes.
+        Roommate preferences apply to shared homes only.
       </p>
     );
   return (
@@ -87,25 +124,28 @@ export function PreferenceChoice({
         role="radiogroup"
         aria-label="Who is this for?"
       >
-        {GENDER_PREFERENCES.map((option) => (
-          <label
-            key={option}
-            className={`gender-option ${value === option ? "is-on" : ""}`}
-          >
-            <input
-              type="radio"
-              name="genderPreference"
-              value={option}
-              checked={value === option}
-              onChange={() => onChange(option)}
-            />
-            <span>{GENDER_PREFERENCE_LABELS[option]}</span>
-          </label>
-        ))}
+        {GENDER_PREFERENCES.map((option) => {
+          const Icon = PREFERENCE_ICONS[option];
+          return (
+            <label
+              key={option}
+              className={`gender-option ${TONE[option]} ${value === option ? "is-on" : ""}`}
+            >
+              <input
+                type="radio"
+                name="genderPreference"
+                value={option}
+                checked={value === option}
+                onChange={() => onChange(option)}
+              />
+              <Icon size={15} />
+              <span>{GENDER_PREFERENCE_LABELS[option]}</span>
+            </label>
+          );
+        })}
       </div>
       <p className="field-hint">
-        Allowed for shared homes where you or your roommates live. Keep it to
-        what you need.
+        Only for shared homes where you or your roommates live.
       </p>
     </fieldset>
   );

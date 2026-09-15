@@ -169,7 +169,7 @@ export type PasswordCheck = {
   hint: string;
   /** The server rule this password breaks, "" when it would be accepted. */
   problem: string;
-  /** True when the server would accept it and the meter reads Okay or better. */
+  /** True when the server would accept it. The meter only advises. */
   valid: boolean;
   /** An order of magnitude guess, "" when an honest one is not available. */
   crack: string;
@@ -193,16 +193,8 @@ export function passwordProblem(
 ) {
   if (value.length < 10) return "Use a password with at least 10 characters.";
   if (value.length > 128) return "Use a password with at most 128 characters.";
-  if (!/[a-zA-Z]/.test(value)) return "Add at least one letter to your password.";
-  if (!/\d/.test(value)) return "Add at least one number to your password.";
-  const folded = fold(value);
-  const low = value.toLowerCase();
-  const local = email.split("@")[0].toLowerCase();
-  if (local.length >= 3 && (folded.includes(local) || low.includes(local)))
-    return "Do not put your email address in your password.";
-  for (const part of name.toLowerCase().split(/[^a-z]+/))
-    if (part.length >= 3 && (folded.includes(part) || low.includes(part)))
-      return "Do not put your name in your password.";
+  void email;
+  void name;
   if (isCommonPassword(value))
     return "That password is one of the most common ones. Choose something only you would pick.";
   return "";
@@ -291,7 +283,7 @@ export function passwordCheck(
     label: LABELS[level],
     hint,
     problem,
-    valid: !problem && score >= 2,
+    valid: !problem,
     crack: problem ? "" : crackTime(bits),
   };
 }

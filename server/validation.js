@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CAMPUSES } from "./config.js";
 import { HttpError } from "./security.js";
-import { isCommonPassword, normalizePassword } from "./common-passwords.js";
+import { isCommonPassword } from "./common-passwords.js";
 
 const text = (max) => z.string().trim().max(max);
 
@@ -14,15 +14,10 @@ export function passwordProblem(value, { email: address = "", name = "" } = {}) 
   const raw = String(value ?? "");
   if (raw.length < 10) return "Use a password with at least 10 characters.";
   if (raw.length > 128) return "Use a password with at most 128 characters.";
-  if (!/[a-zA-Z]/.test(raw)) return "Add at least one letter to your password.";
-  if (!/\d/.test(raw)) return "Add at least one number to your password.";
-  const folded = normalizePassword(raw);
-  const local = String(address).split("@")[0].toLowerCase();
-  if (local.length >= 3 && (folded.includes(local) || raw.toLowerCase().includes(local)))
-    return "Do not put your email address in your password.";
-  for (const part of String(name).toLowerCase().split(/[^a-z]+/))
-    if (part.length >= 3 && (folded.includes(part) || raw.toLowerCase().includes(part)))
-      return "Do not put your name in your password.";
+  // Ten characters is the bar. The only other refusal is a password on the
+  // common list, which costs students nothing to avoid.
+  void address;
+  void name;
   if (isCommonPassword(raw))
     return "That password is one of the most common ones. Choose something only you would pick.";
   return "";

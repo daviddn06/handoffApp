@@ -65,12 +65,26 @@
   --ring: 0 0 0 1px rgb(16 24 40 / 0.08);
   --ring-strong: 0 0 0 1px rgb(16 24 40 / 0.12);
 
+  /* Spacing scale. Every gap, pad and margin in the app comes from here. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  /* Surface padding, one value per surface kind. */
+  --pad-card: var(--s-5);
+  --pad-modal: var(--s-6);
+
   /* Layout */
   --header-h: 60px;
   --mobile-nav-h: 64px;
   --control-h: 40px;
   --input-h: 42px;
-  --page-x: 32px;
+  --page-x: var(--s-6);
   --page-max: 1240px;
 }
 * {
@@ -148,19 +162,20 @@ h3 {
 h1 {
   font-family: "Plus Jakarta Sans", "Geist", sans-serif;
   letter-spacing: -0.03em;
-  line-height: 1.15;
+  line-height: 1.2;
   font-weight: 700;
-  font-size: 30px;
+  font-size: 26px;
 }
 h2 {
   letter-spacing: -0.02em;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.2;
 }
 h3 {
   font-size: 15px;
   font-weight: 600;
+  line-height: 1.2;
   letter-spacing: -0.01em;
 }
 p {
@@ -276,7 +291,7 @@ fieldset {
 legend {
   font-weight: 500;
   font-size: 14px;
-  margin-bottom: 10px;
+  margin-bottom: var(--s-2);
   padding: 0;
 }
 main {
@@ -479,7 +494,7 @@ main {
   min-height: 22px;
   padding: 0 8px;
   border-radius: var(--r-pill);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.01em;
   background: var(--soft-2);
@@ -518,7 +533,7 @@ main {
 /* Text helpers */
 .muted {
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.55;
 }
 .eyebrow {
   font-size: 11px;
@@ -552,12 +567,18 @@ main {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
   min-width: 0;
+}
+/* Label to input is 8px, input to hint or error is 6px. */
+.field > .field-hint,
+.field > .field-error {
+  margin-top: -2px;
 }
 .field-label {
   font-weight: 500;
-  font-size: 13.5px;
+  font-size: 14px;
+  line-height: 1.4;
   color: var(--ink);
 }
 .field-hint {
@@ -576,13 +597,13 @@ main {
 .field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: var(--s-5) var(--s-4);
   align-items: start;
 }
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--s-5);
 }
 .input-prefix,
 .password-input {
@@ -613,7 +634,7 @@ main {
 .check-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2px 12px;
+  gap: var(--s-1) var(--s-4);
 }
 .check-label {
   display: flex;
@@ -643,9 +664,9 @@ main {
   border: 1px solid #f0d3d8;
   background: var(--red-soft);
   border-radius: var(--r-md);
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-4);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .error-box > svg {
   margin-top: 1px;
@@ -662,9 +683,9 @@ main {
   border: 1px solid #cfe9dc;
   border-radius: var(--r-md);
   color: var(--green-ink);
-  padding: 12px 14px;
+  padding: var(--s-3) var(--s-4);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .notice > svg {
   margin-top: 1px;
@@ -678,7 +699,7 @@ main {
   justify-content: center;
   gap: 14px;
   color: var(--muted);
-  font-size: 13.5px;
+  font-size: 13px;
   animation: fade-in var(--duration-fast) var(--ease-out) both;
   animation-delay: 120ms;
 }
@@ -866,14 +887,14 @@ html.is-embed .route-progress {
 .toast {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2);
   background: #1c2533;
   color: #fff;
   padding: 8px 8px 8px 14px;
   border-radius: var(--r-md);
   box-shadow: var(--shadow-lg);
   pointer-events: auto;
-  font-size: 13.5px;
+  font-size: 14px;
   max-width: 560px;
   opacity: 0;
   transform: translateY(var(--toast-distance)) scale(var(--toast-scale));
@@ -920,9 +941,9 @@ html.is-embed .route-progress {
 .modal {
   border: 0;
   border-radius: var(--r-xl);
-  padding: 24px;
+  padding: var(--pad-modal);
   max-width: 520px;
-  width: calc(100% - 32px);
+  width: calc(100% - var(--s-8));
   color: var(--ink);
   box-shadow: var(--shadow-lg), var(--ring);
   max-height: calc(100dvh - 40px);
@@ -966,12 +987,13 @@ html.is-embed .route-progress {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--s-4);
+  margin-bottom: var(--s-6);
 }
 .modal-heading h2 {
   font-family: "Plus Jakarta Sans", sans-serif;
   font-size: 20px;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 .modal-heading .icon-button {
@@ -979,15 +1001,20 @@ html.is-embed .route-progress {
 }
 .modal > .muted {
   font-size: 14px;
+  line-height: 1.55;
+}
+/* One line of support text under a modal title, then the first control. */
+.modal-heading + .muted {
+  margin: calc(var(--s-6) * -1 + var(--s-2)) 0 var(--s-6);
 }
 .modal-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--s-2);
   border-top: 1px solid var(--line);
-  padding-top: 16px;
-  margin-top: 20px;
+  padding-top: var(--s-4);
+  margin-top: var(--s-6);
 }
 .modal .stack .modal-actions {
   margin-top: 0;
@@ -1001,7 +1028,7 @@ html.is-embed .route-progress {
   flex-direction: column;
   min-height: 320px;
   text-align: center;
-  padding: 40px 24px;
+  padding: var(--s-10) var(--s-6);
   max-width: 480px;
   margin: auto;
 }
@@ -1014,24 +1041,25 @@ html.is-embed .route-progress {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 18px;
+  margin-bottom: var(--s-4);
 }
 .empty-state h2 {
   font-family: "Plus Jakarta Sans", sans-serif;
   font-size: 20px;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 .empty-state p {
   font-size: 14px;
-  line-height: 1.65;
+  line-height: 1.55;
   color: var(--muted);
   max-width: 340px;
-  margin-top: 8px;
+  margin-top: var(--s-2);
 }
 .empty-actions {
-  margin-top: 20px;
+  margin-top: var(--s-6);
   display: flex;
-  gap: 10px;
+  gap: var(--s-2);
 }
 
 /* Header */
@@ -1105,12 +1133,12 @@ html.is-embed .route-progress {
   align-items: center;
 }
 .header-actions .list-place {
-  font-size: 13.5px;
+  font-size: 14px;
   min-height: 36px;
   padding: 6px 12px;
 }
 .sign-in-link {
-  font-size: 13.5px;
+  font-size: 14px;
   min-height: 36px;
   padding: 6px 10px;
 }
@@ -1183,11 +1211,11 @@ html.is-embed .route-progress {
   font-weight: 600;
 }
 .menu-identity > span {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--muted);
 }
 .menu-identity small {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--green-ink);
   display: flex;
   align-items: center;
@@ -1202,7 +1230,7 @@ html.is-embed .route-progress {
   gap: 9px;
   padding: 9px 10px;
   width: 100%;
-  font-size: 13.5px;
+  font-size: 14px;
   border-radius: var(--r-xs);
   text-align: left;
   color: var(--ink-2);
@@ -1221,7 +1249,7 @@ html.is-embed .route-progress {
 .page-container {
   width: 100%;
   max-width: var(--page-max);
-  padding: 28px var(--page-x) 64px;
+  padding: var(--s-6) var(--page-x) var(--s-12);
   margin: 0 auto;
 }
 .page-container.narrow {
@@ -1231,24 +1259,27 @@ html.is-embed .route-progress {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
+  gap: var(--s-6);
+  /* A heading block is 24px clear of the first control under it. */
+  margin-bottom: var(--s-6);
 }
 .page-heading .eyebrow {
-  margin-bottom: 6px;
+  margin-bottom: var(--s-1);
 }
 .page-heading h1 {
   font-size: 26px;
+  line-height: 1.2;
 }
 .page-heading p {
   color: var(--muted);
   font-size: 14px;
+  line-height: 1.55;
   margin-top: 6px;
 }
 .heading-actions {
   flex-shrink: 0;
   display: flex;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .section-topline {
   display: flex;
@@ -1257,8 +1288,8 @@ html.is-embed .route-progress {
   font-size: 13px;
   color: var(--muted);
   border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
-  margin-bottom: 18px;
+  padding-bottom: var(--s-3);
+  margin-bottom: var(--s-5);
 }
 .blue-dot {
   height: 6px;
@@ -1391,7 +1422,9 @@ html.is-embed .route-progress {
 /* Responsive header and mobile navigation */
 @media (max-width: 760px) {
   :root {
-    --page-x: 18px;
+    --page-x: var(--s-4);
+    --pad-card: var(--s-4);
+    --pad-modal: var(--s-5);
   }
   .header-inner {
     padding: 0 12px 0 18px;
@@ -1426,7 +1459,7 @@ html.is-embed .route-progress {
     align-items: center;
     justify-content: center;
     gap: 3px;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--muted);
     transition: color var(--duration-quick) var(--ease-out);
@@ -1463,23 +1496,23 @@ html.is-embed .route-progress {
     bottom: calc(var(--mobile-nav-h) + 12px);
   }
   .page-container {
-    padding-top: 20px;
-    padding-bottom: 40px;
+    padding-top: var(--s-5);
+    padding-bottom: var(--s-10);
   }
   .page-heading {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: var(--s-3);
+    margin-bottom: var(--s-6);
   }
   .page-heading h1 {
-    font-size: 23px;
+    font-size: 28px;
   }
   .field-row {
     grid-template-columns: 1fr;
   }
   .modal {
-    padding: 20px;
+    padding: var(--pad-modal);
     border-radius: var(--r-lg);
   }
 }
@@ -1512,8 +1545,8 @@ html.is-embed .browse-page {
 .verify-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px var(--page-x);
+  gap: var(--s-2);
+  padding: var(--s-2) var(--page-x);
   background: var(--amber-soft);
   color: var(--amber-ink);
   font-size: 13px;
@@ -1531,8 +1564,8 @@ html.is-embed .browse-page {
 @media (max-width: 760px) {
   .verify-banner {
     flex-wrap: wrap;
-    padding: 8px 14px;
-    font-size: 12.5px;
+    padding: var(--s-2) var(--page-x);
+    font-size: 13px;
   }
   .verify-banner > span {
     flex-basis: 100%;
@@ -1566,17 +1599,17 @@ html:has(.verify-banner) .browse-page {
   text-align: center;
   max-width: 520px;
   margin: auto;
-  padding: 64px 24px 72px;
+  padding: var(--s-12) var(--s-6);
 }
 .not-live.compact {
-  padding: 40px 24px 48px;
+  padding: var(--s-8) var(--s-6);
 }
 .not-live-mark {
   display: grid;
   place-items: center;
   width: 64px;
   height: 64px;
-  margin-bottom: 20px;
+  margin-bottom: var(--s-4);
   border-radius: var(--r-lg);
   background: var(--blue-soft);
 }
@@ -1588,18 +1621,18 @@ html:has(.verify-banner) .browse-page {
 }
 .not-live h1 {
   font-family: "Plus Jakarta Sans", sans-serif;
-  font-size: 28px;
-  line-height: 1.22;
+  font-size: 26px;
+  line-height: 1.2;
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
 .not-live.compact h1 {
-  font-size: 22px;
+  font-size: 20px;
 }
 .not-live p {
-  margin-top: 10px;
-  font-size: 14.5px;
-  line-height: 1.65;
+  margin-top: var(--s-2);
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--muted);
   max-width: 400px;
   text-wrap: pretty;
@@ -1608,8 +1641,8 @@ html:has(.verify-banner) .browse-page {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
-  margin-top: 24px;
+  gap: var(--s-2);
+  margin-top: var(--s-6);
 }
 .not-live-done {
   display: inline-flex;
@@ -1620,16 +1653,16 @@ html:has(.verify-banner) .browse-page {
   border-radius: var(--r-pill);
   background: var(--green-soft);
   color: var(--green-ink);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   max-width: none;
 }
 @media (max-width: 760px) {
   .not-live {
-    padding: 44px 18px 56px;
+    padding: var(--s-10) var(--page-x);
   }
   .not-live h1 {
-    font-size: 24px;
+    font-size: 28px;
   }
   .not-live-actions > *,
   .not-live-actions form,
@@ -1651,7 +1684,7 @@ html:has(.verify-banner) .browse-page {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--ink);
   margin-bottom: 8px;
@@ -1664,7 +1697,7 @@ html:has(.verify-banner) .browse-page {
   clear: both;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .gender-option {
   position: relative;
@@ -1676,7 +1709,7 @@ html:has(.verify-banner) .browse-page {
   border-radius: var(--r-sm);
   border: 1px solid var(--line-2);
   background: var(--surface);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--ink-2);
   cursor: pointer;
@@ -1701,10 +1734,44 @@ html:has(.verify-banner) .browse-page {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+.gender-option {
+  gap: 7px;
+  --tone: var(--blue);
+  --tone-soft: var(--blue-soft);
+  --tone-ink: var(--blue-ink);
+}
+.gender-option svg {
+  color: var(--muted);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.gender-option.tone-rose {
+  --tone: #d6467a;
+  --tone-soft: #fdeef3;
+  --tone-ink: #9c2a56;
+}
+.gender-option.tone-violet {
+  --tone: #7b5cd6;
+  --tone-soft: #f1edfb;
+  --tone-ink: #54399e;
+}
+.gender-option.tone-green {
+  --tone: var(--green);
+  --tone-soft: var(--green-soft);
+  --tone-ink: var(--green-ink);
+}
+.gender-option.tone-gray {
+  --tone: #6b7280;
+  --tone-soft: var(--soft);
+  --tone-ink: var(--ink-2);
+}
 .gender-option.is-on {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: #fff;
+  background: var(--tone-soft);
+  border-color: var(--tone);
+  color: var(--tone-ink);
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+.gender-option.is-on svg {
+  color: var(--tone);
 }
 .gender-field .field-hint {
   margin: 6px 0 0;
