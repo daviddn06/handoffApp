@@ -14,6 +14,7 @@ import {
   type ImportDraft,
 } from "../lib/import";
 import { Button, ErrorBox } from "../components/ui";
+import { BackLink } from "../components/ui";
 import { StreamingText, ThinkingLine } from "../components/AiText";
 import { SchoolNotLive } from "../components/SchoolNotLive";
 
@@ -113,13 +114,19 @@ export default function ListingChat() {
   const canOpen = done || readyForEditor(draft);
   const filled = PANEL_FIELDS.filter((field) => show(draft, field));
   return (
-    <div className="page-container chat-page">
+    <div className="page-container flow-page chat-page">
+      <BackLink to="/listings/new">Ways to list</BackLink>
+      <div className="start-head flow-head">
+        <h1>Talk it through</h1>
+        <p>Answer a few questions and we write the listing from them.</p>
+      </div>
+      <div className="chat-grid">
       <section className="chat-column">
         <header className="chat-head">
           <span className="chat-mark" aria-hidden="true">
             <MessageCircle size={16} />
           </span>
-          <h1>Talk it through</h1>
+          <h2>Your chat</h2>
         </header>
         <div className="chat-log" ref={logRef}>
           {turns.map((turn, index) => (
@@ -191,6 +198,7 @@ export default function ListingChat() {
           </ul>
         )}
       </aside>
+      </div>
     </div>
   );
 }

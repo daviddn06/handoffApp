@@ -62,9 +62,9 @@ export default function ListingStart() {
     );
   const verified = Boolean(user?.verified);
   return (
-    <div className="page-container start-page">
+    <div className="page-container narrow flow-page start-page">
       <BackLink to="/my-listings">My listings</BackLink>
-      <div className="start-head">
+      <div className="start-head flow-head">
         <h1>How do you want to list?</h1>
         <p>The form is ready now. The two assisted paths are on their way.</p>
       </div>

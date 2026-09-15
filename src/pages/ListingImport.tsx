@@ -6,6 +6,7 @@ import { api, errorMessage } from "../lib/api";
 import { useApp } from "../lib/context";
 import { storeImport, type ImportResult } from "../lib/import";
 import { Button, ErrorBox, Field } from "../components/ui";
+import { BackLink } from "../components/ui";
 import { ThinkingLine } from "../components/AiText";
 import { SchoolNotLive } from "../components/SchoolNotLive";
 
@@ -114,8 +115,9 @@ export default function ListingImport() {
       </div>
     );
   return (
-    <div className="page-container narrow import-page">
-      <div className="start-head">
+    <div className="page-container narrow flow-page import-page">
+      <BackLink to="/listings/new">Ways to list</BackLink>
+      <div className="start-head flow-head">
         <h1>Smart import</h1>
         <p>
           Paste the post you already wrote, or drop screenshots and a PDF. We

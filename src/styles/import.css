@@ -8,19 +8,35 @@
   --amber-ring-soft: rgb(230 162 60 / 0.16);
 }
 
-/* ── Chooser ─────────────────────────────────────────────────── */
-.start-page {
+/* ── One flow shell ──────────────────────────────────────────────
+   The chooser, Smart import, Talk it through and the form all sit in the
+   same centred column: a back link, a centred heading, then one card. */
+.flow-page {
   padding-block: var(--s-6) var(--s-12);
-  /* The page used to stop at 250px in a 900px viewport. */
   min-height: calc(100dvh - var(--header-h));
   display: flex;
   flex-direction: column;
+}
+.flow-page > .back-link {
+  align-self: flex-start;
+}
+.flow-head {
+  max-width: 56ch;
+  margin: var(--s-4) auto var(--s-6);
+  text-align: center;
+}
+.flow-head h1 {
+  font-family: "Plus Jakarta Sans", "Geist", system-ui, sans-serif;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+.flow-head p {
+  text-wrap: balance;
 }
 .start-body {
   display: flex;
   flex-direction: column;
   gap: var(--s-4);
-  max-width: 940px;
 }
 /* The one path that works today leads, as a card with a real button. */
 .start-lead {
@@ -175,10 +191,10 @@
   gap: var(--s-2);
 }
 .start-foot {
-  margin: var(--s-6) 0 0;
+  margin: var(--s-6) auto 0;
   color: var(--muted);
   font-size: 13px;
-  /* Capped to the card grid rather than running the full 1240 container. */
+  text-align: center;
   max-width: 62ch;
 }
 
@@ -411,11 +427,13 @@
 
 /* ── Chat helper ─────────────────────────────────────────────── */
 .chat-page {
+  max-width: 1040px;
+}
+.chat-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: var(--s-6);
   align-items: start;
-  padding-block: var(--s-6) var(--s-12);
 }
 .chat-column {
   display: flex;
@@ -433,9 +451,9 @@
   padding: var(--s-4) var(--s-5);
   border-bottom: 1px solid var(--line);
 }
-.chat-head h1 {
+.chat-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   font-family: inherit;
 }
