@@ -37,6 +37,7 @@ import {
   campusLogo,
 } from "../components/SchoolSearch";
 import { isEmbed } from "../components/Layout";
+import { MobileAccount } from "../components/AccountButton";
 const Map = lazy(() => import("../components/Map"));
 
 const filterKeys = [
@@ -132,8 +133,11 @@ export default function Browse() {
       setSwitchCampus(false);
     }
   }, [auth.open]);
+  // Only an explicit pick flies the map, so this key never moves on a pan.
+  const [flyKey, setFlyKey] = useState(0);
   const chooseCampus = (id: string) => {
     rememberCampus(id);
+    setFlyKey((n) => n + 1);
     try {
       sessionStorage.setItem("handoff:campus-picked", "1");
     } catch {
@@ -203,6 +207,16 @@ export default function Browse() {
     listings: Listing[];
   }>(`/listings?${query}`);
 
+  /* Signing in swaps approximate pins for the real ones, so the list is
+     fetched again as soon as the session changes. */
+  const sessionId = user?.id || "";
+  const lastSession = useRef(sessionId);
+  useEffect(() => {
+    if (lastSession.current === sessionId) return;
+    lastSession.current = sessionId;
+    refresh();
+  }, [sessionId, refresh]);
+
   useEffect(() => setSearch(params.get("query") || ""), [params]);
 
   // Debounced search so typing filters without a submit.
@@ -233,6 +247,34 @@ export default function Browse() {
     activeSource.current = "list";
     setActiveId(id);
   }, []);
+  /**
+   * The reference campus follows the map. Pan from USC to Westwood and the
+   * row, the distances and the travel times all read from UCLA instead. The
+   * map itself is never moved by this, only by an explicit pick.
+   */
+  useEffect(() => {
+    if (!bounds || !campuses.length) return;
+    const t = window.setTimeout(() => {
+      const center = {
+        lat: (bounds.north + bounds.south) / 2,
+        lng: (bounds.east + bounds.west) / 2,
+      };
+      let best = campuses[0],
+        bestMiles = Infinity;
+      for (const option of campuses) {
+        const miles = milesBetween(option, center);
+        if (miles < bestMiles) {
+          bestMiles = miles;
+          best = option;
+        }
+      }
+      if (bestMiles > 12 || best.id === campus?.id) return;
+      rememberCampus(best.id);
+      setParam("campusId", best.id);
+    }, 250);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bounds, campuses, campus?.id]);
   const registerRef = useCallback((id: string, el: HTMLElement | null) => {
     if (el) cardRefs.current.set(id, el);
     else cardRefs.current.delete(id);
@@ -291,6 +333,10 @@ export default function Browse() {
     }
   };
 
+  // The school dropdown matches the row it hangs from on both surfaces.
+  const campusMenuWidth = phone
+    ? Math.min(typeof window === "undefined" ? 360 : window.innerWidth - 32, 460)
+    : Math.max(320, panelWidth - 32);
   const filterCount = filterKeys.filter((key) => params.has(key)).length;
   function setParam(key: string, value: string) {
     setParams(
@@ -405,50 +451,37 @@ export default function Browse() {
       <aside className="browse-panel" aria-label="Listings">
         <div className="panel-head">
           <div className="head-row">
-            {phone ? (
-              <button
-                type="button"
-                className="campus-switch"
-                aria-haspopup="dialog"
-                aria-expanded={switchCampus}
-                onClick={() => setSwitchCampus(true)}
-              >
-                <SchoolLogo src={campusLogo(campus)} />
-                <span className="campus-text">
-                  <strong>Near {campus.name}</strong>
-                  <small>Change school</small>
-                </span>
-                <ChevronDown size={15} className="chip-chevron" />
-              </button>
-            ) : (
-              <Popover
-                width={380}
-                trigger={(props) => (
-                  <button type="button" className="campus-switch" {...props}>
-                    <SchoolLogo src={campusLogo(campus)} />
-                    <span className="campus-text">
-                      <strong>Near {campus.name}</strong>
-                      <small>Change school</small>
-                    </span>
-                    <ChevronDown size={15} className="chip-chevron" />
-                  </button>
-                )}
-              >
-                {(close) => (
-                  <div className="popover-body">
-                    <SchoolSearch
-                      campuses={campuses}
-                      current={campus.id}
-                      onClose={close}
-                      onChoose={(id) => {
-                        chooseCampus(id);
-                        close();
-                      }}
-                    />
-                  </div>
-                )}
-              </Popover>
-            )}
+            <Popover
+              width={campusMenuWidth}
+              open={switchCampus}
+              onOpenChange={setSwitchCampus}
+              className="campus-pop"
+              trigger={(props) => (
+                <button type="button" className="campus-switch" {...props}>
+                  <SchoolLogo src={campusLogo(campus)} />
+                  <span className="campus-value">
+                    <span className="campus-near">Near </span>
+                    {campus.name}
+                  </span>
+                  <ChevronDown size={16} className="campus-chevron" />
+                </button>
+              )}
+            >
+              {(close) => (
+                <div className="popover-body">
+                  <SchoolSearch
+                    campuses={campuses}
+                    current={campus.id}
+                    onClose={close}
+                    onChoose={(id) => {
+                      chooseCampus(id);
+                      close();
+                    }}
+                  />
+                </div>
+              )}
+            </Popover>
+            <MobileAccount className="browse-account" />
           </div>
           <label className="search-field">
             <Search size={16} />
@@ -760,6 +793,23 @@ export default function Browse() {
               </button>
             )}
           </div>
+          <button
+            type="button"
+            className="mobile-view-fab"
+            onClick={() => switchMobileView(mobileView === "map" ? "list" : "map")}
+          >
+            {mobileView === "map" ? (
+              <>
+                <List size={16} />
+                List
+              </>
+            ) : (
+              <>
+                <MapIcon size={16} />
+                Map
+              </>
+            )}
+          </button>
         </div>
         <div className="panel-scroll" ref={scrollRef}>
           {!user && (
@@ -779,7 +829,6 @@ export default function Browse() {
             <span className="results-count">
               <strong>{loading ? "…" : visible.length}</strong>{" "}
               {visible.length === 1 ? "place" : "places"}
-              <span className="results-scope">on the map</span>
             </span>
             <label className="sort-select">
               <span className="sr-only">Sort listings</span>
@@ -891,6 +940,7 @@ export default function Browse() {
             onListing={navigateListing}
             onBounds={setBounds}
             bottomInset={window.innerWidth <= 760 ? 200 : 0}
+            flyKey={flyKey}
             focusId={focusId}
           />
         </Suspense>
@@ -940,29 +990,6 @@ export default function Browse() {
           </div>
         )}
       </section>
-      <div className="mobile-view-toggle t-tabs" role="tablist" aria-label="Map or list">
-        <button
-          type="button"
-          role="tab"
-          className="t-tab"
-          aria-selected={mobileView === "map"}
-          onClick={() => switchMobileView("map")}
-        >
-          <MapIcon size={15} />
-          Map
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className="t-tab"
-          aria-selected={mobileView === "list"}
-          onClick={() => switchMobileView("list")}
-        >
-          <List size={15} />
-          List
-        </button>
-        <span className="t-tabs-pill" aria-hidden="true" data-pos={mobileView} />
-      </div>
       <Modal
         open={pickCampus}
         onClose={() => chooseCampus(campus.id)}
@@ -975,20 +1002,6 @@ export default function Browse() {
           onClose={() => chooseCampus(campus.id)}
         />
       </Modal>
-      {phone && (
-        <Modal
-          open={switchCampus}
-          onClose={() => setSwitchCampus(false)}
-          title="Change school"
-        >
-          <SchoolSearch
-            campuses={campuses}
-            current={campus.id}
-            onChoose={chooseCampus}
-            onClose={() => setSwitchCampus(false)}
-          />
-        </Modal>
-      )}
     </div>
   );
 }

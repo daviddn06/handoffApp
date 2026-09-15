@@ -1,0 +1,157 @@
+/* The student's photo, or their initials. One size scale, 28, 36, 48 and 84,
+   used by the header, the account menu, the lister card, request cards and
+   the profile settings block. Self contained. */
+.avatar-el {
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.avatar-photo {
+  display: block;
+  object-fit: cover;
+  background: var(--soft-2);
+  /* Every photo gets the same hairline, so it never floats on white. */
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+.avatar-el.size-28 {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+.avatar-el.size-36 {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+.avatar-el.size-48 {
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+}
+.avatar-el.size-84 {
+  width: 84px;
+  height: 84px;
+  font-size: 26px;
+}
+.avatar-el.is-blurred {
+  filter: blur(6px);
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+
+/* Picking a photo, in sign up and in profile settings */
+.photo-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.photo-drop {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--soft);
+  color: var(--muted-2);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    box-shadow var(--duration-quick) var(--ease-out),
+    transform var(--duration-quick) var(--ease-smooth-out);
+}
+.photo-drop:hover,
+.photo-drop.is-over {
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 1.5px var(--blue);
+}
+.photo-drop:active {
+  transform: scale(0.96);
+}
+.photo-drop .avatar-el {
+  pointer-events: none;
+}
+.photo-drop-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--blue);
+  box-shadow: var(--shadow-sm), var(--ring);
+}
+.photo-picker-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.photo-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.photo-recommend {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+.photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+/* Sign up gives the photo the whole step, so it is centered there. */
+.photo-step .photo-picker {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-4);
+}
+.photo-step .photo-picker-text {
+  align-items: center;
+  text-align: center;
+}
+.photo-step .photo-drop {
+  width: 104px;
+  height: 104px;
+}
+.photo-step .photo-drop .avatar-el.size-84 {
+  width: 104px;
+  height: 104px;
+  font-size: 30px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-drop {
+    transition: none !important;
+  }
+}
+
+/* Two places already sized their own avatar, so the photo matches. */
+.avatar-el.size-84.pf-avatar {
+  width: 84px;
+  height: 84px;
+  font-size: 26px;
+  margin-bottom: var(--s-2);
+}
+.avatar-el.size-28.tiny {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+  font-weight: 600;
+}
+/* The identity block stacks, so the photo sits above the name. */
+.menu-identity .avatar-el {
+  margin-bottom: var(--s-2);
+}

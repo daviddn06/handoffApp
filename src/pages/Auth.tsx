@@ -693,6 +693,7 @@ export default function Auth({ mode }: { mode: Mode }) {
     return shell(
       <SignInForm
         next={next}
+        email={params.get("email") || ""}
         onDone={(signedIn) => {
           if (!signedIn.verified) return;
           navigate(next, { replace: true });

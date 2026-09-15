@@ -1,7 +1,8 @@
 /**
- * Internal admin dashboard API. Everything here is gated by requireAdmin,
- * which answers 404 rather than 403 so the surface stays invisible to normal
- * students. Every write records a row in admin_audit.
+ * Internal admin dashboard API. It lives only on the internal surface
+ * (internal.handofflease.com) and everything here is gated by requireAdmin,
+ * which answers 404 rather than 403 so the surface stays invisible. Every
+ * write records a row in admin_audit.
  */
 import express from "express";
 import { execFile } from "node:child_process";
@@ -21,6 +22,43 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 /** A signed in admin, or the endpoint simply does not exist. */
 export const notFound = () => new HttpError(404, "Endpoint not found.");
+
+/**
+ * The admin allow list, read from HANDOFF_ADMIN_EMAILS once at startup.
+ * Comma separated, trimmed, lower cased. An empty list allows nobody.
+ */
+export function adminAllowList(env = process.env) {
+  return new Set(
+    String(env.HANDOFF_ADMIN_EMAILS || "")
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+let warnedAboutEmptyAllowList = false;
+/**
+ * Builds isAllowedAdmin(user). The database flag alone is never enough, the
+ * account's email must also be on the allow list, so a flagged but unlisted
+ * account can reach nothing and is never told the dashboard exists.
+ */
+export function adminGate(allowList = adminAllowList()) {
+  const emails =
+    allowList instanceof Set ? allowList : adminAllowList(allowList);
+  if (!emails.size && !warnedAboutEmptyAllowList) {
+    warnedAboutEmptyAllowList = true;
+    console.warn(
+      "HANDOFF_ADMIN_EMAILS is empty. The internal dashboard is closed to every account.",
+    );
+  }
+  return function isAllowedAdmin(user) {
+    return Boolean(
+      user &&
+        user.is_admin &&
+        !user.disabled_at &&
+        emails.has(String(user.email || "").toLowerCase()),
+    );
+  };
+}
 /** Disabled accounts keep their data but lose every authenticated action. */
 export const disabledError = (user) =>
   user?.disabled_at ? new HttpError(403, "This account is disabled.") : undefined;
@@ -79,6 +117,9 @@ export function adminRouter({
   dataDir = resolve("data"),
   staticDir = resolve(here, "../dist"),
   emailReady = false,
+  // The allow list gate. The app builds it once at startup and shares it with
+  // serializeUser so the client and the API always agree.
+  isAllowedAdmin = adminGate(),
 } = {}) {
   const router = express.Router();
   const data = resolve(dataDir);
@@ -114,11 +155,10 @@ export function adminRouter({
         iso(),
       );
 
-  // 404, never 403. A student poking at /api/admin learns nothing.
+  // 404, never 403. A student, or a flagged account that is not on the allow
+  // list, poking at /api/admin learns nothing.
   const requireAdmin = (req, res, next) =>
-    req.user && req.user.is_admin && !req.user.disabled_at
-      ? next()
-      : next(notFound());
+    isAllowedAdmin(req.user) ? next() : next(notFound());
 
   router.use(limit("admin", 3000, 15 * 60 * 1000, (req) => req.user?.id || req.ip));
   router.use(requireAdmin);

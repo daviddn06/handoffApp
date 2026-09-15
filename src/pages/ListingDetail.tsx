@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -21,6 +22,7 @@ import {
   Footprints,
   Grid2X2,
   Image,
+  Lock,
   Mail,
   MapPin,
   MessageSquare,
@@ -46,7 +48,9 @@ import {
 } from "../lib/api";
 import { useApp } from "../lib/context";
 import { BackLink, Button, ErrorBox, Field, Loading, Modal } from "../components/ui";
+import { MobileAccount } from "../components/AccountButton";
 import { SaveButton } from "../components/ListingCard";
+import { Avatar } from "../components/Avatar";
 import {
   GenderTag,
   preferenceMismatch,
@@ -55,6 +59,40 @@ import {
 import { BoostModal, daysLeft } from "../components/BoostModal";
 import { milesBetween, tripLabel } from "../lib/dps";
 const Map = lazy(() => import("../components/Map"));
+
+/**
+ * A locked preview keeps the shape of the real thing, so a visitor can see
+ * there is something to confirm for. The text underneath is a stand in, never
+ * the listing's own words, blurred hard, unselectable and out of the
+ * accessibility tree.
+ */
+function LockedText({
+  children,
+  className = "",
+  as: Tag = "span",
+}: {
+  children: ReactNode;
+  className?: string;
+  as?: "span" | "p" | "strong";
+}) {
+  return (
+    <Tag className={`locked-blur ${className}`} aria-hidden="true">
+      {children}
+    </Tag>
+  );
+}
+function StudentsOnlyChip() {
+  return (
+    <span className="locked-chip">
+      <Lock size={12} />
+      Students only
+    </span>
+  );
+}
+const LOCKED_ADDRESS = "1428 West 30th Street, Los Angeles, CA 90007";
+const LOCKED_DESCRIPTION = `A bright corner bedroom in a four bedroom house, two blocks from campus and one from the bus stop. The room comes furnished with a queen bed, a desk under the window and a tall closet.
+
+Laundry is in the building, the kitchen was redone last summer, and the three roommates are juniors who keep the place quiet on weeknights. Street parking is easy after six.`;
 
 function DetailSkeleton() {
   return (
@@ -115,6 +153,15 @@ export default function ListingDetail() {
     [reportError, setReportError] = useState(""),
     [reportBusy, setReportBusy] = useState(false),
     [boostOpen, setBoostOpen] = useState(false);
+  /* Confirming who you are unlocks the address, the description and the
+     lister, so the listing is fetched again the moment the session changes. */
+  const signedInId = user?.id || "";
+  const lastSession = useRef(signedInId);
+  useEffect(() => {
+    if (lastSession.current === signedInId) return;
+    lastSession.current = signedInId;
+    refresh();
+  }, [signedInId, refresh]);
   useEffect(() => {
     setPhoto(null);
     setGalleryIndex(0);
@@ -129,6 +176,11 @@ export default function ListingDetail() {
   const listing = data?.listing,
     campus = campuses.find((c) => c.id === listing?.campusId),
     own = user?.id === listing?.ownerId;
+  // The server holds back the address, the description, the lister and the
+  // exact point for anyone who has not confirmed they study.
+  const locked = Boolean(listing?.locked);
+  const unlock = (reason: "details" | "request" | "save") =>
+    openAuth({ next: `/listings/${id}`, reason });
   const request =
     createdRequest ||
     requests?.outgoing.find(
@@ -221,12 +273,6 @@ export default function ListingDetail() {
   if (furnished)
     facts.splice(3, 0, { icon: <Sofa size={16} />, label: "Furnished" });
   const save = savings(listing);
-  const initials =
-    listing.ownerName
-      ?.split(" ")
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join("") || "S";
 
   function primaryAction(size: "large" | "small") {
     if (!listing) return null;
@@ -247,7 +293,12 @@ export default function ListingDetail() {
       );
     if (!user)
       return (
-        <button className={cls} onClick={() => openAuth()}>
+        <button
+          className={cls}
+          onClick={() =>
+            openAuth({ next: `/listings/${listing.id}`, reason: "request" })
+          }
+        >
           <MessageSquare size={17} />
           Request handoff
         </button>
@@ -283,6 +334,7 @@ export default function ListingDetail() {
       </div>
 
       <div className="gallery-wrap">
+      <MobileAccount floating className="detail-account" />
       <div
         className={`gallery count-${Math.min(photos.length, 5)}`}
         onScroll={(e) => {
@@ -340,10 +392,21 @@ export default function ListingDetail() {
               {ROOM_LABELS[listing.roomType]} · {campus?.name}
             </div>
             <h1>{listing.title}</h1>
-            <p className="detail-address">
-              <MapPin size={15} />
-              <span>{listing.address}</span>
-            </p>
+            {locked ? (
+              <p className="detail-address is-locked">
+                <MapPin size={15} />
+                <LockedText>{LOCKED_ADDRESS}</LockedText>
+                <span className="sr-only">
+                  The address is hidden until you confirm you are a student.
+                </span>
+                <StudentsOnlyChip />
+              </p>
+            ) : (
+              <p className="detail-address">
+                <MapPin size={15} />
+                <span>{listing.address}</span>
+              </p>
+            )}
             {miles !== null && campus && (
               <p className="detail-distance">
                 <Footprints size={15} />
@@ -374,10 +437,35 @@ export default function ListingDetail() {
 
           <section className="detail-section">
             <h2>About the place</h2>
-            <p className="preserve-lines">
-              {listing.description ||
-                "The student hasn’t added a description yet."}
-            </p>
+            {locked ? (
+              <div className="locked-block">
+                <LockedText as="p" className="preserve-lines">
+                  {LOCKED_DESCRIPTION}
+                </LockedText>
+                <div className="locked-card">
+                  <StudentsOnlyChip />
+                  <p>
+                    Confirm you are a student to see the address, description
+                    and lister.
+                  </p>
+                  <button
+                    className="button primary"
+                    onClick={() => unlock("details")}
+                  >
+                    Confirm you are a student
+                    <ArrowRight size={16} />
+                  </button>
+                  <small>
+                    Handoff is students only, so places stay between students.
+                  </small>
+                </div>
+              </div>
+            ) : (
+              <p className="preserve-lines">
+                {listing.description ||
+                  "The student hasn’t added a description yet."}
+              </p>
+            )}
           </section>
 
           {listing.amenities.length > 0 && (
@@ -401,6 +489,7 @@ export default function ListingDetail() {
                 <Suspense fallback={<Loading label="Loading location…" />}>
                   <Map
                     compact
+                    approx={locked}
                     campus={campus}
                     pin={{ lat: listing.lat, lng: listing.lng }}
                   />
@@ -408,21 +497,50 @@ export default function ListingDetail() {
               </div>
             )}
             <p className="field-hint">
-              The pin is placed by the student, so confirm the address before
-              you commit.
+              {locked
+                ? "The circle covers roughly where the place is. The exact pin and address open once you confirm you are a student."
+                : "The pin is placed by the student, so confirm the address before you commit."}
             </p>
           </section>
 
-          <section className="host-card">
-            <span className="avatar large">{initials}</span>
-            <div className="host-text">
-              <strong>Listed by {listing.ownerName || "a student"}</strong>
-              <span className="host-verified">
-                <ShieldCheck size={14} />
-                Verified {campus?.name} student
-              </span>
-            </div>
-          </section>
+          {locked ? (
+            <section className="host-card is-locked">
+              <Avatar name="Maya Chen" size={48} blurred />
+              <div className="host-text">
+                <LockedText as="strong">Listed by Maya Chen</LockedText>
+                <span className="host-verified">
+                  <ShieldCheck size={14} />
+                  Verified {campus?.name} student
+                </span>
+                <span className="sr-only">
+                  The lister is hidden until you confirm you are a student.
+                </span>
+              </div>
+              <button
+                type="button"
+                className="button secondary small"
+                onClick={() => unlock("details")}
+              >
+                <Lock size={14} />
+                Unlock
+              </button>
+            </section>
+          ) : (
+            <section className="host-card">
+              <Avatar
+                src={listing.ownerAvatar}
+                name={listing.ownerName}
+                size={48}
+              />
+              <div className="host-text">
+                <strong>Listed by {listing.ownerName || "a student"}</strong>
+                <span className="host-verified">
+                  <ShieldCheck size={14} />
+                  Verified {campus?.name} student
+                </span>
+              </div>
+            </section>
+          )}
 
           <div className="detail-guidance">
             <ShieldCheck size={18} />
@@ -733,7 +851,7 @@ export default function ListingDetail() {
               className="button primary full-width"
               onClick={() => {
                 setReportOpen(false);
-                openAuth();
+                unlock("details");
               }}
             >
               Confirm you are a student

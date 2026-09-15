@@ -202,7 +202,8 @@
 }
 .auth-slide[data-step="1"] .t-page[data-page-id="1"],
 .auth-slide[data-step="2"] .t-page[data-page-id="2"],
-.auth-slide[data-step="3"] .t-page[data-page-id="3"] {
+.auth-slide[data-step="3"] .t-page[data-page-id="3"],
+.auth-slide[data-step="4"] .t-page[data-page-id="4"] {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -530,4 +531,146 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* ------------------------------------------------- confirming, in motion */
+
+/* A message that appears in place fades up rather than snapping in. */
+.auth-fade-in {
+  animation: auth-fade-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+@keyframes auth-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* The detected school arrives as the email resolves, so it rises in. */
+.auth-rise-in {
+  animation: auth-rise-in var(--duration-slow) var(--ease-smooth-out) both;
+}
+@keyframes auth-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-base));
+    filter: blur(var(--blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+/* transitions.dev 12, only the field that failed moves. */
+.auth-field-shake {
+  will-change: transform;
+}
+.auth-field-shake.shake-0,
+.auth-field-shake.shake-1 {
+  animation: auth-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2)
+    linear;
+}
+.field-error {
+  animation: auth-fade-in var(--duration-quick) var(--ease-smooth-out) both;
+}
+/* The password meter fills from the left instead of blinking on. */
+.auth-meter span {
+  position: relative;
+  overflow: hidden;
+}
+.auth-meter span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.auth-meter span[data-on="yes"]::after {
+  transform: scaleX(1);
+}
+.auth-meter[data-level="weak"] span {
+  color: var(--red);
+}
+.auth-meter[data-level="okay"] span {
+  color: var(--amber);
+}
+.auth-meter[data-level="good"] span {
+  color: var(--blue);
+}
+.auth-meter[data-level="strong"] span {
+  color: var(--green);
+}
+/* The fill is the layer above now, so the segment itself stays the track. */
+.auth-meter[data-level] span[data-on="yes"] {
+  background: var(--line);
+}
+.auth-meter span:nth-child(2)::after {
+  transition-delay: 40ms;
+}
+.auth-meter span:nth-child(3)::after {
+  transition-delay: 80ms;
+}
+.auth-meter span:nth-child(4)::after {
+  transition-delay: 120ms;
+}
+
+/* The account that already exists. Not a dead end, a door. */
+.auth-exists {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+  box-shadow: var(--ring);
+}
+.auth-exists > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.auth-exists > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.auth-exists p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-exists .button {
+  background: var(--surface);
+}
+
+/* The settled success moment, held before the dialog steps aside. */
+.auth-block.is-settled {
+  align-items: flex-start;
+  min-height: 132px;
+  justify-content: center;
+}
+.auth-block.is-settled .auth-head h1 {
+  font-size: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-fade-in,
+  .auth-rise-in,
+  .auth-field-shake.shake-0,
+  .auth-field-shake.shake-1,
+  .field-error {
+    animation: none !important;
+  }
+  .auth-meter span::after {
+    transition: none !important;
+  }
 }

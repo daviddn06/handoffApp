@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** A stable identifier the UI can branch on, such as "account_exists". */
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 export async function api<T>(
@@ -25,6 +28,7 @@ export async function api<T>(
     throw new ApiError(
       payload?.error || "Something went wrong. Please try again.",
       response.status,
+      payload?.code,
     );
   }
   return payload as T;

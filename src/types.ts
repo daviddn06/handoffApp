@@ -60,6 +60,8 @@ export type User = {
   bio: string;
   /** Shared with listers only through roommate preferences. */
   gender: Gender;
+  /** Optional profile photo, a public path, or null. */
+  avatar: string | null;
   /** Opens the internal dashboard at /admin. False for every student. */
   isAdmin: boolean;
 };
@@ -67,6 +69,8 @@ export type Listing = {
   id: string;
   ownerId: string;
   ownerName: string;
+  /** The lister's photo, when they added one. Null on a locked listing. */
+  ownerAvatar?: string | null;
   campusId: string;
   title: string;
   description: string;
@@ -94,6 +98,11 @@ export type Listing = {
   /** True while boostUntil is still in the future. */
   boosted: boolean;
   saved?: boolean;
+  /**
+   * True for a signed out visitor. The address, description and lister name
+   * arrive empty and the point is approximate until they confirm they study.
+   */
+  locked?: boolean;
 };
 export type BoostStats = {
   views: number;
@@ -107,8 +116,10 @@ export type HandoffRequest = {
   listingPhoto: string;
   requesterId: string;
   requesterName: string;
+  requesterAvatar?: string | null;
   ownerId: string;
   ownerName: string;
+  ownerAvatar?: string | null;
   message: string;
   status: "pending" | "accepted" | "declined" | "withdrawn";
   createdAt: string;

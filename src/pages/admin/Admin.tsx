@@ -1,7 +1,7 @@
 /**
- * Internal dashboard shell. Lives inside the app header, owns its left nav and
- * its own routes. A student who is not an admin sees the normal 404 page, and
- * the API answers 404 too, so nothing here hints that the surface exists.
+ * Internal dashboard shell. It owns its left nav and its own routes, and lives
+ * under the internal chrome on internal.handofflease.com. Its sections are
+ * mounted at the root there, so every link below stays relative.
  */
 import { lazy, Suspense } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import { useApp } from "../../lib/context";
+import { isInternalSurface } from "../../surface";
 import { EmptyState, Loading } from "../../components/ui";
 import "../../styles/admin.css";
 
@@ -42,16 +43,20 @@ const NAV = [
   { to: "audit", label: "Audit", icon: ClipboardList },
 ];
 
-/** The same page a wrong URL gets, so an admin surface never announces itself. */
+/** A wrong URL inside the dashboard. On the internal host it points home. */
 function NotFound() {
   return (
     <div className="page-container">
       <EmptyState
         title="This page has moved on."
-        description="Let’s get you back to finding your next place."
+        description={
+          isInternalSurface
+            ? "That section does not exist."
+            : "Let’s get you back to finding your next place."
+        }
       >
-        <Link className="button primary" to="/browse">
-          Back to browse
+        <Link className="button primary" to={isInternalSurface ? "/" : "/browse"}>
+          {isInternalSurface ? "Back to the dashboard" : "Back to browse"}
         </Link>
       </EmptyState>
     </div>

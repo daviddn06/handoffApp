@@ -12,6 +12,8 @@ import { createApp } from "../server/app.js";
 import { hashToken } from "../server/security.js";
 
 const PASSWORD = "Correct horse battery 572!";
+// The dashboard allow list. The flag alone never opens /api/admin.
+process.env.HANDOFF_ADMIN_EMAILS = "Operator.Case@usc.edu , team.two@usc.edu";
 const ORIGIN = "http://127.0.0.1:4741";
 const validListing = (photos = [], overrides = {}) => ({
   title: "Sunny private room near campus",
@@ -62,12 +64,20 @@ async function setup(t, overrides = {}) {
   });
   const client = () => {
     let cookie = "";
+    // "internal" sends the header Caddy adds on internal.handofflease.com.
+    let surface = "";
     return {
       get cookie() {
         return cookie;
       },
       set cookie(value) {
         cookie = value;
+      },
+      get surface() {
+        return surface;
+      },
+      set surface(value) {
+        surface = value;
       },
       async call(
         path,
@@ -80,6 +90,7 @@ async function setup(t, overrides = {}) {
             ...(!["GET", "HEAD"].includes(method)
               ? { Origin: overrides.origin || ORIGIN }
               : {}),
+            ...(surface ? { "X-Handoff-Surface": surface } : {}),
             ...(body && !isForm ? { "Content-Type": "application/json" } : {}),
             ...(cookie ? { Cookie: cookie } : {}),
             ...headers,
@@ -1077,7 +1088,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 10);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 11);
   assert.throws(
     () =>
       createApp({
@@ -1088,7 +1099,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
   );
 });
 
-test("re-registering an unverified email replaces pre-registered credentials and invalidates old links", async (t) => {
+test("an abandoned unverified registration can be taken over, a live one cannot", async (t) => {
   const env = await setup(t);
   const attackerPassword = "Quiet lantern parade 867";
   const victimPassword = "Copper harbor lantern 915";
@@ -1109,6 +1120,26 @@ test("re-registering an unverified email replaces pre-registered credentials and
   const attackerToken = env.tokenFor("student@usc.edu");
   assert.equal((await attacker.call("/api/session")).body.user.verified, false);
   const victim = env.client();
+  // While that registration is fresh and in use, nobody signs up over it.
+  const refused = await victim.call("/api/auth/signup", {
+    method: "POST",
+    body: {
+      name: "Actual Student",
+      email: "student@usc.edu",
+      password: victimPassword,
+    },
+  });
+  assert.equal(refused.status, 409, JSON.stringify(refused.body));
+  assert.equal(refused.body.code, "account_exists");
+  assert.match(refused.body.error, /already has an account/);
+  // Abandon it: nobody verified, nobody signed in, and a day has passed.
+  const db = env.app.locals.db;
+  const stale = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+  db.prepare("UPDATE users SET created_at=? WHERE email=?").run(
+    stale,
+    "student@usc.edu",
+  );
+  db.prepare("DELETE FROM sessions").run();
   assert.equal(
     (
       await victim.call("/api/auth/signup", {
@@ -1159,19 +1190,16 @@ test("re-registering an unverified email replaces pre-registered credentials and
     ).status,
     200,
   );
-  assert.equal(
-    (
-      await attacker.call("/api/auth/signup", {
-        method: "POST",
-        body: {
-          name: "Attacker Name",
-          email: "student@usc.edu",
-          password: attackerPassword,
-        },
-      })
-    ).status,
-    202,
-  );
+  const again = await attacker.call("/api/auth/signup", {
+    method: "POST",
+    body: {
+      name: "Attacker Name",
+      email: "student@usc.edu",
+      password: attackerPassword,
+    },
+  });
+  assert.equal(again.status, 409, JSON.stringify(again.body));
+  assert.equal(again.body.code, "account_exists");
   assert.equal(
     (
       await victim.call("/api/auth/login", {
@@ -1390,7 +1418,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      10,
+      11,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
@@ -1847,6 +1875,8 @@ test("a request carries the requester's gender to the lister only when it was sh
 test("the admin dashboard is invisible to a student and complete for an admin", async (t) => {
   const f = await setup(t);
   const student = await f.verified("student.admin.case@usc.edu", "Regular Student");
+  // A student on the internal host learns nothing either.
+  student.surface = "internal";
   // Every admin path answers 404, the same as a route that does not exist.
   for (const path of [
     "/api/admin/overview",
@@ -1860,9 +1890,11 @@ test("the admin dashboard is invisible to a student and complete for an admin", 
     assert.equal(denied.body.error, "Endpoint not found.");
   }
   const anonymous = f.client();
+  anonymous.surface = "internal";
   assert.equal((await anonymous.call("/api/admin/overview")).status, 404);
   // A student never sees an admin flag on their own session.
   assert.equal((await student.call("/api/session")).body.user.isAdmin, false);
+  student.surface = "";
 
   const operator = await f.verified("operator.case@usc.edu", "Ops Student");
   // The script's own function is what an operator runs on the VPS.
@@ -1870,6 +1902,8 @@ test("the admin dashboard is invisible to a student and complete for an admin", 
   const promoted = setAdmin(f.app.locals.db, "operator.case@usc.edu");
   assert.equal(promoted.is_admin, 1);
   assert.equal((await operator.call("/api/session")).body.user.isAdmin, true);
+  // Everything the dashboard reaches for happens on the internal host.
+  operator.surface = "internal";
 
   const overview = await operator.call("/api/admin/overview");
   assert.equal(overview.status, 200);
@@ -1943,4 +1977,216 @@ test("the admin dashboard is invisible to a student and complete for an admin", 
   });
   assert.equal(revoked.status, 400);
   assert.match(revoked.body.error, /cannot remove your own admin access/);
+});
+
+test("a signed out visitor gets a locked listing with an approximate point", async (t) => {
+  const env = await setup(t);
+  const owner = await env.verified("locked.owner@usc.edu", "Locked Owner");
+  const listing = await env.publish(owner, {
+    address: "1234 Hoover Street, Los Angeles, CA 90007",
+    description:
+      "A quiet corner room with a desk by the window and a short walk to campus.",
+  });
+  const anonymous = env.client();
+  const one = await anonymous.call(`/api/listings/${listing.id}`);
+  assert.equal(one.status, 200);
+  const hidden = one.body.listing;
+  assert.equal(hidden.locked, true);
+  assert.equal(hidden.address, null);
+  assert.equal(hidden.description, null);
+  assert.equal(hidden.ownerName, null);
+  // Everything a visitor may see is still there.
+  assert.equal(hidden.title, listing.title);
+  assert.equal(hidden.price, listing.price);
+  assert.equal(hidden.originalPrice, listing.originalPrice);
+  assert.deepEqual(hidden.photos, listing.photos);
+  assert.deepEqual(hidden.amenities, listing.amenities);
+  assert.equal(hidden.availableFrom, listing.availableFrom);
+  assert.equal(hidden.availableTo, listing.availableTo);
+  assert.equal(hidden.bedrooms, listing.bedrooms);
+  assert.equal(hidden.bathrooms, listing.bathrooms);
+  assert.equal(hidden.roomType, listing.roomType);
+  assert.equal(hidden.genderPreference, listing.genderPreference);
+  assert.equal(hidden.boosted, listing.boosted);
+  // The point moved, by no more than 250 metres, and it never moves again.
+  assert.notEqual(hidden.lat, listing.lat);
+  const metres =
+    Math.hypot(
+      (hidden.lat - listing.lat) * 111320,
+      (hidden.lng - listing.lng) *
+        111320 *
+        Math.cos((listing.lat * Math.PI) / 180),
+    );
+  assert.ok(metres > 0 && metres <= 251, `moved ${metres} metres`);
+  const repeat = await anonymous.call(`/api/listings/${listing.id}`);
+  assert.equal(repeat.body.listing.lat, hidden.lat);
+  assert.equal(repeat.body.listing.lng, hidden.lng);
+  const browse = await env.client().call("/api/listings");
+  const inList = browse.body.listings.find((row) => row.id === listing.id);
+  assert.equal(inList.locked, true);
+  assert.equal(inList.address, null);
+  assert.equal(inList.description, null);
+  assert.equal(inList.ownerName, null);
+  assert.equal(inList.lat, hidden.lat);
+  assert.equal(inList.lng, hidden.lng);
+  // A signed in student sees the real thing, with no locked flag set.
+  const student = await env.verified("locked.reader@usc.edu", "Locked Reader");
+  const open = await student.call(`/api/listings/${listing.id}`);
+  assert.equal(open.body.listing.locked, false);
+  assert.equal(open.body.listing.address, listing.address);
+  assert.equal(open.body.listing.description, listing.description);
+  assert.equal(open.body.listing.ownerName, "Locked Owner");
+  assert.equal(open.body.listing.lat, listing.lat);
+  assert.equal(open.body.listing.lng, listing.lng);
+});
+
+test("the dashboard lives on the internal host and only for an allow listed admin", async (t) => {
+  const f = await setup(t);
+  const student = await f.verified("surface.student@usc.edu", "Surface Student");
+  const listed = await f.verified("operator.case@usc.edu", "Listed Admin");
+  const unlisted = await f.verified("unlisted.admin@usc.edu", "Unlisted Admin");
+  const { setAdmin } = await import("../scripts/make-admin.js");
+  setAdmin(f.app.locals.db, "operator.case@usc.edu");
+  setAdmin(f.app.locals.db, "unlisted.admin@usc.edu");
+
+  // The allow listed admin, on the internal host, is the only way in.
+  listed.surface = "internal";
+  const overview = await listed.call("/api/admin/overview");
+  assert.equal(overview.status, 200);
+  assert.equal(overview.headers.get("x-robots-tag"), "noindex, nofollow");
+
+  // The database flag alone is not enough, and the client is never told.
+  unlisted.surface = "internal";
+  assert.equal((await unlisted.call("/api/admin/overview")).status, 404);
+  assert.equal((await unlisted.call("/api/session")).body.user.isAdmin, false);
+
+  // A student is refused the same way.
+  student.surface = "internal";
+  assert.equal((await student.call("/api/admin/overview")).status, 404);
+
+  // The internal host is the dashboard and nothing else.
+  for (const path of ["/api/listings", "/api/my-listings", "/api/saved", "/api/requests"])
+    assert.equal((await student.call(path)).status, 404, path);
+  const visitor = f.client();
+  visitor.surface = "internal";
+  for (const path of ["/api/auth/signup", "/api/auth/forgot", "/api/auth/reset", "/api/auth/verify"]) {
+    const gone = await visitor.call(path, { method: "POST", body: {} });
+    assert.equal(gone.status, 404, path);
+  }
+
+  // Sign in on the internal host refuses anybody who is not on the list, and
+  // never opens a session for them.
+  const refused = await visitor.call("/api/auth/login", {
+    method: "POST",
+    body: { email: "surface.student@usc.edu", password: PASSWORD },
+  });
+  assert.equal(refused.status, 403);
+  assert.equal(refused.body.error, "This sign in is for the Handoff team.");
+  assert.equal((await visitor.call("/api/session")).body.user, null);
+  const refusedAdmin = await visitor.call("/api/auth/login", {
+    method: "POST",
+    body: { email: "unlisted.admin@usc.edu", password: PASSWORD },
+  });
+  assert.equal(refusedAdmin.status, 403);
+  assert.equal((await visitor.call("/api/session")).body.user, null);
+
+  const team = f.client();
+  team.surface = "internal";
+  const signedIn = await team.call("/api/auth/login", {
+    method: "POST",
+    body: { email: "operator.case@usc.edu", password: PASSWORD },
+  });
+  assert.equal(signedIn.status, 200);
+  assert.equal(signedIn.body.user.isAdmin, true);
+  assert.equal((await team.call("/api/admin/overview")).status, 200);
+
+  // The app host never carries the dashboard, not even for that admin.
+  const onApp = f.client();
+  onApp.cookie = team.cookie;
+  assert.equal((await onApp.call("/api/admin/overview")).status, 404);
+  assert.equal((await onApp.call("/api/session")).body.user.isAdmin, true);
+  assert.equal(
+    (await onApp.call("/api/listings")).status,
+    200,
+    "the student app is untouched",
+  );
+  assert.equal((await onApp.call("/api/session")).headers.get("x-robots-tag"), null);
+
+  // The internal host tells crawlers to stay away.
+  const robots = await visitor.call("/robots.txt", { raw: true });
+  assert.equal(robots.status, 200);
+  assert.match(robots.body.toString(), /Disallow: \//);
+  assert.equal((await onApp.call("/robots.txt", { raw: true })).status, 404);
+});
+
+test("a profile photo is optional, square, replaceable and removable", async (t) => {
+  const env = await setup(t);
+  const student = await env.verified("photo.student@usc.edu", "Photo Student");
+  assert.equal((await student.call("/api/session")).body.user.avatar, null);
+  const png = async (size, colour) =>
+    await sharp({
+      create: {
+        width: size,
+        height: Math.round(size * 0.75),
+        channels: 3,
+        background: colour,
+      },
+    })
+      .png()
+      .toBuffer();
+  const send = async (bytes, filename, type) => {
+    const form = new FormData();
+    form.append("avatar", new Blob([bytes], { type }), filename);
+    return student.call("/api/profile/avatar", { method: "POST", body: form });
+  };
+  const first = await send(await png(400, "#3b78d7"), "me.png", "image/png");
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  const one = first.body.user.avatar;
+  assert.match(one, /^\/avatars\/[a-f0-9-]{36}\.jpg$/);
+  const served = await fetch(`${env.url}${one}`);
+  assert.equal(served.status, 200);
+  assert.equal(served.headers.get("content-type"), "image/jpeg");
+  const shape = await sharp(
+    Buffer.from(await served.arrayBuffer()),
+  ).metadata();
+  assert.equal(shape.width, 320);
+  assert.equal(shape.height, 320);
+  assert.equal(shape.format, "jpeg");
+  // Replacing it swaps the path and the old file stops being served.
+  const second = await send(await png(500, "#159a6a"), "new.png", "image/png");
+  assert.equal(second.status, 201, JSON.stringify(second.body));
+  const two = second.body.user.avatar;
+  assert.notEqual(two, one);
+  assert.equal((await fetch(`${env.url}${one}`)).status, 404);
+  assert.equal((await fetch(`${env.url}${two}`)).status, 200);
+  // The photo travels with the name, never on its own.
+  const listing = await env.publish(student);
+  const reader = await env.verified("photo.reader@usc.edu", "Photo Reader");
+  const seen = await reader.call(`/api/listings/${listing.id}`);
+  assert.equal(seen.body.listing.ownerAvatar, two);
+  const hidden = await env.client().call(`/api/listings/${listing.id}`);
+  assert.equal(hidden.body.listing.ownerAvatar, null);
+  // Anything that is not an image is refused and nothing changes.
+  const bad = await send(
+    Buffer.from("not really a photo at all"),
+    "note.txt",
+    "text/plain",
+  );
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /JPG, PNG or WebP/);
+  assert.equal((await student.call("/api/session")).body.user.avatar, two);
+  const tiny = await send(await png(40, "#c4907a"), "tiny.png", "image/png");
+  assert.equal(tiny.status, 400);
+  // Removing it clears the row and the file.
+  const removed = await student.call("/api/profile/avatar", {
+    method: "DELETE",
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.user.avatar, null);
+  assert.equal((await fetch(`${env.url}${two}`)).status, 404);
+  assert.equal(
+    (await env.client().call("/api/profile/avatar", { method: "DELETE" }))
+      .status,
+    401,
+  );
 });

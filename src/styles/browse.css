@@ -31,18 +31,21 @@
   background: var(--surface);
 }
 .head-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s-3);
+  display: block;
 }
+.head-row > .popover-anchor {
+  display: block;
+}
+/* The campus control is a plain row, not a field. The search below it already
+   carries a box, so this one only needs a mark, the name and an arrow. */
 .campus-switch {
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
   gap: var(--s-2);
-  min-height: 40px;
-  padding: var(--s-1) var(--s-2) var(--s-1) var(--s-1);
-  margin-left: calc(var(--s-1) * -1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s-2);
+  margin-left: calc(var(--s-2) * -1);
   border-radius: var(--r-sm);
   text-align: left;
   min-width: 0;
@@ -50,34 +53,39 @@
   transition: background-color var(--duration-quick) var(--ease-out);
 }
 .campus-switch[aria-expanded="true"] {
-  background: var(--soft-2);
+  background: var(--soft);
 }
 @media (hover: hover) {
   .campus-switch:hover {
-    background: var(--soft-2);
+    background: var(--soft);
   }
 }
-.campus-switch .chip-chevron {
-  color: var(--muted);
-}
-.campus-text {
-  display: flex;
-  flex-direction: column;
+/* The school name wraps rather than truncating. Two lines is the ceiling. */
+.campus-value {
+  flex: 1;
   min-width: 0;
-  line-height: 1.2;
-}
-.campus-text strong {
   font-size: 15px;
   font-weight: 600;
+  line-height: 1.3;
   letter-spacing: -0.01em;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
-.campus-text small {
-  font-size: 11px;
+.campus-near {
+  font-weight: 400;
   color: var(--muted);
-  white-space: nowrap;
+}
+.campus-chevron {
+  flex: none;
+  /* Aligned to the first line of the name, not to the block. */
+  margin-top: 2px;
+  color: var(--muted);
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.campus-switch[aria-expanded="true"] .campus-chevron {
+  transform: rotate(180deg);
 }
 .head-count {
   font-size: 13px;
@@ -497,7 +505,7 @@
 }
 .listing-card.compact {
   grid-template-columns: 140px minmax(0, 1fr);
-  min-height: 118px;
+  min-height: 126px;
 }
 .listing-card.grid {
   grid-template-columns: 1fr;
@@ -509,14 +517,8 @@
   }
 }
 .listing-card.is-active {
-  box-shadow:
-    var(--shadow-md),
-    0 0 0 2px var(--blue),
-    0 0 0 6px rgb(59 120 215 / 0.14);
-  transform: translateY(-1px) scale(1.01);
-}
-.listing-card.is-active .card-body {
-  background: linear-gradient(180deg, var(--blue-soft) 0%, #fff 70%);
+  box-shadow: var(--shadow-md), 0 0 0 1.5px var(--blue);
+  transform: translateY(-1px);
 }
 .listing-card:focus-within {
   box-shadow: var(--shadow-md), 0 0 0 2px var(--focus);
@@ -559,6 +561,39 @@
   color: var(--muted-2);
   font-size: 11px;
 }
+/* Boosted and the roommate preference are marks over the photo, never pills
+   in the body, where they pushed the facts line into an ellipsis. */
+.card-badges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 5px;
+}
+.boost-badge,
+.preference-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 1px 4px rgb(16 24 40 / 0.3),
+    0 0 0 1.5px rgb(255 255 255 / 0.9);
+}
+.boost-badge {
+  background: var(--blue);
+  color: #fff;
+}
+.preference-badge.tone-rose {
+  background: #f8e3ec;
+  color: #a03a64;
+}
+.preference-badge.tone-blue {
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+}
 .card-photo .room-badge {
   position: absolute;
   left: 8px;
@@ -599,25 +634,37 @@
 .photo-step.next {
   right: 6px;
 }
-.listing-card:hover .photo-step,
+@media (hover: hover) {
+  .listing-card:hover .photo-step {
+    opacity: 1;
+  }
+}
 .photo-step:focus-visible {
   opacity: 1;
+}
+@media (hover: none) {
+  .photo-step {
+    display: none;
+  }
 }
 .photo-step:active {
   transform: translateY(-50%) scale(0.96);
 }
 .photo-dots {
   position: absolute;
-  bottom: 8px;
+  bottom: 7px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  align-items: center;
   gap: 3px;
   z-index: 2;
-}
-.listing-card.compact .photo-dots {
-  bottom: auto;
-  top: 8px;
+  padding: 3px 5px;
+  border-radius: var(--r-pill);
+  background: rgb(16 24 40 / 0.22);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
 }
 .photo-dots span {
   width: 5px;
@@ -692,8 +739,8 @@
 .card-topline {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--s-1) var(--s-2);
+  flex-wrap: nowrap;
+  gap: var(--s-2);
   min-width: 0;
 }
 .card-topline .savings-tag {
@@ -751,6 +798,7 @@
   font-weight: 500;
   color: var(--blue-ink);
 }
+
 .card-original {
   font-size: 12px;
   color: var(--muted-2);
@@ -1055,6 +1103,17 @@
     0 3px 8px rgb(16 24 40 / 0.25);
   cursor: grab;
 }
+/* An approximate location reads as a soft area, never a precise point. */
+.location-marker-wrap.is-approx .location-marker {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgb(59 120 215 / 0.18);
+  box-shadow: inset 0 0 0 1.5px rgb(59 120 215 / 0.45);
+}
+.location-marker-wrap.is-approx .location-marker::after {
+  display: none;
+}
 .location-marker::after {
   content: "";
   position: absolute;
@@ -1225,6 +1284,10 @@
 .map-preview-card:hover {
   box-shadow: var(--shadow-lg), 0 0 0 1.5px rgb(59 120 215 / 0.5);
 }
+.map-preview-photo .card-badges {
+  top: 8px;
+  left: 8px;
+}
 .map-preview-photo {
   position: relative;
   height: 132px;
@@ -1299,6 +1362,10 @@
   color: var(--muted);
   line-height: 1.45;
 }
+.map-preview-meta p {
+  margin: 0;
+  font-size: 12.5px;
+}
 .map-preview-meta b {
   font-weight: 500;
   color: var(--blue-ink);
@@ -1324,60 +1391,13 @@
   bottom: 14px;
 }
 
-.sheet-handle,
-.mobile-view-toggle {
+.sheet-handle {
   display: none;
 }
-.t-tabs {
-  position: relative;
-  align-items: center;
-  gap: 3px;
-  padding: 3px;
-  border-radius: 48px;
-  background: rgb(27 35 48 / 0.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-lg);
-}
-.t-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 4px 18px;
-  color: rgb(255 255 255 / 0.72);
-  border-radius: 48px;
-  z-index: 1;
-  font-size: 13px;
-  font-weight: 600;
-  transition: color var(--tabs-dur) var(--tabs-ease);
-}
-.t-tab[aria-selected="true"] {
-  color: var(--ink);
-}
-.t-tabs-pill {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  height: 36px;
-  width: calc(50% - 4.5px);
-  background: #fff;
-  border-radius: 48px;
-  transform: translateX(0);
-  transition: transform var(--tabs-dur) var(--tabs-ease);
-  will-change: transform;
-  z-index: 0;
-  pointer-events: none;
-}
-.t-tabs-pill[data-pos="list"] {
-  transform: translateX(calc(100% + 3px));
-}
-@media (prefers-reduced-motion: reduce) {
-  .t-tabs-pill,
-  .t-tab {
-    transition: none !important;
-  }
+/* Phones swap the whole surface with one floating button, so there is no
+   segmented control taking room away from the map. */
+.mobile-view-fab {
+  display: none;
 }
 
 /* Responsive */
@@ -1403,17 +1423,18 @@
   }
 }
 @media (max-width: 760px) {
+  /* The site header is gone on a phone, so browse owns the whole viewport. */
   .browse-page {
     display: block;
-    height: calc(100dvh - var(--header-h) - var(--mobile-nav-h));
+    height: 100dvh;
     min-height: 0;
     overflow: hidden;
   }
   .browse-page .panel-resizer {
     display: none;
   }
-  /* Map mode. The map fills the screen, the search and chips float on top,
-     the cards ride in a carousel above the tab bar. */
+  /* Map mode. The map fills the screen, the campus field, search and chips
+     float on top, the cards ride in a carousel above the nav pill. */
   .browse-map {
     display: none;
     position: absolute;
@@ -1435,12 +1456,34 @@
   .browse-page.mobile-map .panel-head {
     background: transparent;
     border-bottom: 0;
-    padding: var(--s-3) var(--s-4) 0;
-    gap: var(--s-3);
+    padding: calc(env(safe-area-inset-top) + var(--s-3)) var(--s-4) 0;
+    gap: var(--s-2);
     pointer-events: auto;
   }
-  .browse-page.mobile-map .head-row {
-    display: none;
+  .browse-page.mobile-list .panel-head {
+    padding: calc(env(safe-area-inset-top) + var(--s-3)) var(--s-4) var(--s-3);
+    gap: var(--s-2);
+  }
+  /* The campus field and the account entry share the top row. */
+  .head-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+  }
+  .head-row > .popover-anchor {
+    flex: 1;
+    min-width: 0;
+  }
+  /* Over the map the row takes a soft white fill so it stays legible. No
+     border, no ring, it is still a row and not a field. */
+  .browse-page.mobile-map .campus-switch {
+    margin-left: 0;
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md);
+    background: rgb(255 255 255 / 0.82);
+    backdrop-filter: saturate(1.6) blur(14px);
+    -webkit-backdrop-filter: saturate(1.6) blur(14px);
+    box-shadow: none;
   }
   .browse-page.mobile-map .search-field {
     background: rgb(255 255 255 / 0.96);
@@ -1466,7 +1509,7 @@
   }
   .browse-page.mobile-map .map-controls {
     top: auto;
-    bottom: 218px;
+    bottom: calc(var(--mobile-nav-h) + 148px + env(safe-area-inset-bottom));
     left: auto;
     right: 12px;
   }
@@ -1476,7 +1519,7 @@
     display: none;
   }
   .browse-page.mobile-map .maplibregl-ctrl-bottom-right {
-    bottom: 200px;
+    bottom: calc(var(--mobile-nav-h) + 130px + env(safe-area-inset-bottom));
   }
   .browse-page.mobile-map .maplibregl-ctrl-bottom-left {
     display: none;
@@ -1487,19 +1530,13 @@
     inset: 0;
     border-right: 0;
   }
-  .browse-page.mobile-list .panel-head {
-    padding: var(--s-3) var(--s-4);
-    gap: var(--s-3);
-  }
-  .browse-page.mobile-list .campus-switch {
-    margin-left: -4px;
-  }
   .chip-row {
     margin: 0 calc(var(--s-4) * -1);
     padding: 2px var(--s-4);
   }
   .listing-list {
-    padding: var(--s-3) var(--s-4) 96px;
+    padding: var(--s-3) var(--s-4)
+      calc(var(--mobile-nav-h) + var(--s-8) + env(safe-area-inset-bottom));
   }
   .listing-card.compact {
     grid-template-columns: 124px minmax(0, 1fr);
@@ -1507,12 +1544,49 @@
   .popover {
     max-width: calc(100vw - 24px);
   }
-  /* Card carousel over the map */
+  /* One floating button swaps map and list, sitting under the chips. */
+  .mobile-view-fab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    position: absolute;
+    top: 100%;
+    right: var(--s-4);
+    margin-top: var(--s-2);
+    height: 40px;
+    padding: 0 var(--s-4);
+    border-radius: var(--r-pill);
+    background: rgb(255 255 255 / 0.92);
+    backdrop-filter: saturate(1.6) blur(18px);
+    -webkit-backdrop-filter: saturate(1.6) blur(18px);
+    box-shadow: var(--shadow-lg), var(--ring);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    pointer-events: auto;
+    z-index: 8;
+    transition: transform var(--duration-quick) var(--ease-out);
+  }
+  .mobile-view-fab:active {
+    transform: scale(0.96);
+  }
+  .panel-head {
+    position: relative;
+  }
+  /* In list mode the button floats over the first row of the list, so the
+     sort control steps aside for it. */
+  .browse-page.mobile-list .results-toolbar {
+    padding-right: 104px;
+  }
+  .browse-page.mobile-list .signin-banner {
+    margin-top: 44px;
+  }
+  /* Card carousel over the map, clear of the floating nav pill. */
   .mobile-carousel {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 68px;
+    bottom: calc(var(--mobile-nav-h) + var(--s-6) + env(safe-area-inset-bottom));
     z-index: 6;
     display: flex;
     gap: var(--s-3);
@@ -1533,24 +1607,20 @@
   .carousel-item .listing-card {
     box-shadow: var(--shadow-lg), var(--ring);
   }
+  /* No tint and no blue fill on the card in view, only a hairline ring. */
   .carousel-item .listing-card.is-active {
     transform: none;
+    box-shadow: var(--shadow-lg), 0 0 0 1px var(--blue);
   }
   .carousel-item .listing-card.compact {
-    grid-template-columns: 112px minmax(0, 1fr);
-    min-height: 108px;
+    grid-template-columns: 116px minmax(0, 1fr);
+    min-height: 116px;
   }
   .carousel-item .card-photo {
-    min-height: 108px;
+    min-height: 116px;
   }
-  /* Map or list toggle above the tab bar */
-  .mobile-view-toggle {
-    display: inline-flex;
-    position: absolute;
-    left: 50%;
-    bottom: 12px;
-    transform: translateX(-50%);
-    z-index: 30;
+  .carousel-item .card-body {
+    padding: var(--s-3) var(--s-3) var(--s-3) var(--s-2);
   }
 }
 
@@ -1742,8 +1812,9 @@
    ------------------------------------------------------------------ */
 .school-search {
   position: relative;
-  height: 428px;
 }
+/* The page in view sits in the flow and sets the height, the one leaving
+   overlays it, so an empty query leaves nothing but the search field. */
 .school-search > .t-page {
   position: absolute;
   inset: 0;
@@ -1767,6 +1838,8 @@
 }
 .school-search[data-view="search"] > .t-page[data-page-id="search"],
 .school-search[data-view="waitlist"] > .t-page[data-page-id="waitlist"] {
+  position: relative;
+  inset: auto;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -1814,9 +1887,11 @@
   min-height: 30px;
 }
 .school-panel {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
+  max-height: 372px;
   overflow-y: auto;
+  animation: school-panel-in var(--dropdown-open-dur) var(--dropdown-ease);
   overscroll-behavior: contain;
   padding: var(--s-2);
   border-radius: var(--r-md);
@@ -1824,20 +1899,11 @@
   box-shadow: var(--ring);
   scrollbar-width: thin;
 }
-.school-idle {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  min-height: 160px;
-  padding: var(--s-6);
-  text-align: center;
-}
-.school-idle p {
-  margin: 0;
-  max-width: 26ch;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--muted-2);
+@keyframes school-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--dropdown-pre-scale)) translateY(-4px);
+  }
 }
 .school-panel.plain {
   padding: 2px 0 0;
@@ -2043,12 +2109,16 @@
   background: var(--green-soft);
   color: var(--green-ink);
 }
-.popover .school-search {
-  height: 400px;
+.school-panel.plain {
+  max-height: none;
+  animation: none;
 }
 .campus-switch .school-logo {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
+}
+.campus-switch > .school-logo {
+  margin-top: -1px;
 }
 .campus-switch .school-logo img {
   width: 19px;
@@ -2059,7 +2129,8 @@
   height: 22px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .school-row {
+  .school-row,
+  .school-panel {
     animation: none;
   }
   .school-search > .t-page {
@@ -2069,10 +2140,8 @@
 }
 
 @media (max-width: 760px) {
-  .school-search,
-  .popover .school-search {
-    height: min(62dvh, 520px);
-    min-height: 320px;
+  .school-panel {
+    max-height: min(52dvh, 372px);
   }
   .school-field {
     flex-basis: 48px;

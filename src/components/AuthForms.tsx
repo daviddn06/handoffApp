@@ -6,9 +6,9 @@ import {
   type FormEvent,
 } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
-import { api, errorMessage, json } from "../lib/api";
-import { useApp } from "../lib/context";
+import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ApiError, api, errorMessage, json } from "../lib/api";
+import { useApp, type AuthReason } from "../lib/context";
 import { Button, ErrorBox, Field } from "./ui";
 import type { Gender, User } from "../types";
 import { GenderChoice } from "./Gender";
@@ -20,6 +20,7 @@ import {
 } from "../lib/schools";
 import { passwordCheck, type PasswordCheck } from "../lib/password";
 import { SchoolLogo } from "./SchoolSearch";
+import { PhotoPicker } from "./PhotoPicker";
 
 /**
  * The three signed out forms, lifted out of the auth pages so the same code
@@ -34,10 +35,94 @@ export type AuthFormProps = {
   onSwitch?: (mode: AuthFormMode) => void;
   /** Tighter spacing for the modal. */
   compact?: boolean;
+  /** What the student was reaching for, so the headline can name it. */
+  reason?: AuthReason;
+  /** Seeds the email field, so switching forms keeps what was typed. */
+  email?: string;
+  /** Reports every keystroke, so the host can seed the other form. */
+  onEmail?: (value: string) => void;
 };
 
+/**
+ * The headline names the action, because a dialog that appears over a page
+ * has to say what it is for. The reason wins, the target is the fallback.
+ */
+function actionPhrase(next: string, reason?: AuthReason) {
+  const byReason: Partial<Record<AuthReason, string>> = {
+    saved: "to see your saved places",
+    requests: "to see your requests",
+    "my-listings": "to see your listings",
+    "new-listing": "to list your place",
+    request: "to request this place",
+    details: "to see the address and details",
+    save: "to save this place",
+  };
+  if (reason && byReason[reason]) return byReason[reason] as string;
+  const path = (next || "").split("?")[0];
+  if (path.startsWith("/saved")) return "to see your saved places";
+  if (path.startsWith("/requests")) return "to see your requests";
+  if (path.startsWith("/my-listings")) return "to see your listings";
+  if (path.startsWith("/listings/new")) return "to list your place";
+  return "";
+}
+export function signUpHeadline(next: string, reason?: AuthReason) {
+  const phrase = actionPhrase(next, reason);
+  return `Confirm you are a student ${phrase || "to continue"}.`;
+}
+export function signInLead(next: string, reason?: AuthReason) {
+  const phrase = actionPhrase(next, reason);
+  return `Sign in ${phrase || "to pick up where you left off"}.`;
+}
+export const STUDENTS_ONLY_LINE =
+  "Handoff is students only. Confirm with your school email.";
+
+/**
+ * A settled success check, held for a beat so the student sees the result
+ * before the dialog gets out of the way. transitions.dev 10.
+ */
+export const SUCCESS_HOLD = 700;
+function useSettledSuccess(onDone: () => void) {
+  const [done, setDone] = useState(false);
+  const fire = useRef(onDone);
+  fire.current = onDone;
+  useEffect(() => {
+    if (!done) return;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const t = window.setTimeout(() => fire.current(), reduced ? 120 : SUCCESS_HOLD);
+    return () => window.clearTimeout(t);
+  }, [done]);
+  return { done, settle: () => setDone(true) };
+}
+
+/**
+ * transitions.dev 12, but only the field that failed moves. Alternating the
+ * class restarts the animation on a repeated failure without a remount, so
+ * the caret never leaves the input.
+ */
+function useFieldShake() {
+  const [state, setState] = useState<{ field: string; tick: number }>({
+    field: "",
+    tick: 0,
+  });
+  return {
+    shakeField: (field: string) =>
+      setState((c) => ({ field, tick: c.tick + 1 })),
+    fieldClass: (field: string) =>
+      state.field === field
+        ? `auth-field-shake shake-${state.tick % 2}`
+        : "",
+  };
+}
+
 /** Signing up is a student confirming who they are, so the steps say that. */
-export const STEP_NAMES = ["Your school email", "Your name", "A password"];
+export const STEP_NAMES = [
+  "Your school email",
+  "Your name",
+  "A password",
+  "Add a photo",
+];
 export const STEPS = STEP_NAMES.length;
 
 export function SuccessCheck() {
@@ -163,16 +248,32 @@ function liveCampusFor(
 
 /* ---------------------------------------------------------------- sign in */
 
-export function SignInForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
+export function SignInForm({
+  next,
+  onDone,
+  onSwitch,
+  compact,
+  reason,
+  email: sharedEmail,
+  onEmail,
+}: AuthFormProps) {
   const { setUser, campuses: allCampuses } = useApp();
   const campuses = liveCampuses(allCampuses);
-  const { ref, shake } = useShake();
+  const { shakeField, fieldClass } = useFieldShake();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [email, setEmail] = useState(""),
+    [email, setEmailValue] = useState(sharedEmail || ""),
     [password, setPassword] = useState(""),
     [showPassword, setShowPassword] = useState(false),
+    [signedIn, setSignedIn] = useState<User | null>(null),
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const setEmail = (value: string) => {
+    setEmailValue(value);
+    onEmail?.(value);
+  };
+  const { done, settle } = useSettledSuccess(() => {
+    if (signedIn) onDone?.(signedIn);
+  });
   const clearField = (key: string) =>
     setFieldErrors((current) =>
       current[key] ? { ...current, [key]: "" } : current,
@@ -187,7 +288,7 @@ export function SignInForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
     });
     setFieldErrors(problems);
     if (Object.keys(problems).length) {
-      shake();
+      shakeField(problems.email ? "email" : "password");
       return;
     }
     setError("");
@@ -198,24 +299,43 @@ export function SignInForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
         body: json({ email, password }),
       });
       setUser(r.user);
-      onDone?.(r.user);
+      setSignedIn(r.user);
+      settle();
     } catch (err) {
       setError(errorMessage(err));
-      shake();
-    } finally {
+      shakeField("password");
       setBusy(false);
     }
   }
 
+  if (done)
+    return (
+      <div className={`${blockClass(compact)} is-settled`}>
+        <header className="auth-head">
+          <SuccessCheck />
+          <h1>You are in.</h1>
+          <p className="auth-fade-in">Taking you back to what you were doing.</p>
+        </header>
+      </div>
+    );
+
   return (
-    <div className={blockClass(compact)} ref={ref}>
+    <div className={blockClass(compact)}>
       <header className="auth-head">
         <h1>Welcome back.</h1>
-        <p>Sign in to pick up where you left off.</p>
+        <p>{signInLead(next, reason)}</p>
       </header>
-      {error && <ErrorBox message={error} />}
+      {error && (
+        <div className="auth-fade-in">
+          <ErrorBox message={error} />
+        </div>
+      )}
       <form className="auth-form" noValidate onSubmit={submit}>
-        <Field label="Student email" error={fieldErrors.email}>
+        <Field
+          label="Student email"
+          error={fieldErrors.email}
+          className={fieldClass("email")}
+        >
           <input
             type="email"
             name="email"
@@ -229,7 +349,11 @@ export function SignInForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
             placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
           />
         </Field>
-        <Field label="Password" error={fieldErrors.password}>
+        <Field
+          label="Password"
+          error={fieldErrors.password}
+          className={fieldClass("password")}
+        >
           <div className="password-input">
             <input
               type={showPassword ? "text" : "password"}
@@ -291,20 +415,35 @@ export function SignInForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
 
 /* ---------------------------------------------------------------- sign up */
 
-export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
+export function SignUpForm({
+  next,
+  onDone,
+  onSwitch,
+  compact,
+  reason,
+  email: seedEmail,
+  onEmail,
+}: AuthFormProps) {
   const { setUser, campuses: allCampuses, emailReady } = useApp();
   const campuses = liveCampuses(allCampuses);
-  const { ref, shake } = useShake();
+  const { shakeField, fieldClass } = useFieldShake();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [errorCode, setErrorCode] = useState(""),
     [success, setSuccess] = useState(""),
-    [email, setEmail] = useState(""),
+    [email, setEmailValue] = useState(seedEmail || ""),
     [name, setName] = useState(""),
     [gender, setGender] = useState<Gender>("unspecified"),
     [password, setPassword] = useState(""),
     [showPassword, setShowPassword] = useState(false),
     [step, setStep] = useState(1),
+    [joined, setJoined] = useState<User | null>(null),
+    [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null),
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const setEmail = (value: string) => {
+    setEmailValue(value);
+    onEmail?.(value);
+  };
   // The school list is only needed by sign up, so it loads with the form.
   const [schools, setSchools] = useState<School[] | null>(null);
   useEffect(() => {
@@ -313,7 +452,9 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
   const slideRef = useRef<HTMLDivElement>(null);
   const [slideHeight, setSlideHeight] = useState<number>();
   const strength = passwordCheck(password, { email, name });
-  const listingNext = next === "/listings/new" || next.startsWith("/listings/new?");
+  const { done, settle } = useSettledSuccess(() => {
+    if (joined) onDone?.(joined);
+  });
   // The school is read from the email as the student types. There is nothing
   // to pick: their email decides it, and listing opens when Handoff does.
   const found = schools ? schoolForEmail(email, schools) : null;
@@ -343,23 +484,35 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
     observer.observe(panel);
     return () => observer.disconnect();
   }, [step, error, emailReady, detected]);
+  /* Focus lands only once the slide has settled. Focusing mid transition
+     scrolls the clipped track sideways, which is the bug this avoids. */
   useEffect(() => {
-    const root = slideRef.current;
-    const first = root?.querySelector<HTMLElement>(
-      `.t-page[data-page-id="${step}"] input`,
+    if (step < 2) return;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const t = window.setTimeout(
+      () =>
+        slideRef.current
+          ?.querySelector<HTMLElement>(
+            `.t-page[data-page-id="${step}"] input:not([type="file"])`,
+          )
+          ?.focus({ preventScroll: true }),
+      reduced ? 0 : 280,
     );
-    if (step > 1) first?.focus();
+    return () => window.clearTimeout(t);
   }, [step]);
 
   /* Sign up steps. Enter advances, the last step submits. */
   async function advance(e: FormEvent) {
     e.preventDefault();
     setError("");
+    setErrorCode("");
     if (step === 1) {
       const problems = checkFields(["email"], { email, name, password });
       setFieldErrors(problems);
       if (Object.keys(problems).length) {
-        shake();
+        shakeField("email");
         return;
       }
       // The school list may still be in flight on a fast first keystroke.
@@ -369,7 +522,7 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
       setBusy(false);
       if (!schoolForEmail(email, list)) {
         setError("Use your school email. We could not find that school yet.");
-        shake();
+        shakeField("email");
         return;
       }
       setStep(2);
@@ -377,7 +530,7 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
       const problems = checkFields(["name"], { email, name, password });
       setFieldErrors(problems);
       if (Object.keys(problems).length) {
-        shake();
+        shakeField("name");
         return;
       }
       setStep(3);
@@ -389,10 +542,11 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
     const problems = checkFields(["newPassword"], { email, name, password });
     setFieldErrors(problems);
     if (Object.keys(problems).length) {
-      shake();
+      shakeField("password");
       return;
     }
     setError("");
+    setErrorCode("");
     setBusy(true);
     try {
       const r = await api<{ user: User | null; message: string }>(
@@ -401,23 +555,70 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
       );
       if (r.user) {
         setUser(r.user);
-        onDone?.(r.user);
-      } else {
-        setSuccess(
-          "If that email is new you are in, otherwise sign in with the password you already have.",
-        );
+        setJoined(r.user);
+        // The account exists now. The photo is the last, optional step.
+        setStep(4);
+        return;
       }
+      setSuccess(
+        "If that email is new you are in, otherwise sign in with the password you already have.",
+      );
     } catch (err) {
+      const code = err instanceof ApiError ? err.code || "" : "";
       setError(errorMessage(err));
-      shake();
+      setErrorCode(code);
+      // The email is the thing to fix, so that is the field that moves, and
+      // the student is put back on the step that owns it.
+      if (code === "account_exists") setStep(1);
+      shakeField(code === "account_exists" ? "email" : "password");
     } finally {
       setBusy(false);
     }
   }
 
+  /* The photo step. It runs against the session the password step created,
+     so skipping costs nothing and a failed upload never blocks anyone. */
+  async function finish() {
+    if (!photo) {
+      settle();
+      return;
+    }
+    setBusy(true);
+    try {
+      const body = new FormData();
+      body.append("avatar", photo.file);
+      const r = await api<{ user: User }>("/profile/avatar", {
+        method: "POST",
+        body,
+      });
+      setUser(r.user);
+      setJoined(r.user);
+    } catch (err) {
+      setError(errorMessage(err));
+      shakeField("photo");
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    settle();
+  }
+
+  if (done)
+    return (
+      <div className={`${blockClass(compact)} is-settled`}>
+        <header className="auth-head">
+          <SuccessCheck />
+          <h1>You are confirmed.</h1>
+          <p className="auth-fade-in">
+            Welcome to Handoff, {name.split(" ")[0] || "student"}.
+          </p>
+        </header>
+      </div>
+    );
+
   if (success)
     return (
-      <div className={blockClass(compact)} ref={ref}>
+      <div className={blockClass(compact)}>
         <header className="auth-head">
           <SuccessCheck />
           <h1>Check your inbox.</h1>
@@ -441,28 +642,55 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
       </div>
     );
 
+  const toSignIn = `/sign-in?next=${encodeURIComponent(next)}${
+    email ? `&email=${encodeURIComponent(email)}` : ""
+  }`;
+
   return (
-    <div className={blockClass(compact)} ref={ref}>
+    <div className={blockClass(compact)}>
       <header className="auth-head">
-        <h1>
-          {listingNext
-            ? "Confirm you are a student to list your place."
-            : "Confirm you are a student."}
-        </h1>
-        <p>Your school email is all it takes.</p>
+        <h1>{signUpHeadline(next, reason)}</h1>
+        <p>{STUDENTS_ONLY_LINE}</p>
       </header>
       <p className="auth-step-name">
         Step {step} of {STEPS} · {STEP_NAMES[step - 1]}
       </p>
       <ol className="auth-progress" aria-label={`Step ${step} of ${STEPS}`}>
-        {[1, 2, 3].map((n) => (
+        {[1, 2, 3, 4].map((n) => (
           <li
             key={n}
             className={n < step ? "is-done" : n === step ? "is-active" : ""}
           />
         ))}
       </ol>
-      {error && <ErrorBox message={error} />}
+      {error &&
+        (errorCode === "account_exists" ? (
+          <div className="auth-exists auth-fade-in" role="alert">
+            <AlertCircle size={18} />
+            <div>
+              <p>{error}</p>
+              {onSwitch ? (
+                <button
+                  type="button"
+                  className="button secondary small"
+                  onClick={() => onSwitch("signin")}
+                >
+                  Sign in
+                  <ArrowRight size={15} />
+                </button>
+              ) : (
+                <Link className="button secondary small" to={toSignIn}>
+                  Sign in
+                  <ArrowRight size={15} />
+                </Link>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="auth-fade-in">
+            <ErrorBox message={error} />
+          </div>
+        ))}
       <div
         className="auth-slide t-page-slide"
         ref={slideRef}
@@ -476,7 +704,11 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
           style={{ "--t-page-from-x": "-8px" } as React.CSSProperties}
         >
           <form className="auth-form" noValidate onSubmit={advance}>
-            <Field label="Student email" error={fieldErrors.email}>
+            <Field
+              label="Student email"
+              error={fieldErrors.email}
+              className={fieldClass("email")}
+            >
               <input
                 type="email"
                 name="email"
@@ -487,10 +719,25 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
                 onChange={(e) => {
                   setEmail(e.target.value);
                   clearField("email");
+                  if (errorCode === "account_exists") {
+                    setError("");
+                    setErrorCode("");
+                  }
                 }}
                 placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
               />
             </Field>
+            {detected && (
+              <p className="auth-school-line auth-rise-in" key={detected.domain}>
+                <SchoolLogo
+                  src={`/api/logo/${encodeURIComponent(detected.domain)}`}
+                />
+                <span>{detected.name}</span>
+                {!detected.live && (
+                  <small>Browsing only for now, listings open soon</small>
+                )}
+              </p>
+            )}
             {error && !detected && (
               <p className="auth-hint">
                 Not seeing your school?{" "}
@@ -524,6 +771,7 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
               label="Your name"
               hint="First and last, the way students will see it."
               error={fieldErrors.name}
+              className={fieldClass("name")}
             >
               <input
                 name="name"
@@ -547,7 +795,7 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
               tabIndex={step === 2 ? undefined : -1}
             />
             {detected && (
-              <p className="auth-school-line">
+              <p className="auth-school-line auth-rise-in" key={detected.domain}>
                 <SchoolLogo
                   src={`/api/logo/${encodeURIComponent(detected.domain)}`}
                 />
@@ -583,7 +831,11 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
           style={{ "--t-page-from-x": "8px" } as React.CSSProperties}
         >
           <form className="auth-form" noValidate onSubmit={submit}>
-            <Field label="Password" error={fieldErrors.password}>
+            <Field
+              label="Password"
+              error={fieldErrors.password}
+              className={fieldClass("password")}
+            >
               <div className="password-input">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -637,6 +889,51 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
             </button>
           </form>
         </section>
+        <section
+          className="t-page photo-step"
+          data-page-id="4"
+          aria-hidden={step !== 4}
+          style={{ "--t-page-from-x": "8px" } as React.CSSProperties}
+        >
+          <div className={`auth-form ${fieldClass("photo")}`}>
+            <PhotoPicker
+              src={photo?.preview}
+              name={name}
+              busy={busy}
+              onPick={(file) => {
+                if (photo) URL.revokeObjectURL(photo.preview);
+                setPhoto({ file, preview: URL.createObjectURL(file) });
+                setError("");
+              }}
+              onRemove={() => {
+                if (photo) URL.revokeObjectURL(photo.preview);
+                setPhoto(null);
+              }}
+            />
+            <Button
+              type="button"
+              busy={busy}
+              className="auth-cta"
+              tabIndex={step === 4 ? undefined : -1}
+              onClick={finish}
+            >
+              Finish
+              <ArrowRight size={17} />
+            </Button>
+            <button
+              type="button"
+              className="auth-back text-button"
+              tabIndex={step === 4 ? undefined : -1}
+              onClick={() => {
+                if (photo) URL.revokeObjectURL(photo.preview);
+                setPhoto(null);
+                settle();
+              }}
+            >
+              Skip for now
+            </button>
+          </div>
+        </section>
       </div>
       <p className="auth-fineprint">
         By confirming you agree to our <Link to="/terms">Terms of Service</Link>{" "}
@@ -650,7 +947,7 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
               Sign in
             </button>
           ) : (
-            <Link to={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link>
+            <Link to={toSignIn}>Sign in</Link>
           )}
         </p>
       )}
@@ -660,15 +957,24 @@ export function SignUpForm({ next, onDone, onSwitch, compact }: AuthFormProps) {
 
 /* ----------------------------------------------------------------- forgot */
 
-export function ForgotForm({ onSwitch, compact }: AuthFormProps) {
+export function ForgotForm({
+  onSwitch,
+  compact,
+  email: seedEmail,
+  onEmail,
+}: AuthFormProps) {
   const { campuses: allCampuses, emailReady } = useApp();
   const campuses = liveCampuses(allCampuses);
   const { ref, shake } = useShake();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
-    [email, setEmail] = useState(""),
+    [email, setEmailValue] = useState(seedEmail || ""),
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const setEmail = (value: string) => {
+    setEmailValue(value);
+    onEmail?.(value);
+  };
 
   async function submit(e: FormEvent) {
     e.preventDefault();

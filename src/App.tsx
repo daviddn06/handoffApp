@@ -8,6 +8,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { AppProvider, useApp } from "./lib/context";
+import { isInternalSurface } from "./surface";
 import { safeNext } from "./lib/api";
 import { Layout, RequireAuth } from "./components/Layout";
 import { EmptyState, Loading } from "./components/ui";
@@ -31,7 +32,9 @@ const Legal = lazy(() => import("./pages/Legal"));
 const Profile = lazy(() =>
   import("./pages/Account").then((m) => ({ default: m.Profile })),
 );
-const Admin = lazy(() => import("./pages/admin/Admin"));
+/** The dashboard's own host. The student app never loads on it. */
+const Internal = lazy(() => import("./pages/admin/Internal"));
+const AdminMoved = lazy(() => import("./pages/admin/Moved"));
 /** Signed in students never see sign in or sign up, they go straight in. */
 function GuestOnly({ children }: { children: React.ReactElement }) {
   const { user } = useApp();
@@ -56,6 +59,18 @@ function NewListing() {
 }
 
 export default function App() {
+  // internal.handofflease.com serves this same bundle. There it is the
+  // dashboard and nothing else, mounted at the root with its own chrome.
+  if (isInternalSurface)
+    return (
+      <BrowserRouter>
+        <AppProvider>
+          <Suspense fallback={<Loading />}>
+            <Internal />
+          </Suspense>
+        </AppProvider>
+      </BrowserRouter>
+    );
   return (
     <BrowserRouter>
       <AppProvider>
@@ -87,14 +102,13 @@ export default function App() {
                 <Route path="listings/new" element={<NewListing />} />
                 <Route path="listings/:id/edit" element={<ListingEditor />} />
               </Route>
+              {/* The dashboard moved to internal.handofflease.com. */}
+              <Route path="admin/*" element={<AdminMoved />} />
               <Route element={<RequireAuth />}>
                 <Route path="saved" element={<Saved />} />
                 <Route path="my-listings" element={<MyListings />} />
                 <Route path="requests" element={<Requests />} />
                 <Route path="profile" element={<Profile />} />
-                {/* The dashboard gates itself again on user.isAdmin and shows
-                    the normal 404 page, matching the API's own 404. */}
-                <Route path="admin/*" element={<Admin />} />
               </Route>
               <Route
                 path="*"

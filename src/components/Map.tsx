@@ -17,8 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type { Campus, Listing } from "../types";
-import { ROOM_LABELS } from "../types";
-import { GenderTag } from "./Gender";
+import { BoostBadge, CardFacts, PreferenceBadge } from "./ListingCard";
 import { dateLabel, money, savings } from "../lib/api";
 import {
   PATROL_ZONES,
@@ -40,6 +39,8 @@ type Props = {
   /** Fired after every pan or zoom with the visible bounds. */
   onBounds?: (bounds: MapBounds) => void;
   pin?: { lat: number; lng: number };
+  /** Show the pin as an approximate area, used where the exact spot is locked. */
+  approx?: boolean;
   onPin?: (point: { lat: number; lng: number }) => void;
   /** Compact mode hides the legend and shrinks controls (editor, detail). */
   compact?: boolean;
@@ -49,11 +50,20 @@ type Props = {
   focusId?: string | null;
   /** Bump to fly back to the campus, used by the empty state. */
   homeSignal?: number;
+  /**
+   * Bump to frame the campus. The reference campus also follows the map as
+   * the student pans, and that must never move the map, so framing happens
+   * only when this key changes.
+   */
+  flyKey?: number;
 };
 
 // OpenFreeMap serves the Positron style without an API key.
 const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 const ZONE_SOURCE = "patrol-zone";
+const APPROX_SOURCE = "approx-area";
+/** Matches the radius the server fuzzes a locked listing's point by. */
+const APPROX_METRES = 250;
 
 type Cluster = { items: Listing[]; lat: number; lng: number };
 /** Greedy pixel-distance clustering. Listings closer than `radius` px merge. */
@@ -96,6 +106,8 @@ function el(className: string, html: string) {
 
 export default function Map({
   campus,
+  flyKey = 0,
+  approx = false,
   listings = [],
   activeId = null,
   onActive,
@@ -249,10 +261,15 @@ export default function Map({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Campus change: draw the patrol zone and frame it.
+  // Campus change: draw the patrol zone. Framing happens only on an explicit
+  // pick, so panning across town can move the reference without a jump.
+  const lastFly = useRef<number | null>(null);
   useEffect(() => {
     const m = map.current;
     if (!m || !ready) return;
+    const shouldFrame = lastFly.current !== flyKey;
+    const animate = lastFly.current !== null;
+    lastFly.current = flyKey;
     setPreview(null);
     // The campus reads as part of the basemap, a soft footprint, a dot, and a
     // label set in the map's own typography, instead of a floating pill.
@@ -365,7 +382,7 @@ export default function Map({
             b.getNorth() > bounds.getSouth(),
         );
       };
-      frameRef.current(false);
+      if (shouldFrame) frameRef.current(animate);
       check();
       m.on("moveend", check);
       return () => {
@@ -374,9 +391,9 @@ export default function Map({
     }
     zoneBounds.current = null;
     setZoneVisible(false);
-    frameRef.current(false);
+    if (shouldFrame) frameRef.current(animate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campus.id, ready]);
+  }, [campus.id, ready, flyKey]);
 
   // Markers. One marker per listing lives for the whole session of the
   // listings array. Clustering never removes pins, it slides them together
@@ -528,7 +545,57 @@ export default function Map({
     m.on("zoomend", layout);
 
     let pinMarker: maplibregl.Marker | null = null;
-    if (pin) {
+    for (const id of [APPROX_SOURCE, `${APPROX_SOURCE}-edge`])
+      if (m.getLayer(id)) m.removeLayer(id);
+    if (m.getSource(APPROX_SOURCE)) m.removeSource(APPROX_SOURCE);
+    if (pin && approx) {
+      // No marker. A real 250 metre disc, the same radius the server fuzzed
+      // the point by, so the area stays honest at every zoom.
+      const pixels = (level: number) =>
+        APPROX_METRES /
+        ((156543.03392 * Math.cos((pin.lat * Math.PI) / 180)) /
+          Math.pow(2, level));
+      const radius = [
+        "interpolate",
+        ["exponential", 2],
+        ["zoom"],
+        10,
+        pixels(10),
+        18,
+        pixels(18),
+      ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<number>;
+      m.addSource(APPROX_SOURCE, {
+        type: "geojson",
+        data: {
+          type: "Feature",
+          properties: {},
+          geometry: { type: "Point", coordinates: [pin.lng, pin.lat] },
+        },
+      });
+      m.addLayer({
+        id: APPROX_SOURCE,
+        type: "circle",
+        source: APPROX_SOURCE,
+        paint: {
+          "circle-color": "#3b78d7",
+          "circle-opacity": 0.14,
+          "circle-radius": radius,
+        },
+      });
+      m.addLayer({
+        id: `${APPROX_SOURCE}-edge`,
+        type: "circle",
+        source: APPROX_SOURCE,
+        paint: {
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-stroke-color": "#3b78d7",
+          "circle-stroke-width": 1.4,
+          "circle-stroke-opacity": 0.45,
+          "circle-radius": radius,
+        },
+      });
+      if (!onPin) m.jumpTo({ center: [pin.lng, pin.lat], zoom: 15 });
+    } else if (pin) {
       const node = el(
         "location-marker-wrap",
         '<span class="location-marker"></span>',
@@ -554,7 +621,7 @@ export default function Map({
       clusterNodes.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campus.id, listings, pin?.lat, pin?.lng, !!onPin, ready]);
+  }, [campus.id, listings, pin?.lat, pin?.lng, !!onPin, approx, ready]);
 
   // Keep the active marker in sync without rebuilding.
   useEffect(() => {
@@ -601,6 +668,10 @@ export default function Map({
       onClick={() => callbacks.current.onListing?.(preview.listing.id)}
     >
       <div className="map-preview-photo">
+        <span className="card-badges">
+          <BoostBadge listing={preview.listing} />
+          <PreferenceBadge listing={preview.listing} />
+        </span>
         {preview.listing.photos[0] ? (
           <img src={preview.listing.photos[0]} alt="" />
         ) : (
@@ -621,19 +692,12 @@ export default function Map({
         </div>
         <div className="map-preview-title">{preview.listing.title}</div>
         <div className="map-preview-meta">
-          <span>
-            {ROOM_LABELS[preview.listing.roomType]} ·{" "}
-            {preview.listing.bedrooms === 0
-              ? "Studio"
-              : `${preview.listing.bedrooms} bd`}{" "}
-            · {preview.listing.bathrooms} ba
-          </span>
-          <span>
+          <CardFacts listing={preview.listing} />
+          <p className="card-meta card-dates">
             {dateLabel(preview.listing.availableFrom)} to{" "}
             {dateLabel(preview.listing.availableTo)} ·{" "}
             <b>{travelLabel(milesBetween(campus, preview.listing))}</b>
-          </span>
-          <GenderTag preference={preview.listing.genderPreference} />
+          </p>
         </div>
       </div>
     </Link>
@@ -748,6 +812,11 @@ export default function Map({
                 </li>
               )}
             </ul>
+            {listings.some((item) => item.locked) && (
+              <p className="map-legend-note">
+                Locations are approximate until you confirm
+              </p>
+            )}
           </div>
         </div>
       )}

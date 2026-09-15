@@ -21,6 +21,8 @@ export function AuthModal() {
   const ref = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const [mode, setMode] = useState<AuthFormMode>(auth.mode);
+  // Kept across a switch, so "Sign in instead" arrives with the email filled.
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
     if (auth.open) setMode(auth.mode);
@@ -105,6 +107,9 @@ export function AuthModal() {
           <SignUpForm
             compact
             next={auth.next}
+            reason={auth.reason}
+            email={email}
+            onEmail={setEmail}
             onSwitch={setMode}
             onDone={done}
           />
@@ -113,6 +118,9 @@ export function AuthModal() {
           <SignInForm
             compact
             next={auth.next}
+            reason={auth.reason}
+            email={email}
+            onEmail={setEmail}
             onSwitch={setMode}
             onDone={(user) => {
               notify(`Welcome back, ${user.name.split(" ")[0]}.`);
@@ -121,7 +129,13 @@ export function AuthModal() {
           />
         )}
         {mode === "forgot" && (
-          <ForgotForm compact next={auth.next} onSwitch={setMode} />
+          <ForgotForm
+            compact
+            next={auth.next}
+            email={email}
+            onEmail={setEmail}
+            onSwitch={setMode}
+          />
         )}
       </div>
     </dialog>

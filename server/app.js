@@ -1,9 +1,9 @@
 import express from "express";
 import multer from "multer";
 import sharp from "sharp";
-import { randomInt, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { createHash, randomInt, randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -13,7 +13,12 @@ import {
   liveCampusForEmail,
   schoolForEmail,
 } from "./schools.js";
-import { adminRouter, disabledError } from "./admin.js";
+import {
+  adminAllowList,
+  adminGate,
+  adminRouter,
+  disabledError,
+} from "./admin.js";
 import { openDatabase } from "./database.js";
 import { geocode } from "./geocode.js";
 import {
@@ -59,7 +64,7 @@ const SESSION_AGE = 30 * 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 const GENERIC_EMAIL_MESSAGE =
   "If this email is eligible, you will receive a link shortly. Check your spam folder too.";
-const listingFields = "l.*, u.name AS owner_name";
+const listingFields = "l.*, u.name AS owner_name, u.avatar AS owner_avatar";
 const listingJoin = "listings l JOIN users u ON u.id=l.owner_id";
 const iso = () => new Date().toISOString();
 const escapeHtml = (value) =>
@@ -190,6 +195,36 @@ export function createApp({
     !["localhost", "127.0.0.1", "[::1]"].includes(parsedOrigin.hostname)
   )
     throw new Error("Public Handoff deployments require HTTPS.");
+  /**
+   * The internal dashboard host. Caddy reverse proxies
+   * internal.handofflease.com to this same app and adds X-Handoff-Surface,
+   * so one build and one process serve both surfaces.
+   */
+  const internalHosts = new Set([
+    "internal.handofflease.com",
+    "internal.localhost",
+  ]);
+  const surfaceOf = (req) =>
+    String(req.get("X-Handoff-Surface") || "")
+      .trim()
+      .toLowerCase() === "internal" ||
+    internalHosts.has(String(req.hostname || "").toLowerCase())
+      ? "internal"
+      : "app";
+  // Mutations on the internal host carry its own Origin, never the app's.
+  const internalOrigins = new Set([origin]);
+  if (process.env.HANDOFF_INTERNAL_ORIGIN)
+    internalOrigins.add(process.env.HANDOFF_INTERNAL_ORIGIN);
+  else if (parsedOrigin.protocol === "https:")
+    internalOrigins.add(
+      `https://internal.${parsedOrigin.hostname.replace(/^app\./, "")}`,
+    );
+  if (parsedOrigin.protocol !== "https:")
+    internalOrigins.add(
+      `http://internal.localhost${parsedOrigin.port ? `:${parsedOrigin.port}` : ""}`,
+    );
+  /** The admin flag plus the HANDOFF_ADMIN_EMAILS allow list, read once here. */
+  const isAllowedAdmin = adminGate(adminAllowList());
   const useSecureCookies = secureCookies ?? parsedOrigin.protocol === "https:";
   if (!useSecureCookies && parsedOrigin.protocol === "https:")
     throw new Error("HTTPS deployments require secure cookies.");
@@ -217,6 +252,13 @@ export function createApp({
     }
   };
   app.locals.emailReady = emailReady;
+  app.use((req, res, next) => {
+    req.surface = surfaceOf(req);
+    // The internal host is never indexed. Caddy sends this too, belt and braces.
+    if (req.surface === "internal")
+      res.set("X-Robots-Tag", "noindex, nofollow");
+    next();
+  });
   app.use((req, res, next) => {
     res.set({
       "X-Content-Type-Options": "nosniff",
@@ -250,10 +292,11 @@ export function createApp({
     next();
   });
   app.use("/api", (req, res, next) => {
-    if (
-      !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
-      req.get("Origin") !== origin
-    )
+    const allowedOrigin =
+      req.surface === "internal"
+        ? internalOrigins.has(req.get("Origin"))
+        : req.get("Origin") === origin;
+    if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && !allowedOrigin)
       return next(
         new HttpError(
           403,
@@ -262,6 +305,22 @@ export function createApp({
       );
     next();
   });
+  /**
+   * The internal host is the dashboard and nothing else. It needs the session,
+   * the config, health and its own sign in, so every other student route
+   * answers 404 there. The app host is untouched.
+   */
+  const internalApiPath = (path) =>
+    ["/health", "/config", "/session", "/auth/login", "/auth/logout"].includes(
+      path,
+    ) ||
+    path === "/admin" ||
+    path.startsWith("/admin/");
+  app.use("/api", (req, res, next) =>
+    req.surface !== "internal" || internalApiPath(req.path)
+      ? next()
+      : next(new HttpError(404, "Endpoint not found.")),
+  );
   app.use(express.json({ limit: "96kb", strict: true }));
   app.use((req, res, next) => {
     const sessionToken = cookies(req.get("Cookie"))[cookieName];
@@ -326,7 +385,11 @@ export function createApp({
     termsAccepted: Boolean(user.terms_accepted_at),
     bio: user.bio,
     gender: user.gender || "unspecified",
-    isAdmin: Boolean(user.is_admin),
+    /** Optional profile photo, a public path like a listing photo, or null. */
+    avatar: user.avatar || null,
+    // The allow list decides, so the client never offers a dashboard that the
+    // API would answer 404 for.
+    isAdmin: isAllowedAdmin(user),
   });
   /**
    * Listing is the one thing a live campus unlocks. Browsing, saving and
@@ -567,10 +630,27 @@ ${button}
   app.get("/api/session", (req, res) =>
     res.json({ user: req.user ? serializeUser(req.user) : null }),
   );
+  const ABANDONED_AFTER = 24 * HOUR;
+  /**
+   * A registration nobody ever came back to: never verified, never signed in
+   * since, and older than a day. Only these may be taken over by a fresh
+   * signup, so a live account is never overwritten by whoever types the
+   * address next.
+   */
+  const abandonedRegistration = (row) => {
+    if (!row || row.verified_at) return false;
+    const created = Date.parse(row.created_at);
+    if (!Number.isFinite(created) || Date.now() - created < ABANDONED_AFTER)
+      return false;
+    return !db
+      .prepare("SELECT 1 FROM sessions WHERE user_id=? LIMIT 1")
+      .get(row.id);
+  };
   app.post(
     "/api/auth/signup",
     limit("signup-ip", 10, HOUR),
-    requireMail,
+    // Mail is checked inside, after the account check. Telling a returning
+    // student their account already exists needs no email at all.
     async (req, res) => {
       const input = parse(signupSchema, req.body);
       const school = schoolForEmail(input.email);
@@ -582,12 +662,29 @@ ${button}
         );
       // The campus is derived, never chosen. Null means browse only for now.
       const campusId = liveCampusForEmail(input.email)?.id || null;
+      // One account per email. A student who already registered is sent to
+      // sign in instead of quietly signing up again. The only exception is an
+      // abandoned registration, unverified, older than a day, never used.
+      const claimed = db
+        .prepare("SELECT * FROM users WHERE email=?")
+        .get(input.email);
+      if (claimed && !abandonedRegistration(claimed))
+        throw new HttpError(
+          409,
+          "This email already has an account. Sign in instead.",
+          "account_exists",
+        );
+      if (!emailReady)
+        throw new HttpError(
+          503,
+          "Student email delivery is not available yet. Please try again later.",
+        );
       const passwordHash = await hashPassword(input.password);
       const user = db.transaction(() => {
         let existing = db
           .prepare("SELECT * FROM users WHERE email=?")
           .get(input.email);
-        if (existing?.verified_at) return existing;
+        if (existing && !abandonedRegistration(existing)) return existing;
         const timestamp = iso();
         if (existing) {
           // A legitimate signup must never activate a password chosen by a prior unverified registrant.
@@ -624,10 +721,13 @@ ${button}
         }
         return db.prepare("SELECT * FROM users WHERE email=?").get(input.email);
       })();
-      if (user.verified_at) {
-        // Never reveal that an account exists. The UI points them to sign in.
-        res.status(202).json({ message: GENERIC_EMAIL_MESSAGE, user: null });
-        return;
+      if (user.verified_at || user.password_hash !== passwordHash) {
+        // The row was claimed between the check and the write. Same answer.
+        throw new HttpError(
+          409,
+          "This email already has an account. Sign in instead.",
+          "account_exists",
+        );
       }
       await sendToken(user, "verify");
       if (req.sessionHash)
@@ -658,6 +758,10 @@ ${button}
       )
         throw new HttpError(401, "Email or password is incorrect.");
       if (currentUser.disabled_at) throw disabledError(currentUser);
+      // The internal host signs in the Handoff team only, and never opens a
+      // session for anybody else.
+      if (req.surface === "internal" && !isAllowedAdmin(currentUser))
+        throw new HttpError(403, "This sign in is for the Handoff team.");
       if (req.sessionHash)
         db.prepare("DELETE FROM sessions WHERE token_hash=?").run(
           req.sessionHash,
@@ -798,42 +902,72 @@ ${button}
     },
   );
 
-  const serializeListing = (row, userId) => ({
-    id: row.id,
-    ownerId: row.owner_id,
-    ownerName: row.owner_name,
-    campusId: row.campus_id,
-    title: row.title,
-    description: row.description,
-    address: row.address,
-    lat: row.lat,
-    lng: row.lng,
-    price: row.price,
-    deposit: row.deposit,
-    originalPrice: row.original_price ?? null,
-    bedrooms: row.bedrooms,
-    bathrooms: row.bathrooms,
-    roomType: row.room_type,
-    genderPreference: row.gender_preference || "any",
-    availableFrom: row.available_from,
-    availableTo: row.available_to,
-    amenities: JSON.parse(row.amenities),
-    photos: JSON.parse(row.photos),
-    status: row.status,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    boostUntil: row.boost_until ?? null,
-    boosted: Boolean(row.boost_until && row.boost_until > iso()),
-    saved: userId
-      ? Boolean(
-          db
-            .prepare(
-              "SELECT 1 FROM saved_listings WHERE user_id=? AND listing_id=?",
-            )
-            .get(userId, row.id),
-        )
-      : false,
-  });
+  /**
+   * A signed out visitor gets the place, never the address. The point is moved
+   * by up to 250 metres in a direction taken from the listing id, so the same
+   * listing always lands on the same spot and the pin never wanders between
+   * loads. Signing in returns the real coordinates.
+   */
+  const FUZZ_METRES = 250;
+  const approximatePoint = (id, lat, lng) => {
+    const digest = createHash("sha256").update(`approx:${id}`).digest();
+    const angle = (digest.readUInt32BE(0) / 0xffffffff) * Math.PI * 2;
+    // Square root keeps the offsets spread evenly over the disc.
+    const radius = Math.sqrt(digest.readUInt32BE(4) / 0xffffffff) * FUZZ_METRES;
+    const north = (radius * Math.cos(angle)) / 111320;
+    const east =
+      (radius * Math.sin(angle)) /
+      (111320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
+    return {
+      lat: Number((lat + north).toFixed(6)),
+      lng: Number((lng + east).toFixed(6)),
+    };
+  };
+  const serializeListing = (row, userId) => {
+    const locked = !userId;
+    const point = locked
+      ? approximatePoint(row.id, row.lat, row.lng)
+      : { lat: row.lat, lng: row.lng };
+    return {
+      id: row.id,
+      ownerId: row.owner_id,
+      ownerName: locked ? null : row.owner_name,
+      ownerAvatar: locked ? null : row.owner_avatar || null,
+      campusId: row.campus_id,
+      title: row.title,
+      description: locked ? null : row.description,
+      address: locked ? null : row.address,
+      lat: point.lat,
+      lng: point.lng,
+      price: row.price,
+      deposit: row.deposit,
+      originalPrice: row.original_price ?? null,
+      bedrooms: row.bedrooms,
+      bathrooms: row.bathrooms,
+      roomType: row.room_type,
+      genderPreference: row.gender_preference || "any",
+      availableFrom: row.available_from,
+      availableTo: row.available_to,
+      amenities: JSON.parse(row.amenities),
+      photos: JSON.parse(row.photos),
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      boostUntil: row.boost_until ?? null,
+      boosted: Boolean(row.boost_until && row.boost_until > iso()),
+      saved: userId
+        ? Boolean(
+            db
+              .prepare(
+                "SELECT 1 FROM saved_listings WHERE user_id=? AND listing_id=?",
+              )
+              .get(userId, row.id),
+          )
+        : false,
+      /** Sensitive fields are held back until the visitor confirms they study. */
+      locked,
+    };
+  };
   const getListing = (id) =>
     db
       .prepare(`SELECT ${listingFields} FROM ${listingJoin} WHERE l.id=?`)
@@ -1349,6 +1483,107 @@ ${button}
       }
     },
   );
+  /* ------------------------------------------------------- profile photo */
+  /**
+   * One optional square photo per student. It is stored beside the listing
+   * photos, always re-encoded, and the previous file is removed as soon as a
+   * new one is in place. Nothing about it is required.
+   */
+  const AVATAR_PATH = /^\/avatars\/[a-f0-9-]{36}\.jpg$/;
+  const dropAvatarFile = async (path) => {
+    if (!path || !AVATAR_PATH.test(path)) return;
+    try {
+      await unlink(join(uploadDir, path.slice("/avatars/".length)));
+    } catch {
+      /* Already gone. The row is what matters. */
+    }
+  };
+  const avatarUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { files: 1, fileSize: 8 * 1024 * 1024, fields: 0, parts: 2 },
+  });
+  app.post(
+    "/api/profile/avatar",
+    requireUser,
+    limit("avatar-hour", 20, HOUR, (req) => req.user.id),
+    avatarUpload.single("avatar"),
+    async (req, res) => {
+      if (!req.file) throw new HttpError(400, "Choose a photo.");
+      let buffer;
+      try {
+        const decoder = sharp(req.file.buffer, {
+          limitInputPixels: 24_000_000,
+          animated: false,
+          failOn: "warning",
+        });
+        const metadata = await decoder.metadata();
+        if (
+          !["jpeg", "png", "webp"].includes(metadata.format) ||
+          (metadata.pages && metadata.pages > 1)
+        )
+          throw new Error("Unsupported image.");
+        if (
+          !metadata.width ||
+          !metadata.height ||
+          metadata.width < 80 ||
+          metadata.height < 80
+        )
+          throw new Error("Image too small.");
+        buffer = await decoder
+          .rotate()
+          .resize({ width: 320, height: 320, fit: "cover", position: "centre" })
+          .jpeg({ quality: 82 })
+          .toBuffer();
+      } catch {
+        throw new HttpError(
+          400,
+          "Use a JPG, PNG or WebP photo at least 80 by 80 pixels.",
+        );
+      }
+      const filename = `${randomUUID()}.jpg`;
+      await writeFile(join(uploadDir, filename), buffer, {
+        flag: "wx",
+        mode: 0o600,
+      });
+      const previous = req.user.avatar;
+      db.prepare("UPDATE users SET avatar=?,updated_at=? WHERE id=?").run(
+        `/avatars/${filename}`,
+        iso(),
+        req.user.id,
+      );
+      await dropAvatarFile(previous);
+      res.status(201).json({
+        user: serializeUser(
+          db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id),
+        ),
+      });
+    },
+  );
+  app.delete("/api/profile/avatar", requireUser, async (req, res) => {
+    const previous = req.user.avatar;
+    db.prepare("UPDATE users SET avatar=NULL,updated_at=? WHERE id=?").run(
+      iso(),
+      req.user.id,
+    );
+    await dropAvatarFile(previous);
+    res.json({
+      user: serializeUser(
+        db.prepare("SELECT * FROM users WHERE id=?").get(req.user.id),
+      ),
+    });
+  });
+  app.get("/avatars/:filename", (req, res) => {
+    if (!/^[a-f0-9-]{36}\.jpg$/.test(req.params.filename))
+      throw new HttpError(404, "Photo not found.");
+    const path = `/avatars/${req.params.filename}`;
+    const owner = db.prepare("SELECT 1 FROM users WHERE avatar=?").get(path);
+    if (!owner) throw new HttpError(404, "Photo not found.");
+    // A profile photo only ever appears beside a name that is already shown,
+    // and the name is unguessable, so it caches like a listing photo.
+    res.set("Cache-Control", "public, max-age=3600");
+    res.type("image/jpeg").sendFile(join(uploadDir, req.params.filename));
+  });
+
   // Smart import. The model reads a pasted post, screenshots or a PDF and
   // fills the wizard for the lister. Nothing here publishes anything: the
   // answer is a draft the student reviews step by step, and the usual listing
@@ -1510,7 +1745,7 @@ ${button}
   });
 
   // This query intentionally excludes email. Contacts are fetched only after authorization and acceptance.
-  const requestSelect = `SELECT r.*,l.title AS listing_title,l.photos AS listing_photos,l.owner_id,l.status AS listing_status,l.available_to,requester.name AS requester_name,requester.gender AS requester_gender,owner.name AS owner_name FROM handoff_requests r JOIN listings l ON l.id=r.listing_id JOIN users requester ON requester.id=r.requester_id JOIN users owner ON owner.id=l.owner_id`;
+  const requestSelect = `SELECT r.*,l.title AS listing_title,l.photos AS listing_photos,l.owner_id,l.status AS listing_status,l.available_to,requester.name AS requester_name,requester.avatar AS requester_avatar,requester.gender AS requester_gender,owner.name AS owner_name,owner.avatar AS owner_avatar FROM handoff_requests r JOIN listings l ON l.id=r.listing_id JOIN users requester ON requester.id=r.requester_id JOIN users owner ON owner.id=l.owner_id`;
   const getRequest = (id) =>
     db.prepare(`${requestSelect} WHERE r.id=?`).get(id);
   const serializeRequest = (row, viewerId) => {
@@ -1523,8 +1758,10 @@ ${button}
       listingPhoto: JSON.parse(row.listing_photos)[0] || "",
       requesterId: row.requester_id,
       requesterName: row.requester_name,
+      requesterAvatar: row.requester_avatar || null,
       ownerId: row.owner_id,
       ownerName: row.owner_name,
+      ownerAvatar: row.owner_avatar || null,
       message: row.message,
       status: row.status,
       createdAt: row.created_at,
@@ -1701,11 +1938,28 @@ ${button}
     },
   );
 
-  app.use("/api/admin", adminRouter({ db, limit, dataDir, staticDir, emailReady }));
+  // The dashboard lives on the internal host only. On the app host the whole
+  // tree answers 404, exactly as it does for a student.
+  app.use("/api/admin", (req, res, next) =>
+    req.surface === "internal"
+      ? next()
+      : next(new HttpError(404, "Endpoint not found.")),
+  );
+  app.use(
+    "/api/admin",
+    adminRouter({ db, limit, dataDir, staticDir, emailReady, isAllowedAdmin }),
+  );
 
   app.use("/api", (req, res, next) =>
     next(new HttpError(404, "Endpoint not found.")),
   );
+  app.get("/robots.txt", (req, res, next) => {
+    if (req.surface !== "internal") return next();
+    res
+      .type("text/plain")
+      .set("Cache-Control", "no-cache")
+      .send("User-agent: *\nDisallow: /\n");
+  });
   if (existsSync(join(staticDir, "index.html"))) {
     app.use(
       express.static(staticDir, {
@@ -1718,12 +1972,27 @@ ${button}
         },
       }),
     );
+    // The internal host gets the same bundle with one extra meta tag. That tag
+    // is what the SPA reads to mount the dashboard at / instead of the app.
+    let internalDocument;
+    const internalIndex = () => {
+      if (internalDocument === undefined)
+        internalDocument = readFileSync(
+          join(staticDir, "index.html"),
+          "utf8",
+        ).replace(
+          /<head>/i,
+          '<head><meta name="handoff-surface" content="internal"/>',
+        );
+      return internalDocument;
+    };
     app.get("/{*path}", (req, res) => {
       if (req.path.startsWith("/uploads/") || /\.[a-z0-9]+$/i.test(req.path))
         return res.status(404).send("Not found");
-      res
-        .set("Cache-Control", "no-cache")
-        .sendFile(join(staticDir, "index.html"));
+      res.set("Cache-Control", "no-cache");
+      if (req.surface === "internal")
+        return res.type("html").send(internalIndex());
+      res.sendFile(join(staticDir, "index.html"));
     });
   }
   app.use((err, req, res, next) => {

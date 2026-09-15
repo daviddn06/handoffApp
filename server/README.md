@@ -35,7 +35,31 @@ sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js ai
 
 ## Internal dashboard
 
-The dashboard at `/admin` replaces most of the operator commands above for day to day work. It is invisible without the admin flag: `/api/admin/*` answers 404 for everyone else, and the UI shows the normal 404 page. Grant it on the VPS to an account that already exists.
+The dashboard is its own host, `internal.handofflease.com`, served by the same process on 127.0.0.1:4742 and the same built bundle. Caddy reverse proxies it and adds the surface header, so the app never has to know which host it is behind.
+
+```
+internal.handofflease.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:4742 {
+        header_up X-Handoff-Surface internal
+    }
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        X-Frame-Options DENY
+        X-Robots-Tag "noindex, nofollow"
+    }
+}
+```
+
+Two things are required and neither is enough alone. The account needs the admin flag from `scripts/make-admin.js`, and its email must be listed in `HANDOFF_ADMIN_EMAILS` in `/etc/handoff/app.env` (comma separated, matched lower case after trimming). Anything else, including a flagged account that is not listed, is refused at sign in on that host with 403 and never gets a session, sees `isAdmin:false` on its own session, and gets 404 from every `/api/admin` route. An empty or missing `HANDOFF_ADMIN_EMAILS` closes the dashboard to everybody and the service logs one warning at startup. Changing the list needs a service restart, since it is read once.
+
+```
+HANDOFF_ADMIN_EMAILS=daviddn@usc.edu
+```
+
+The internal host carries the dashboard and nothing else. Only health, config, session, sign in, sign out and `/api/admin/*` exist there; signup, recovery, listings and requests all answer 404. On the app host `/api/admin/*` answers 404 for everyone, and `/admin` only points a browser at the internal host. The internal host sends `X-Robots-Tag: noindex, nofollow` and a `robots.txt` that disallows everything, and it is on no CORS allow list. Grant the flag on the VPS to an account that already exists.
 
 ```bash
 runuser -u handoff -- env HANDOFF_SEED_CONFIRM=production HANDOFF_DATA_DIR=/var/lib/handoff node scripts/make-admin.js david@usc.edu
@@ -44,7 +68,7 @@ runuser -u handoff -- env HANDOFF_SEED_CONFIRM=production HANDOFF_DATA_DIR=/var/
 
 The script refuses production data directories unless `HANDOFF_SEED_CONFIRM=production` is set on purpose, the same guard `scripts/seed-demo.js` uses. Locally it is just `HANDOFF_DATA_DIR=./data node scripts/make-admin.js demo.owner@usc.edu`.
 
-Every admin write lands in `admin_audit` and is visible on the dashboard's Audit page. Disabling an account sets `users.disabled_at`, ends every session for it, and refuses both login and every authenticated route with 403. Nothing is deleted. The System page reads the release marker, the schema version, host memory and load, `df -k` on the data directory, the backups directory, and `journalctl -u handoff -n 50 --no-pager` when the service user can read it. The dashboard shows private student details, so treat an open browser tab the same as an operator shell.
+The dashboard's sections are at `/`, `/users`, `/listings` and so on on the internal host. Every admin write lands in `admin_audit` and is visible on the dashboard's Audit page. Disabling an account sets `users.disabled_at`, ends every session for it, and refuses both login and every authenticated route with 403. Nothing is deleted. The System page reads the release marker, the schema version, host memory and load, `df -k` on the data directory, the backups directory, and `journalctl -u handoff -n 50 --no-pager` when the service user can read it. The dashboard shows private student details, so treat an open browser tab the same as an operator shell.
 
 ## Backup and recovery
 

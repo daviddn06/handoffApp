@@ -18,6 +18,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { MobileAccount } from "./AccountButton";
 export function Button({
   children,
   busy = false,
@@ -130,6 +131,7 @@ export function PageHeading({
         {description && <p>{description}</p>}
       </div>
       {children && <div className="heading-actions">{children}</div>}
+      <MobileAccount />
     </div>
   );
 }

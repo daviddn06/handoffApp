@@ -4,6 +4,7 @@
    the tab bar and the safe area. Loaded last so it wins on specificity ties. */
 
 /* Elements that only exist for the phone layout stay out of the way elsewhere. */
+.m-account,
 .sheet-grip,
 .gallery-counter,
 .mg-row-link,
@@ -16,40 +17,238 @@
   :root {
     --page-x: var(--s-4);
     --gutter: var(--s-4);
-    /* Everything pinned to the bottom clears the tab bar and the home bar. */
-    --tabbar: calc(var(--mobile-nav-h) + env(safe-area-inset-bottom));
+    /* The nav pill is inset, so everything pinned to the bottom clears the
+       pill, its own gap and the home bar, with 8px of air left over. */
+    --nav-inset: var(--s-4);
+    --nav-gap: var(--s-3);
+    --tabbar: calc(
+      var(--mobile-nav-h) + var(--nav-gap) + 8px + env(safe-area-inset-bottom)
+    );
     --group-r: 14px;
   }
 
   /* ---------- Shell ---------- */
+  /* No top bar on a phone. Every screen carries its own large title and the
+     account entry, which is worth more than 60px of chrome. */
+  .site-header {
+    display: none;
+  }
   body {
     background: var(--soft);
   }
   main {
     background: var(--soft);
     padding-bottom: var(--tabbar);
+    min-height: 100dvh;
   }
-  .site-header {
-    height: auto;
-    padding-top: env(safe-area-inset-top);
-  }
-  .header-inner {
-    height: var(--header-h);
-    padding: 0 var(--s-3) 0 var(--s-4);
-  }
-  .brand {
-    font-size: 21px;
+  /* Each screen owns the status bar inset, so a full height page like browse
+     is never pushed past the bottom of the viewport. */
+  html:has(.verify-banner) .browse-page {
+    height: calc(100dvh - 44px);
   }
   .toast-region {
-    bottom: calc(var(--tabbar) + var(--s-3));
+    bottom: calc(var(--tabbar) + var(--s-2));
     max-width: calc(100% - var(--s-8));
   }
   .toast {
     border-radius: var(--group-r);
     font-size: 14px;
   }
+
+  /* ---------- Floating nav pill ---------- */
+  .mobile-nav {
+    left: var(--nav-inset);
+    right: var(--nav-inset);
+    bottom: calc(var(--nav-gap) + env(safe-area-inset-bottom));
+    height: var(--mobile-nav-h);
+    padding-bottom: 0;
+    border-top: 0;
+    border-radius: 28px;
+    background: rgb(255 255 255 / 0.92);
+    backdrop-filter: saturate(1.8) blur(20px);
+    -webkit-backdrop-filter: saturate(1.8) blur(20px);
+    box-shadow: var(--shadow-lg), var(--ring);
+    transition: transform var(--duration-quick) var(--ease-smooth-out);
+  }
+  .mobile-nav.is-hidden {
+    transform: translateY(
+      calc(100% + var(--nav-gap) + env(safe-area-inset-bottom) + 8px)
+    );
+  }
   .mobile-nav a {
+    position: relative;
     font-size: 11px;
+    border-radius: 24px;
+  }
+  .mobile-nav a > * {
+    position: relative;
+    z-index: 1;
+  }
+  /* The soft dot behind the icon marks where the student is. */
+  .mobile-nav a.active::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    width: 32px;
+    height: 24px;
+    border-radius: var(--r-pill);
+    background: var(--blue-soft);
+  }
+  .mobile-list-action.active::before {
+    display: none;
+  }
+  .mobile-list-button {
+    margin-top: -16px;
+  }
+
+  /* ---------- Account entry, the header replacement ---------- */
+  .m-account {
+    display: block;
+    position: relative;
+    flex: none;
+  }
+  .m-account-avatar {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    transition: transform var(--duration-quick) var(--ease-out);
+  }
+  .m-account-avatar::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+  }
+  .m-account-avatar:active {
+    transform: scale(0.94);
+  }
+  .m-account-avatar .avatar {
+    width: 36px;
+    height: 36px;
+    font-size: 13px;
+  }
+  .m-account-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 var(--s-4);
+    border-radius: var(--r-pill);
+    background: var(--blue);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    transition: transform var(--duration-quick) var(--ease-out);
+  }
+  .m-account-pill:active {
+    transform: scale(0.96);
+  }
+  /* In a title row the avatar sits on the right of the heading line. */
+  .page-heading {
+    position: relative;
+    padding-right: 48px;
+  }
+  .page-heading > .m-account {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  /* Over a full bleed surface it floats instead. */
+  .m-account.is-floating {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + var(--s-3));
+    right: var(--s-3);
+    z-index: 30;
+  }
+  .m-account.is-floating .m-account-avatar,
+  .m-account.is-floating .m-account-pill,
+  .browse-page.mobile-map .browse-account .m-account-avatar,
+  .browse-page.mobile-map .browse-account .m-account-pill {
+    background: rgb(255 255 255 / 0.92);
+    backdrop-filter: saturate(1.6) blur(18px);
+    -webkit-backdrop-filter: saturate(1.6) blur(18px);
+    box-shadow: var(--shadow-lg), var(--ring);
+  }
+  .m-account.is-floating .m-account-pill,
+  .browse-page.mobile-map .browse-account .m-account-pill {
+    background: var(--blue);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* The account menu as a bottom sheet. */
+  .m-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .m-sheet-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgb(16 24 40 / 0.4);
+    animation: m-sheet-fade var(--modal-open-dur) var(--modal-ease);
+  }
+  .m-sheet-panel {
+    position: relative;
+    background: var(--surface);
+    border-top-left-radius: var(--r-xl);
+    border-top-right-radius: var(--r-xl);
+    padding: var(--s-2) var(--s-4)
+      calc(var(--s-5) + env(safe-area-inset-bottom));
+    box-shadow: var(--shadow-lg);
+    animation: m-sheet-up var(--modal-open-dur) var(--modal-ease);
+  }
+  .m-sheet-grip {
+    display: block;
+    width: 40px;
+    height: 5px;
+    margin: var(--s-2) auto var(--s-3);
+    border-radius: var(--r-pill);
+    background: var(--line-2);
+  }
+  .m-sheet-panel .menu-identity {
+    border-bottom: 1px solid var(--line);
+    padding: 0 var(--s-2) var(--s-3);
+    margin-bottom: var(--s-2);
+  }
+  /* The sheet reuses the account menu rows, but not its dropdown framing. */
+  .m-sheet-list.account-menu {
+    position: static;
+    width: auto;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+  }
+  .m-sheet-list > a,
+  .m-sheet-list > button {
+    min-height: 48px;
+    font-size: 16px;
+    border-radius: var(--r-sm);
+  }
+  .m-sheet-list .menu-legal {
+    justify-content: center;
+    gap: var(--s-5);
+    padding: var(--s-3) var(--s-2) 0;
+  }
+  .m-sheet-list .menu-legal a {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+  }
+  @keyframes m-sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes m-sheet-fade {
+    from {
+      opacity: 0;
+    }
   }
 
   /* No page may scroll sideways. */
@@ -60,7 +259,8 @@
 
   /* ---------- Type and page furniture ---------- */
   .page-container {
-    padding: var(--s-5) var(--gutter) var(--s-10);
+    padding: calc(env(safe-area-inset-top) + var(--s-5)) var(--gutter)
+      var(--s-10);
     max-width: none;
   }
   .page-heading {
@@ -240,7 +440,8 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--tabbar);
+    /* Above the inset nav pill, with a 12px gap, never on top of it. */
+    bottom: calc(var(--tabbar) + var(--s-3));
     z-index: 55;
     padding: var(--s-3) var(--gutter);
     background: rgb(255 255 255 / 0.86);
@@ -417,10 +618,11 @@
 
   /* ---------- Listing detail ---------- */
   .detail-page {
-    padding: 0 0 84px;
+    /* Clear the pinned price bar and the nav pill under it. */
+    padding: 0 0 calc(var(--tabbar) + 84px);
   }
   .detail-top {
-    padding: var(--s-2) var(--gutter);
+    padding: calc(env(safe-area-inset-top) + var(--s-2)) var(--gutter) var(--s-2);
     margin-bottom: 0;
     min-height: 44px;
   }
@@ -583,7 +785,8 @@
     height: auto;
     min-height: 0;
     overflow: visible;
-    padding: var(--s-2) var(--gutter) calc(var(--tabbar) + 84px);
+    padding: calc(env(safe-area-inset-top) + var(--s-2)) var(--gutter)
+      calc(var(--tabbar) + 84px);
     background: var(--soft);
   }
   .editor-rail {
@@ -609,9 +812,15 @@
   }
   .editor-head {
     display: block;
-    padding: 2px 2px 0;
+    position: relative;
+    padding: 2px 48px 0 2px;
     background: transparent;
     border-bottom: 0;
+  }
+  .editor-head > .m-account {
+    position: absolute;
+    top: 0;
+    right: 0;
   }
   .step-count {
     margin-bottom: 3px;

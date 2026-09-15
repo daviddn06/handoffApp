@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Link,
   NavLink,
@@ -21,10 +21,12 @@ import {
   LogOut,
   Check,
 } from "lucide-react";
-import { useApp } from "../lib/context";
+import { useApp, type AuthReason } from "../lib/context";
+import { internalHome } from "../surface";
 import { api, errorMessage } from "../lib/api";
 import { ErrorBox, Loading } from "./ui";
 import { AuthModal } from "./AuthModal";
+import { Avatar } from "./Avatar";
 const links = [
   { to: "/browse", label: "Browse", icon: Search },
   { to: "/saved", label: "Saved", icon: Heart },
@@ -55,12 +57,13 @@ const AUTH_ROUTES = new Set([
   "/reset-password",
 ]);
 
-/** Links a signed out visitor cannot use yet. They open the auth modal. */
-const GUARDED = new Set([
-  "/saved",
-  "/requests",
-  "/my-listings",
-  "/listings/new",
+/** Links a signed out visitor cannot use yet. They open the auth modal, and
+    the reason is what the dialog's headline says back to them. */
+const GUARDED = new Map<string, AuthReason>([
+  ["/saved", "saved"],
+  ["/requests", "requests"],
+  ["/my-listings", "my-listings"],
+  ["/listings/new", "new-listing"],
 ]);
 
 export function Layout() {
@@ -92,10 +95,11 @@ export function Layout() {
       ? undefined
       : (e: React.MouseEvent) => {
           e.preventDefault();
-          openAuth({ next: to });
+          openAuth({ next: to, reason: GUARDED.get(to) });
         };
   const [menu, setMenu] = useState(false),
-    [loggingOut, setLoggingOut] = useState(false);
+    [loggingOut, setLoggingOut] = useState(false),
+    [navHidden, setNavHidden] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setMenu(false);
@@ -120,6 +124,20 @@ export function Layout() {
       names[location.pathname] ||
       (location.pathname.startsWith("/admin") ? "Admin" : "Your next place");
     document.title = `${name} · Handoff`;
+  }, [location.pathname]);
+  /* The floating nav pill steps aside while the student scrolls down a page
+     and comes back the moment they scroll up. */
+  useEffect(() => {
+    setNavHidden(false);
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (Math.abs(y - last) < 6) return;
+      setNavHidden(y > last && y > 72);
+      last = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, [location.pathname]);
   useEffect(() => {
     if (!menu) return;
@@ -185,18 +203,13 @@ export function Layout() {
                   aria-controls="account-menu"
                   onClick={() => setMenu(!menu)}
                 >
-                  <span className="avatar">
-                    {user.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")}
-                  </span>
+                  <Avatar src={user.avatar} name={user.name} size={28} />
                   <ChevronDown size={15} />
                 </button>
                 {menu && (
                   <div className="account-menu" id="account-menu">
                     <div className="menu-identity">
+                      <Avatar src={user.avatar} name={user.name} size={36} />
                       <strong>{user.name}</strong>
                       <span>{user.email}</span>
                       {user.verified && (
@@ -211,10 +224,10 @@ export function Layout() {
                       Your profile
                     </Link>
                     {user.isAdmin && (
-                      <Link to="/admin">
+                      <a href={internalHome()}>
                         <Gauge size={16} />
                         Admin
-                      </Link>
+                      </a>
                     )}
                     <button onClick={logout} disabled={loggingOut}>
                       <LogOut size={16} />
@@ -257,7 +270,10 @@ export function Layout() {
           <Outlet />
         )}
       </main>
-      <nav className="mobile-nav" aria-label="Mobile navigation">
+      <nav
+        className={`mobile-nav ${navHidden ? "is-hidden" : ""}`}
+        aria-label="Mobile navigation"
+      >
         {links.slice(0, 2).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} onClick={guard(to)}>
             <Icon size={20} />
@@ -291,13 +307,20 @@ export function Layout() {
  * sign in, where a returning student expects to land.
  */
 export function RequireAuth(_props: { to?: string } = {}) {
-  const { user, openAuth } = useApp(),
+  const { user, loading, auth, openAuth } = useApp(),
     location = useLocation();
   const target = location.pathname + location.search;
-  useEffect(() => {
-    if (!user) openAuth({ next: target });
-  }, [user, target, openAuth]);
-  return user ? <Outlet /> : <Navigate to="/browse" replace />;
+  // The dialog is already open on a direct hit, decided before the first
+  // paint in the provider. This only covers the in app case, and it runs
+  // before the browser paints, so the protected screen is never drawn.
+  useLayoutEffect(() => {
+    if (!user && !loading && !auth.open)
+      openAuth({ next: target, reason: GUARDED.get(location.pathname) });
+  }, [user, loading, auth.open, target, location.pathname, openAuth]);
+  if (user) return <Outlet />;
+  // Browse is what sits behind the dialog. Replacing keeps the back button
+  // pointing at wherever they came from, not at the page they cannot see.
+  return loading ? null : <Navigate to="/browse" replace />;
 }
 
 /** Reminder strip for signed in students who have not verified their email. */

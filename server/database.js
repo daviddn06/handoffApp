@@ -14,7 +14,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 10) {
+  if (version > 11) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -326,6 +326,19 @@ export function openDatabase(dataDir) {
         "CREATE INDEX IF NOT EXISTS admin_audit_target ON admin_audit(target_id, created_at)",
       );
       db.pragma("user_version = 10");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 10) {
+    db.transaction(() => {
+      // An optional profile photo, stored beside the listing photos and
+      // referenced by its public path, exactly like a listing photo is.
+      const userColumns = db
+        .prepare("PRAGMA table_info(users)")
+        .all()
+        .map((column) => column.name);
+      if (!userColumns.includes("avatar"))
+        db.exec("ALTER TABLE users ADD COLUMN avatar TEXT");
+      db.pragma("user_version = 11");
     })();
   }
   return db;

@@ -1,9 +1,8 @@
 import { useState, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Heart, Image, Zap } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, Image, Users, Zap } from "lucide-react";
 import type { Campus, Listing } from "../types";
-import { ROOM_LABELS } from "../types";
-import { GenderTag } from "./Gender";
+import { GENDER_PREFERENCE_LABELS, ROOM_LABELS } from "../types";
 import { api, dateLabel, errorMessage, money, savings } from "../lib/api";
 import { useApp } from "../lib/context";
 import { distanceLabel, milesBetween, travelLabel } from "../lib/dps";
@@ -28,7 +27,7 @@ export function SaveButton({
     e.stopPropagation();
     if (!user) {
       // Signed out, confirm who they are without leaving the page.
-      openAuth();
+      openAuth({ reason: "save" });
       return;
     }
     setBusy(true);
@@ -90,6 +89,45 @@ export function SavingsTag({
   );
 }
 
+/** Boosted reads as one small mark over the photo, never a body pill. */
+export function BoostBadge({ listing }: { listing: Listing }) {
+  if (!listing.boosted) return null;
+  return (
+    <span className="boost-badge" title="Boosted" aria-label="Boosted listing">
+      <Zap size={12} fill="currentColor" strokeWidth={0} />
+    </span>
+  );
+}
+
+/**
+ * The roommate preference as a mark over the photo, beside the boost badge.
+ * On one line of text it truncated, here it always reads.
+ */
+export function PreferenceBadge({ listing }: { listing: Listing }) {
+  const preference = listing.genderPreference;
+  if (preference === "any") return null;
+  const tone = preference.startsWith("women") ? "rose" : "blue";
+  return (
+    <span
+      className={`preference-badge tone-${tone}`}
+      title={GENDER_PREFERENCE_LABELS[preference]}
+      aria-label={GENDER_PREFERENCE_LABELS[preference]}
+    >
+      <Users size={12} />
+    </span>
+  );
+}
+
+/** Room, beds and baths. Nothing else, so it never has to truncate. */
+export function CardFacts({ listing }: { listing: Listing }) {
+  const beds = listing.bedrooms === 0 ? "Studio" : `${listing.bedrooms} bd`;
+  return (
+    <p className="card-meta card-facts">
+      {ROOM_LABELS[listing.roomType]} · {beds} · {listing.bathrooms} ba
+    </p>
+  );
+}
+
 export function ListingCard({
   listing,
   campus,
@@ -125,7 +163,6 @@ export function ListingCard({
     if (photos.length < 2) return;
     setIndex((index + dir + photos.length) % photos.length);
   };
-  const beds = listing.bedrooms === 0 ? "Studio" : `${listing.bedrooms} bd`;
   return (
     <article
       className={`listing-card ${variant} ${active ? "is-active" : ""}`}
@@ -138,6 +175,10 @@ export function ListingCard({
         aria-label={`${listing.title}, ${money(listing.price)} per month`}
       />
       <div className="card-photo">
+        <span className="card-badges">
+          <BoostBadge listing={listing} />
+          <PreferenceBadge listing={listing} />
+        </span>
         {photo ? (
           <img src={photo} alt="" loading="lazy" />
         ) : (
@@ -185,12 +226,6 @@ export function ListingCard({
             <strong>{money(listing.price)}</strong>
             <span>/mo</span>
           </div>
-          {listing.boosted && (
-            <span className="boost-tag" title="Boosted listing">
-              <Zap size={11} fill="currentColor" strokeWidth={0} />
-              Boosted
-            </span>
-          )}
           {save && (
             <span
               className="savings-tag"
@@ -201,10 +236,8 @@ export function ListingCard({
           )}
         </div>
         <h2 className="card-title">{listing.title}</h2>
-        <p className="card-meta">
-          {ROOM_LABELS[listing.roomType]} · {beds} · {listing.bathrooms} ba
-        </p>
-        <p className="card-meta">
+        <CardFacts listing={listing} />
+        <p className="card-meta card-dates">
           {dateLabel(listing.availableFrom)} to {dateLabel(listing.availableTo)}
           {miles !== null && (
             <>
@@ -218,7 +251,6 @@ export function ListingCard({
             </>
           )}
         </p>
-        <GenderTag preference={listing.genderPreference} />
       </div>
     </article>
   );

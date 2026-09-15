@@ -245,7 +245,7 @@ export function SchoolSearch({
           <input
             ref={input}
             aria-label="Search schools"
-            placeholder="Search any school"
+            placeholder="Search another school"
             value={query}
             autoComplete="off"
             spellCheck={false}
@@ -265,6 +265,7 @@ export function SchoolSearch({
             </button>
           )}
         </label>
+        {searching && (
         <div
           className="school-panel"
           ref={list}
@@ -273,12 +274,7 @@ export function SchoolSearch({
         >
           <div className="school-rows" key={trimmed}>
             {!schools && <div className="school-note">Loading schools…</div>}
-            {schools && !searching && (
-              <div className="school-idle">
-                <p>Start typing your school.</p>
-              </div>
-            )}
-            {schools && searching && rows.length === 0 && (
+            {schools && rows.length === 0 && (
               <div className="school-empty">
                 <p>No school called {trimmed} yet.</p>
                 <button
@@ -331,6 +327,7 @@ export function SchoolSearch({
             ))}
           </div>
         </div>
+        )}
       </div>
 
       <div className="t-page" data-page-id="waitlist" aria-hidden={!waiting}>

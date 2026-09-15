@@ -59,6 +59,8 @@ import {
 import { ListingCard } from "../components/ListingCard";
 import { BoostModal, daysLeft } from "../components/BoostModal";
 import { SchoolNotLive } from "../components/SchoolNotLive";
+import { Avatar } from "../components/Avatar";
+import { PhotoPicker } from "../components/PhotoPicker";
 
 type TabItem = { value: string; label: string; count?: number };
 
@@ -666,11 +668,14 @@ export function Requests() {
                     </Link>
                   </h2>
                   <p>
-                    <span className="avatar tiny">
-                      {initials(
-                        tab === "incoming" ? r.requesterName : r.ownerName,
-                      )}
-                    </span>
+                    <Avatar
+                      className="tiny"
+                      size={28}
+                      src={
+                        tab === "incoming" ? r.requesterAvatar : r.ownerAvatar
+                      }
+                      name={tab === "incoming" ? r.requesterName : r.ownerName}
+                    />
                     {tab === "incoming" ? r.requesterName : r.ownerName}
                     {tab === "incoming" && r.requesterGender && (
                       <em>· {GENDER_LABELS[r.requesterGender]}</em>
@@ -843,9 +848,43 @@ export function Profile() {
     [bio, setBio] = useState(user?.bio || ""),
     [gender, setGender] = useState<Gender>(user?.gender || "unspecified"),
     [busy, setBusy] = useState(false),
+    [photoBusy, setPhotoBusy] = useState(false),
     [signingOut, setSigningOut] = useState(false),
     [error, setError] = useState("");
   const campus = campuses.find((c) => c.id === user?.campusId);
+  /* The profile photo. Optional, and changed on the spot rather than saved
+     with the rest of the form. */
+  async function changePhoto(file: File) {
+    setPhotoBusy(true);
+    try {
+      const body = new FormData();
+      body.append("avatar", file);
+      const r = await api<{ user: User }>("/profile/avatar", {
+        method: "POST",
+        body,
+      });
+      setUser(r.user);
+      notify("Your photo is up to date.");
+    } catch (e) {
+      notify(errorMessage(e), "error");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+  async function removePhoto() {
+    setPhotoBusy(true);
+    try {
+      const r = await api<{ user: User }>("/profile/avatar", {
+        method: "DELETE",
+      });
+      setUser(r.user);
+      notify("Your photo is removed.");
+    } catch (e) {
+      notify(errorMessage(e), "error");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
   useEffect(() => {
     setName(user?.name || "");
     setBio(user?.bio || "");
@@ -889,7 +928,12 @@ export function Profile() {
       />
       <div className="pf-layout enter-stagger">
         <aside className="pf-identity">
-          <span className="avatar pf-avatar">{initials(user?.name || "")}</span>
+          <Avatar
+            src={user?.avatar}
+            name={user?.name}
+            size={84}
+            className="pf-avatar"
+          />
           <h2>{user?.name}</h2>
           <p className="pf-email">{user?.email}</p>
           <p className="pf-campus">{campus?.name}</p>
@@ -905,6 +949,15 @@ export function Profile() {
           </p>
         </aside>
         <form className="pf-card" onSubmit={submit}>
+          <h2>Your photo</h2>
+          <PhotoPicker
+            src={user?.avatar}
+            name={user?.name}
+            busy={photoBusy}
+            onPick={changePhoto}
+            onRemove={removePhoto}
+            chooseLabel="Add a photo"
+          />
           <h2>Profile details</h2>
           <div className="stack">
             <Field

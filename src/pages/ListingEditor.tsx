@@ -57,6 +57,7 @@ import {
 } from "../lib/api";
 import { useApp } from "../lib/context";
 import { Button, ErrorBox, Field, Loading } from "../components/ui";
+import { MobileAccount } from "../components/AccountButton";
 import { SchoolNotLive } from "../components/SchoolNotLive";
 import { DateField } from "../components/DateField";
 import { FIELD_STEP, takeImport } from "../lib/import";
@@ -689,6 +690,7 @@ export default function ListingEditor() {
           className="editor-form"
         >
           <header className="editor-head">
+            <MobileAccount className="editor-account" />
             <div className="head-text">
               <span className="step-count">
                 Step {step + 1} of {STEPS.length}

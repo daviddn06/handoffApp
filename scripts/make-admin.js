@@ -59,7 +59,7 @@ if (invokedDirectly && process.argv.length > 2) {
       console.log(
         revoke
           ? "Their existing sessions stay valid, the dashboard simply disappears."
-          : "They can open /admin after their next page load.",
+          : `They can open the dashboard on internal.handofflease.com once ${user.email} is also on HANDOFF_ADMIN_EMAILS. The flag alone opens nothing.`,
       );
     } finally {
       db.close();

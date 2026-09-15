@@ -8,3 +8,19 @@ app.handofflease.com {
         X-Frame-Options DENY
     }
 }
+
+# The internal dashboard. Same app, same port, one added request header. DNS
+# for this name must point at the VPS before Caddy can get its certificate.
+internal.handofflease.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:4742 {
+        header_up X-Handoff-Surface internal
+    }
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        X-Frame-Options DENY
+        X-Robots-Tag "noindex, nofollow"
+    }
+}
