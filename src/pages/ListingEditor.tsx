@@ -578,6 +578,17 @@ export default function ListingEditor() {
           {dirty
             ? "You have unsaved changes."
             : "Your draft stays private until you publish."}
+          <Button
+            type="button"
+            variant="secondary"
+            className="rail-save"
+            onClick={() => save("draft")}
+            busy={saving && step !== LAST}
+            disabled={uploading || saving}
+          >
+            <Save size={15} />
+            Save and exit
+          </Button>
         </p>
       </aside>
       <section className="editor-main">

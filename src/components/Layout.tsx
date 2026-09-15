@@ -59,6 +59,8 @@ export function Layout() {
     location = useLocation();
   const embed = isEmbed();
   const onAuthRoute = AUTH_ROUTES.has(location.pathname);
+  const onEditor =
+    location.pathname === "/listings/new" || location.pathname.endsWith("/edit");
   useEffect(() => {
     document.documentElement.classList.toggle("is-embed", embed);
     if (!embed) return;
@@ -142,7 +144,7 @@ export function Layout() {
             ))}
           </nav>
           <div className="header-actions">
-            {!onAuthRoute && (
+            {!onAuthRoute && !onEditor && (
               <Link to="/listings/new" className="button primary list-place">
                 <Plus size={17} />
                 <span>List your place</span>

@@ -12,6 +12,11 @@
   background: var(--soft);
 }
 
+/* Save and exit lives in the desktop top strip only. */
+.rail-save {
+  display: none;
+}
+
 /* ---------- Step rail ---------- */
 .editor-rail {
   display: flex;
@@ -954,63 +959,137 @@
 }
 
 /* ---------- Phone: one step per screen ---------- */
-/* ---------- Desktop: one centered box ----------
-   The rail, step body and footer live inside a single card in the middle of
-   the page, the same shell the auth pages use. Nothing floats at the edges. */
+/* ---------- Desktop: a focused flow ----------
+   One question per screen on a plain white page, the way host onboarding
+   flows work. A slim top strip (back, status, save and exit), a thin
+   progress bar, the step centered at a comfortable reading width, and a
+   pinned bottom bar with one primary action. No rail, no card in a card. */
 @media (min-width: 761px) {
-  main:has(> .editor-shell) {
-    background: var(--soft);
-  }
   .editor-shell {
-    --box-h: min(720px, calc(100dvh - var(--header-h) - 48px));
-    grid-template-columns: 236px minmax(0, 1fr);
-    width: min(1040px, calc(100% - 48px));
-    height: var(--box-h);
-    min-height: 480px;
-    margin: max(24px, calc((100dvh - var(--header-h) - var(--box-h)) / 2)) auto;
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - var(--header-h));
+    min-height: 520px;
     background: var(--surface);
-    border-radius: 20px;
-    box-shadow: var(--shadow-lg), var(--ring);
   }
   .editor-rail {
-    padding: 22px 18px;
-    background: var(--soft);
-    border-right: 1px solid var(--line);
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 32px;
+    overflow: visible;
+    border-right: 0;
   }
-  .rail-head h1 {
-    font-size: 20px;
+  .rail-head {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
   }
-  .step-item > button {
-    padding: 8px 10px;
+  .rail-head h1,
+  .step-rail {
+    display: none;
+  }
+  .rail-back {
+    min-height: 36px;
+    font-size: 13.5px;
+  }
+  .rail-head .pill {
+    margin-top: 0;
+  }
+  .draft-note {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--muted);
   }
   .editor-main {
+    flex: 1;
+    min-height: 0;
     background: var(--surface);
   }
+  .mobile-progress {
+    display: flex;
+    order: -1;
+    gap: 3px;
+    height: 4px;
+    margin: 0;
+    padding: 0;
+    background: var(--soft);
+  }
+  .mobile-progress > span {
+    flex: 1;
+    background: var(--line);
+    border-radius: 0;
+    transition: background var(--duration-fast) var(--ease-smooth-out);
+  }
+  .mobile-progress > span.is-done,
+  .mobile-progress > span.is-current {
+    background: var(--blue);
+  }
   .editor-head {
-    padding: 22px 32px 0;
+    width: min(680px, 100% - 64px);
+    margin: 0 auto;
+    padding: 22px 0 4px;
     border-bottom: 0;
+    background: transparent;
+  }
+  .step-count {
+    font-size: 11.5px;
   }
   .head-text h2 {
-    font-size: 21px;
+    font-family: "Plus Jakarta Sans", "Geist", sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  .head-text p {
+    font-size: 15px;
+    margin-top: 6px;
   }
   .editor-body > .t-page {
-    padding: 18px 32px 24px;
+    padding: 10px 32px 28px;
+  }
+  .editor-map {
+    height: clamp(170px, 25vh, 320px);
   }
   .step-inner {
-    max-width: none;
+    max-width: 680px;
+    margin: 0 auto;
     padding: 0;
     background: transparent;
     border-radius: 0;
     box-shadow: none;
   }
+  .step-inner > .stack {
+    gap: 18px;
+  }
   .editor-foot {
-    padding: 12px 32px 14px;
+    padding: 14px 32px;
     background: var(--surface);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+  /* Desktop keeps one primary action per screen. Draft saving lives in the
+     top strip as "Save and exit", the phone bar keeps its own Save draft. */
+  .editor-foot .foot-actions > .button.secondary {
+    display: none;
+  }
+  .editor-foot .button.primary {
+    min-width: 160px;
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .rail-save {
+    display: inline-flex;
+  }
   .editor-success {
-    border-radius: 20px;
+    border-radius: 0;
   }
 }
 
