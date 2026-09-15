@@ -46,6 +46,12 @@
   html:has(.verify-banner) .browse-page {
     height: calc(100dvh - 44px);
   }
+  /* Browse fills the viewport and floats its own carousel above the nav, so
+     the shared bottom padding would only paint a gray band under the pill. */
+  main:has(> .browse-page) {
+    padding-bottom: 0;
+    min-height: 0;
+  }
   .toast-region {
     bottom: calc(var(--tabbar) + var(--s-2));
     max-width: calc(100% - var(--s-8));

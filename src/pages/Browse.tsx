@@ -505,6 +505,7 @@ export default function Browse() {
               </button>
             )}
           </label>
+          <div className="chip-strip">
           <div className="chip-row" role="group" aria-label="Filters">
             <Popover
               width={340}
@@ -810,6 +811,7 @@ export default function Browse() {
               </>
             )}
           </button>
+          </div>
         </div>
         <div className="panel-scroll" ref={scrollRef}>
           {!user && (

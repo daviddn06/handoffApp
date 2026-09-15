@@ -40,7 +40,7 @@
    carries a box, so this one only needs a mark, the name and an arrow. */
 .campus-switch {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--s-2);
   width: 100%;
   min-height: 44px;
@@ -1544,17 +1544,28 @@
   .popover {
     max-width: calc(100vw - 24px);
   }
-  /* One floating button swaps map and list, sitting under the chips. */
+  /* One button swaps map and list. It sits at the end of the filter strip,
+     the same height as the chips, so it reads as part of the toolbar. */
+  .chip-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-width: 0;
+  }
+  .chip-strip > .chip-row {
+    flex: 1;
+    min-width: 0;
+    margin-right: 0;
+    padding-right: var(--s-2);
+  }
   .mobile-view-fab {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    position: absolute;
-    top: 100%;
-    right: var(--s-4);
-    margin-top: var(--s-2);
-    height: 40px;
-    padding: 0 var(--s-4);
+    flex: none;
+    height: 36px;
+    padding: 0 var(--s-3);
     border-radius: var(--r-pill);
     background: rgb(255 255 255 / 0.92);
     backdrop-filter: saturate(1.6) blur(18px);
