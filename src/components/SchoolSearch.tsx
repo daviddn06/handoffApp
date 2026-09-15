@@ -342,14 +342,9 @@ export function SchoolSearch({
                   {row.campus ? (
                     row.campus.id === current ? (
                       <Check size={17} className="school-check" />
-                    ) : (
-                      <span className="school-live">
-                        <i aria-hidden="true" />
-                        Live
-                      </span>
-                    )
+                    ) : null
                   ) : (
-                    <span className="school-tag">Waitlist</span>
+                    <span className="school-tag">Coming soon</span>
                   )}
                 </button>
               </div>
