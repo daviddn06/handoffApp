@@ -10,6 +10,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Archive,
+  Trash2,
   Check,
   CheckCircle2,
   Clock,
@@ -272,7 +273,7 @@ export function MyListings() {
   const [filter, setFilter] = useState("all"),
     [action, setAction] = useState<{
       listing: Listing;
-      status: Listing["status"];
+      status: Listing["status"] | "deleted";
     } | null>(null),
     [boost, setBoost] = useState<Listing | null>(null),
     [busy, setBusy] = useState(false),
@@ -287,12 +288,17 @@ export function MyListings() {
     setBusy(true);
     setActionError("");
     try {
-      await api(`/listings/${action.listing.id}`, {
-        method: "PATCH",
-        body: json({ status: action.status }),
-      });
+      if (action.status === "deleted")
+        await api(`/listings/${action.listing.id}`, { method: "DELETE" });
+      else
+        await api(`/listings/${action.listing.id}`, {
+          method: "PATCH",
+          body: json({ status: action.status }),
+        });
       notify(
-        action.status === "handed_off"
+        action.status === "deleted"
+          ? "Listing deleted."
+          : action.status === "handed_off"
           ? "Marked as handed off. Here’s to what’s next."
           : action.status === "archived"
             ? "Listing archived. You can still find it here."
@@ -481,6 +487,16 @@ export function MyListings() {
                     Archive
                   </button>
                 )}
+                <button
+                  className="button small ghost quiet danger"
+                  onClick={() => {
+                    setAction({ listing: l, status: "deleted" });
+                    setActionError("");
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
               </div>
             </article>
           ))}
@@ -524,20 +540,24 @@ export function MyListings() {
         open={!!action}
         onClose={() => !busy && setAction(null)}
         title={
-          action?.status === "handed_off"
-            ? "Found your next student?"
-            : action?.status === "archived"
-              ? "Archive this listing?"
-              : "Put this place back on the map?"
+          action?.status === "deleted"
+            ? "Delete this listing?"
+            : action?.status === "handed_off"
+              ? "Found your next student?"
+              : action?.status === "archived"
+                ? "Archive this listing?"
+                : "Put this place back on the map?"
+        }
+        description={
+          action?.status === "deleted"
+            ? "This removes the listing, its photos and every request on it for everyone. It cannot be undone. Archive it instead if you might relist."
+            : action?.status === "handed_off"
+              ? "This removes your listing from browse. Keep working through the lease directly with the student."
+              : action?.status === "archived"
+                ? "Your listing will be hidden from browse and kept in your archive. You can relist it later."
+                : "Your listing will become visible in browse again. Check the photos, rent and dates first."
         }
       >
-        <p className="muted">
-          {action?.status === "handed_off"
-            ? "This removes your listing from browse. Keep working through the lease and final details directly with the student."
-            : action?.status === "archived"
-              ? "Your listing will be hidden from browse and kept in your archive. You can relist it later."
-              : "Your listing will become visible in browse again. Make sure the photos, rent, and availability dates are still accurate."}
-        </p>
         {actionError && <ErrorBox message={actionError} />}
         <div className="modal-actions">
           <Button
@@ -547,12 +567,18 @@ export function MyListings() {
           >
             Cancel
           </Button>
-          <Button busy={busy} onClick={confirm}>
-            {action?.status === "handed_off"
-              ? "Mark handed off"
-              : action?.status === "archived"
-                ? "Archive listing"
-                : "Relist listing"}
+          <Button
+            busy={busy}
+            onClick={confirm}
+            variant={action?.status === "deleted" ? "danger" : "primary"}
+          >
+            {action?.status === "deleted"
+              ? "Delete for good"
+              : action?.status === "handed_off"
+                ? "Mark handed off"
+                : action?.status === "archived"
+                  ? "Archive listing"
+                  : "Relist listing"}
           </Button>
         </div>
       </Modal>
@@ -811,14 +837,14 @@ export function Requests() {
               ? "Decline this request?"
               : "Withdraw your request?"
         }
-      >
-        <p className="muted">
-          {action?.status === "accepted"
-            ? `We’ll share your email (${user?.email}) with ${action.request.requesterName.split(" ")[0]}, and reveal theirs to you. Accepting starts a conversation and doesn’t commit you to a lease.`
+        description={
+          action?.status === "accepted"
+            ? `We’ll share your email (${user?.email}) with ${action.request.requesterName.split(" ")[0]} and reveal theirs to you. Nothing here commits you to a lease.`
             : action?.status === "declined"
-              ? "The student will see that their request was declined. Your contact details will stay private."
-              : "The listing owner will see that you’ve withdrawn. You can send a new request later if the place is still available."}
-        </p>
+              ? "The student will see that their request was declined. Your contact details stay private."
+              : "The listing owner will see that you’ve withdrawn. You can send a new request later."
+        }
+      >
         {actionError && <ErrorBox message={actionError} />}
         <div className="modal-actions">
           <Button

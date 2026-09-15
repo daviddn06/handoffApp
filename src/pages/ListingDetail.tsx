@@ -61,24 +61,20 @@ import { milesBetween, tripLabel } from "../lib/dps";
 const Map = lazy(() => import("../components/Map"));
 
 /**
- * A locked preview keeps the shape of the real thing, so a visitor can see
- * there is something to confirm for. The text underneath is a stand in, never
- * the listing's own words, blurred hard, unselectable and out of the
- * accessibility tree.
+ * A locked preview keeps the shape of the real thing without ever carrying
+ * text. The server already sends null for the address, the description and
+ * the lister when nobody is signed in, and what stands in for them here is a
+ * row of neutral bars with no words in them at all, out of the accessibility
+ * tree. There is nothing to unblur, because there is nothing underneath.
  */
-function LockedText({
-  children,
-  className = "",
-  as: Tag = "span",
-}: {
-  children: ReactNode;
-  className?: string;
-  as?: "span" | "p" | "strong";
-}) {
+const LOCKED_LINES = [92, 78, 96, 64, 88, 52];
+function LockedLines({ lines = LOCKED_LINES }: { lines?: number[] }) {
   return (
-    <Tag className={`locked-blur ${className}`} aria-hidden="true">
-      {children}
-    </Tag>
+    <span className="locked-lines" aria-hidden="true">
+      {lines.map((width, i) => (
+        <span key={i} style={{ width: `${width}%` }} />
+      ))}
+    </span>
   );
 }
 function StudentsOnlyChip() {
@@ -89,10 +85,23 @@ function StudentsOnlyChip() {
     </span>
   );
 }
-const LOCKED_ADDRESS = "1428 West 30th Street, Los Angeles, CA 90007";
-const LOCKED_DESCRIPTION = `A bright corner bedroom in a four bedroom house, two blocks from campus and one from the bus stop. The room comes furnished with a queen bed, a desk under the window and a tall closet.
-
-Laundry is in the building, the kitchen was redone last summer, and the three roommates are juniors who keep the place quiet on weeknights. Street parking is easy after six.`;
+/** The one block that explains the hold and opens all of it. */
+function LockedGate({ onUnlock }: { onUnlock: () => void }) {
+  return (
+    <div className="locked-gate">
+      <span className="locked-gate-icon" aria-hidden="true">
+        <Lock size={16} />
+      </span>
+      <strong>Students only</strong>
+      <p>
+        Confirm you are a student to see the address, description and lister.
+      </p>
+      <button className="button primary" onClick={onUnlock}>
+        Confirm you are a student
+      </button>
+    </div>
+  );
+}
 
 function DetailSkeleton() {
   return (
@@ -395,7 +404,7 @@ export default function ListingDetail() {
             {locked ? (
               <p className="detail-address is-locked">
                 <MapPin size={15} />
-                <LockedText>{LOCKED_ADDRESS}</LockedText>
+                <span className="locked-bar" aria-hidden="true" />
                 <span className="sr-only">
                   The address is hidden until you confirm you are a student.
                 </span>
@@ -439,26 +448,8 @@ export default function ListingDetail() {
             <h2>About the place</h2>
             {locked ? (
               <div className="locked-block">
-                <LockedText as="p" className="preserve-lines">
-                  {LOCKED_DESCRIPTION}
-                </LockedText>
-                <div className="locked-card">
-                  <StudentsOnlyChip />
-                  <p>
-                    Confirm you are a student to see the address, description
-                    and lister.
-                  </p>
-                  <button
-                    className="button primary"
-                    onClick={() => unlock("details")}
-                  >
-                    Confirm you are a student
-                    <ArrowRight size={16} />
-                  </button>
-                  <small>
-                    Handoff is students only, so places stay between students.
-                  </small>
-                </div>
+                <LockedLines />
+                <LockedGate onUnlock={() => unlock("details")} />
               </div>
             ) : (
               <p className="preserve-lines">
@@ -505,12 +496,12 @@ export default function ListingDetail() {
 
           {locked ? (
             <section className="host-card is-locked">
-              <Avatar name="Maya Chen" size={48} blurred />
+              <span className="locked-avatar" aria-hidden="true" />
               <div className="host-text">
-                <LockedText as="strong">Listed by Maya Chen</LockedText>
+                <span className="locked-bar short" aria-hidden="true" />
                 <span className="host-verified">
                   <ShieldCheck size={14} />
-                  Verified {campus?.name} student
+                  Verified student
                 </span>
                 <span className="sr-only">
                   The lister is hidden until you confirm you are a student.
@@ -536,7 +527,7 @@ export default function ListingDetail() {
                 <strong>Listed by {listing.ownerName || "a student"}</strong>
                 <span className="host-verified">
                   <ShieldCheck size={14} />
-                  Verified {campus?.name} student
+                  Verified student
                 </span>
               </div>
             </section>
@@ -765,6 +756,11 @@ export default function ListingDetail() {
         open={requestOpen}
         onClose={() => setRequestOpen(false)}
         title={createdRequest ? "Request sent" : "Request this handoff"}
+        description={
+          createdRequest
+            ? undefined
+            : "Your email is shared only if they accept."
+        }
       >
         {createdRequest ? (
           <div className="request-sent">
@@ -799,9 +795,6 @@ export default function ListingDetail() {
           </div>
         ) : (
           <form className="request-form" onSubmit={sendRequest}>
-            <p className="muted">
-              Your email is shared only if they accept.
-            </p>
             <Field label="Your message">
               <textarea
                 required
@@ -824,7 +817,7 @@ export default function ListingDetail() {
               </p>
             )}
             {requestError && <ErrorBox message={requestError} />}
-            <div className="modal-actions">
+            <div className="modal-actions spread">
               <span className="request-fineprint">
                 No payment or commitment required.
               </span>
@@ -841,12 +834,14 @@ export default function ListingDetail() {
         open={reportOpen}
         onClose={() => setReportOpen(false)}
         title="Report this listing"
+        description={
+          user
+            ? "Tell us what does not look right."
+            : "Confirm you are a student so we can follow up."
+        }
       >
         {!user ? (
           <>
-            <p className="muted">
-              Confirm you are a student so we can follow up.
-            </p>
             <button
               className="button primary full-width"
               onClick={() => {
@@ -860,9 +855,6 @@ export default function ListingDetail() {
           </>
         ) : (
           <form className="stack" onSubmit={submitReport}>
-            <p className="muted">
-              Tell us what does not look right.
-            </p>
             <Field label="Reason">
               <select
                 value={reportReason}

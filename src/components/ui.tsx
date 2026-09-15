@@ -5,8 +5,10 @@ import {
   useEffect,
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   ArrowRight,
@@ -135,85 +137,179 @@ export function PageHeading({
     </div>
   );
 }
+/** Reduced motion is checked at the moment it matters, never cached. */
+const reducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Opening a dialog must not move the page behind it. The scroll is locked and
+ * the width the scrollbar gave up is handed back as padding, so nothing
+ * reflows on open or close. Ref counted, because two dialogs can overlap.
+ */
+let scrollLocks = 0;
+let savedOverflow = "";
+let savedPadding = "";
+function lockPageScroll() {
+  if (scrollLocks++ > 0) return;
+  const root = document.documentElement;
+  const gap = window.innerWidth - root.clientWidth;
+  savedOverflow = root.style.overflow;
+  savedPadding = root.style.paddingRight;
+  root.style.overflow = "hidden";
+  if (gap > 0) root.style.paddingRight = `${gap}px`;
+}
+function unlockPageScroll() {
+  if (scrollLocks === 0 || --scrollLocks > 0) return;
+  const root = document.documentElement;
+  root.style.overflow = savedOverflow;
+  root.style.paddingRight = savedPadding;
+}
+
+/**
+ * Every dialog in the app opens and closes the same way. The element stays
+ * mounted and open through the whole close animation, and only then does
+ * close() run, so the card and its backdrop leave together instead of
+ * blinking out. Returns the class the host puts on the dialog.
+ */
+export function useDialogMotion(
+  open: boolean,
+  ref: RefObject<HTMLDialogElement | null>,
+) {
+  const [closing, setClosing] = useState(false);
+  const restoreTo = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (open) {
+      setClosing(false);
+      if (!el.open) {
+        restoreTo.current = document.activeElement as HTMLElement | null;
+        lockPageScroll();
+        el.showModal();
+      }
+      return;
+    }
+    if (!el.open) return;
+    const finish = () => {
+      if (!el.open) return;
+      el.close();
+      setClosing(false);
+      unlockPageScroll();
+      // Back to whatever they clicked, so the keyboard keeps its place.
+      restoreTo.current?.focus?.();
+    };
+    if (reducedMotion()) {
+      finish();
+      return;
+    }
+    setClosing(true);
+    // The animation end is the signal, the timer is only the safety net.
+    const onEnd = (e: AnimationEvent) => {
+      if (e.target === el) finish();
+    };
+    el.addEventListener("animationend", onEnd);
+    const timer = window.setTimeout(finish, 420);
+    return () => {
+      el.removeEventListener("animationend", onEnd);
+      window.clearTimeout(timer);
+    };
+  }, [open, ref]);
+  useEffect(() => () => unlockPageScroll(), []);
+  return closing ? "is-closing" : "";
+}
+
+/** Tab never leaves an open dialog. */
+export function trapTab(e: React.KeyboardEvent<HTMLDialogElement>) {
+  if (e.key !== "Tab") return;
+  const items = Array.from(
+    e.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
+    ),
+  ).filter((el) => el.offsetParent !== null && el.tabIndex !== -1);
+  const first = items[0],
+    last = items[items.length - 1];
+  if (!first) return;
+  if (
+    e.shiftKey &&
+    (document.activeElement === first ||
+      document.activeElement === e.currentTarget)
+  ) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+/** A click outside the card, which on a dialog means outside its own box. */
+export function backdropClick(
+  e: React.MouseEvent<HTMLDialogElement>,
+  onClose: () => void,
+) {
+  if (e.target !== e.currentTarget) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  if (
+    e.clientX < r.left ||
+    e.clientX > r.right ||
+    e.clientY < r.top ||
+    e.clientY > r.bottom
+  )
+    onClose();
+}
+
 export function Modal({
   open,
   onClose,
   title,
+  description,
   children,
   wide = false,
+  className = "",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  /** One muted line under the title. Longer support copy belongs in the body. */
+  description?: string;
   children: ReactNode;
   wide?: boolean;
+  className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     id = useId();
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (open && !el.open) el.showModal();
-    if (!open && el.open) el.close();
-  }, [open]);
+  const motion = useDialogMotion(open, ref);
   return (
     <dialog
-      className={`modal ${wide ? "wide" : ""}`}
+      className={`modal ${wide ? "wide" : ""} ${className} ${motion}`.trim()}
       ref={ref}
       aria-labelledby={id}
-      onKeyDown={(e) => {
-        if (e.key !== "Tab") return;
-        const items = Array.from(
-          e.currentTarget.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
-          ),
-        ).filter((el) => el.offsetParent !== null);
-        const first = items[0],
-          last = items[items.length - 1];
-        if (!first) return;
-        if (
-          e.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === e.currentTarget)
-        ) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }}
+      onKeyDown={trapTab}
       onCancel={(e) => {
         e.preventDefault();
         onClose();
       }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          const r = e.currentTarget.getBoundingClientRect();
-          if (
-            e.clientX < r.left ||
-            e.clientX > r.right ||
-            e.clientY < r.top ||
-            e.clientY > r.bottom
-          )
-            onClose();
-        }
-      }}
+      onClick={(e) => backdropClick(e, onClose)}
     >
       <span className="sheet-grip" aria-hidden="true">
         <span />
       </span>
-      <div className="modal-heading">
-        <h2 id={id}>{title}</h2>
-        <button
-          className="icon-button"
-          onClick={onClose}
-          aria-label="Close dialog"
-        >
-          <X size={21} />
-        </button>
+      <button
+        type="button"
+        className="icon-button modal-close"
+        onClick={onClose}
+        aria-label="Close dialog"
+      >
+        <X size={20} />
+      </button>
+      <div className="modal-scroll">
+        <div className="modal-heading">
+          <h2 id={id}>{title}</h2>
+        </div>
+        {description && <p className="muted">{description}</p>}
+        {children}
       </div>
-      {children}
     </dialog>
   );
 }

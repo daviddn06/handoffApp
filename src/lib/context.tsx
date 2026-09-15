@@ -50,6 +50,12 @@ export type AuthModalState = {
   reason: AuthReason;
   /** A key that changes on every open, so the modal remounts fresh. */
   key: number;
+  /** Opened by the route guard rather than by a click, so it can be taken
+      back the moment the session turns out to be alive. */
+  auto: boolean;
+  /** A guarded route whose session has not answered yet. Nothing is shown
+      until it does, because the session cookie is httpOnly and unreadable. */
+  pending: boolean;
 };
 
 /** Routes a signed out visitor can never see. The modal stands in for them. */
@@ -80,6 +86,8 @@ const CLOSED: AuthModalState = {
   next: "/browse",
   reason: "default",
   key: 0,
+  auto: false,
+  pending: false,
 };
 /** A hint that survives a reload, so a returning student never sees a flash. */
 const SIGNED_IN_HINT = "handoff:signed-in";
@@ -100,10 +108,12 @@ const writeHint = (signedIn: boolean) => {
   }
 };
 /**
- * What the very first render already knows. A direct hit on a protected route,
- * an ?auth=signup&next=/saved link, or a handoff left in sessionStorage all
- * resolve here, synchronously, so the dialog is open in the same frame the
- * page paints. Nothing navigates and no protected screen is ever drawn.
+ * What the very first render already knows. An ?auth=signup&next=/saved link
+ * or a handoff left in sessionStorage is an explicit ask, so it opens in the
+ * same frame the page paints. A guarded route is not: the session lives in an
+ * httpOnly cookie this code cannot read, so it waits for the session to
+ * answer and opens only if it comes back empty. Nothing gated is drawn while
+ * it waits, the layout shows its loading state.
  */
 function initialAuth(): AuthModalState {
   if (typeof window === "undefined") return CLOSED;
@@ -124,14 +134,11 @@ function initialAuth(): AuthModalState {
     (route) => pathname === route.path || pathname.startsWith(`${route.path}/`),
   );
   if (!asked && !guarded) return CLOSED;
-  // A student we believe is signed in gets the page, not the dialog. If the
-  // session turns out to be gone, the check below opens it a moment later.
-  if (readHint()) return CLOSED;
   const next =
     safePath(params.get("next")) ||
     safePath(handoff?.next) ||
     (guarded ? pathname + search : "/browse");
-  return {
+  const wanted: AuthModalState = {
     open: true,
     mode: asked === "signin" ? "signin" : "signup",
     next,
@@ -139,7 +146,12 @@ function initialAuth(): AuthModalState {
       ? guarded.reason
       : asReason(params.get("reason") || handoff?.reason || null),
     key: 1,
+    auto: !asked,
+    pending: false,
   };
+  if (asked) return wanted;
+  // A guarded route. Hold it back until the session has spoken.
+  return { ...wanted, open: false, pending: true };
 }
 const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -171,6 +183,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       reason?: AuthReason;
     }) =>
       setAuth((current) => ({
+        auto: false,
+        pending: false,
         open: true,
         mode: options?.mode || "signup",
         // No target given means stay exactly where they are.
@@ -205,10 +219,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then(([session, config]) => {
         writeHint(Boolean(session.user));
         setUserState(session.user);
-        // A stale signed in hint kept the dialog shut. Now we know better.
-        if (!session.user)
-          setAuth((current) => (current.open ? current : initialAuth()));
-        else setAuth((current) => ({ ...current, open: false }));
+        setAuth((current) => {
+          // The session is alive, so anything the route guard put up comes
+          // straight back down. A dialog they opened themselves stays.
+          if (session.user)
+            return current.auto || current.pending
+              ? { ...current, open: false, pending: false }
+              : current;
+          // No session. A held back guard opens now.
+          if (current.pending)
+            return { ...current, open: true, pending: false };
+          return current;
+        });
         setCampuses(config.campuses);
         setEmailReady(config.emailReady);
         setAiReady(Boolean(config.aiReady));

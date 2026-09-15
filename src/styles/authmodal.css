@@ -3,84 +3,81 @@
    page they were on, with browse still readable (blurred) behind the sheet.
    Self contained, phone rules included. */
 .auth-modal {
-  border: 0;
+  position: fixed;
+  inset: 0;
   margin: auto;
-  padding: var(--pad-modal);
+  border: 0;
+  padding: 0;
   width: calc(100% - var(--s-8));
-  max-width: 440px;
-  max-height: calc(100dvh - var(--s-12));
+  max-width: 480px;
+  max-height: calc(100dvh - var(--s-6) * 2);
   /* The box never scrolls, its body does, so the close button stays put. */
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  position: relative;
   background: var(--surface);
   color: var(--ink);
-  border-radius: 20px;
+  border-radius: var(--r-xl);
   box-shadow: var(--shadow-lg), var(--ring);
   transform-origin: center;
-  transform: scale(var(--modal-scale));
-  opacity: 0;
-  transition:
-    transform var(--modal-open-dur) var(--modal-ease),
-    opacity var(--modal-open-dur) var(--modal-ease),
-    overlay var(--modal-open-dur) allow-discrete,
-    display var(--modal-open-dur) allow-discrete;
 }
+.auth-modal:not([open]) {
+  display: none;
+}
+/* Same open and close as every other dialog: the backdrop leads in, the
+   card leads out, both as keyframes so the blur actually runs. */
 .auth-modal[open] {
-  transform: scale(1);
-  opacity: 1;
+  animation: modal-in var(--modal-in) var(--modal-ease) 60ms both;
 }
-@starting-style {
-  .auth-modal[open] {
-    transform: scale(var(--modal-scale));
-    opacity: 0;
-  }
+.auth-modal[open]::backdrop {
+  animation: modal-backdrop-in var(--modal-in) var(--modal-ease) both;
+}
+.auth-modal.is-closing {
+  animation: modal-out var(--modal-out) var(--modal-ease) both;
+}
+.auth-modal.is-closing::backdrop {
+  animation: modal-backdrop-out var(--modal-out) var(--modal-ease) 40ms both;
 }
 /* Everything behind stays visible, just out of focus. */
 .auth-modal::backdrop {
-  background: rgb(16 24 40 / 0.35);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition:
-    background-color var(--modal-open-dur) var(--modal-ease),
-    backdrop-filter var(--modal-open-dur) var(--modal-ease),
-    overlay var(--modal-open-dur) allow-discrete,
-    display var(--modal-open-dur) allow-discrete;
-}
-@starting-style {
-  .auth-modal[open]::backdrop {
-    background: rgb(16 24 40 / 0);
-    backdrop-filter: blur(0);
-    -webkit-backdrop-filter: blur(0);
-  }
+  background-color: var(--modal-backdrop-tint);
+  backdrop-filter: blur(var(--modal-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--modal-backdrop-blur));
 }
 .auth-modal-close {
   position: absolute;
   top: var(--s-3);
   right: var(--s-3);
-  z-index: 3;
-  color: var(--muted);
+  z-index: 4;
 }
 .auth-modal-body {
-  /* The parked step pages sit 8px off to the side. Clip, not hidden, so a
-     focus call during the slide can never scroll the body sideways. */
-  overflow-x: clip;
-  display: flex;
-  flex-direction: column;
+  /* 4px of slack all round, so the focus ring on a full width input is never
+     clipped by the scroll container at the left or the right edge. */
+  padding: 4px;
+  margin: calc(var(--s-8) - 4px);
   min-height: 0;
   overflow-y: auto;
+  overflow-x: clip;
   overscroll-behavior: contain;
 }
+.auth-modal-inner {
+  display: flex;
+  flex-direction: column;
+}
 
-/* The shared auth forms, tightened for the smaller box */
+/* The shared auth forms, laid out for the dialog */
 .auth-modal .auth-block.is-compact {
-  gap: var(--s-6);
+  gap: var(--s-5);
 }
 .auth-modal .auth-head h1 {
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  /* Clear of the close button in the corner. */
   padding-right: var(--s-8);
+}
+.auth-modal .auth-head p {
+  font-size: 13.5px;
 }
 .auth-modal .auth-form {
   gap: var(--s-5);
@@ -100,23 +97,17 @@
   color: var(--muted-2);
 }
 .auth-modal .auth-cta {
-  min-height: 46px;
+  min-height: 48px;
   width: 100%;
-  margin-top: var(--s-1);
+  margin-top: 0;
   font-size: 15px;
 }
-.auth-modal .auth-switch {
-  text-align: center;
-  margin-top: var(--s-1);
-}
-.auth-modal .auth-switch .text-button,
 .auth-modal .forgot-link.text-button {
   font-weight: 500;
   color: var(--blue);
   min-height: 0;
   text-decoration: none;
 }
-.auth-modal .auth-switch .text-button:hover,
 .auth-modal .forgot-link.text-button:hover {
   color: var(--blue-hover);
   text-decoration: underline;
@@ -124,11 +115,8 @@
 }
 .auth-modal .forgot-link.text-button {
   align-self: flex-end;
-  margin-top: -6px;
+  margin-top: calc(var(--s-3) * -1);
   font-size: 12.5px;
-}
-.auth-modal .auth-fineprint {
-  max-width: none;
 }
 
 /* Phones get the same bottom sheet as every other modal */
@@ -137,44 +125,37 @@
     width: 100%;
     max-width: none;
     margin: auto auto 0;
-    padding: 0 var(--pad-modal) calc(var(--s-5) + env(safe-area-inset-bottom));
     border-radius: var(--r-xl) var(--r-xl) 0 0;
     max-height: 92dvh;
-    opacity: 1;
-    transform: translateY(100%);
-    transition:
-      transform var(--modal-open-dur) var(--modal-ease),
-      overlay var(--modal-open-dur) allow-discrete,
-      display var(--modal-open-dur) allow-discrete;
   }
   .auth-modal[open] {
-    transform: translateY(0);
+    animation: sheet-in var(--modal-in) var(--modal-ease) 60ms both;
   }
-  @starting-style {
-    .auth-modal[open] {
-      transform: translateY(100%);
-      opacity: 1;
-    }
+  .auth-modal.is-closing {
+    animation: sheet-out var(--modal-out) var(--modal-ease) both;
   }
   .auth-modal .sheet-grip {
     display: grid;
-  }
-  .auth-modal-close {
-    top: var(--s-6);
-    right: var(--s-2);
+    flex: none;
   }
   .auth-modal-body {
-    padding-top: var(--s-2);
+    /* 24px of padding on a phone, minus the 4px of ring slack. */
+    margin: calc(var(--s-2) - 4px) calc(var(--s-6) - 4px)
+      calc(var(--s-6) + env(safe-area-inset-bottom) - 4px);
+  }
+  .auth-modal-close {
+    top: var(--s-4);
+    right: var(--s-3);
   }
   .auth-modal .auth-head h1 {
-    font-size: 20px;
+    font-size: 21px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .auth-modal,
   .auth-modal::backdrop {
-    transition: none !important;
+    animation: none !important;
   }
 }
 
@@ -191,9 +172,8 @@
 }
 
 .auth-modal .auth-slide {
+  /* Clip the parked steps, but let the 3px focus ring on an input paint
+     past the edge, which is what was cutting the ring off at both sides. */
   overflow: clip;
-}
-.auth-modal .auth-slide .t-page {
-  left: 0;
-  right: 0;
+  overflow-clip-margin: 6px;
 }

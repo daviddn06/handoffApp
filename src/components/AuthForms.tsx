@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { ApiError, api, errorMessage, json } from "../lib/api";
 import { useApp, type AuthReason } from "../lib/context";
-import { Button, ErrorBox, Field } from "./ui";
+import { Button, Field } from "./ui";
 import type { Gender, User } from "../types";
 import { GenderChoice } from "./Gender";
 import {
@@ -68,6 +68,22 @@ function actionPhrase(next: string, reason?: AuthReason) {
 export function signUpHeadline(next: string, reason?: AuthReason) {
   const phrase = actionPhrase(next, reason);
   return `Confirm you are a student ${phrase || "to continue"}.`;
+}
+/** The terms footnote, the same words under every signed out form. */
+export function TermsFootnote() {
+  return (
+    <p className="auth-fineprint">
+      By continuing you agree to the{" "}
+      <a href="/terms" target="_blank" rel="noreferrer">
+        Terms of Service
+      </a>{" "}
+      and{" "}
+      <a href="/privacy" target="_blank" rel="noreferrer">
+        Privacy Policy
+      </a>
+      .
+    </p>
+  );
 }
 export function signInLead(next: string, reason?: AuthReason) {
   const phrase = actionPhrase(next, reason);
@@ -261,7 +277,6 @@ export function SignInForm({
   const campuses = liveCampuses(allCampuses);
   const { shakeField, fieldClass } = useFieldShake();
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
     [email, setEmailValue] = useState(sharedEmail || ""),
     [password, setPassword] = useState(""),
     [showPassword, setShowPassword] = useState(false),
@@ -291,7 +306,6 @@ export function SignInForm({
       shakeField(problems.email ? "email" : "password");
       return;
     }
-    setError("");
     setBusy(true);
     try {
       const r = await api<{ user: User }>("/auth/login", {
@@ -302,7 +316,7 @@ export function SignInForm({
       setSignedIn(r.user);
       settle();
     } catch (err) {
-      setError(errorMessage(err));
+      setFieldErrors({ password: errorMessage(err) });
       shakeField("password");
       setBusy(false);
     }
@@ -325,11 +339,6 @@ export function SignInForm({
         <h1>Welcome back.</h1>
         <p>{signInLead(next, reason)}</p>
       </header>
-      {error && (
-        <div className="auth-fade-in">
-          <ErrorBox message={error} />
-        </div>
-      )}
       <form className="auth-form" noValidate onSubmit={submit}>
         <Field
           label="Student email"
@@ -394,21 +403,26 @@ export function SignInForm({
           Sign in
           <ArrowRight size={17} />
         </Button>
+        <div className="auth-row is-single">
+          <p className="auth-switch">
+            New here?{" "}
+            {onSwitch ? (
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onSwitch("signup")}
+              >
+                Confirm you are a student
+              </button>
+            ) : (
+              <Link to={`/sign-up?next=${encodeURIComponent(next)}`}>
+                Confirm you are a student
+              </Link>
+            )}
+          </p>
+        </div>
       </form>
-      {compact && (
-        <p className="auth-switch">
-          New here?{" "}
-          {onSwitch ? (
-            <button type="button" className="text-button" onClick={() => onSwitch("signup")}>
-              Confirm you are a student
-            </button>
-          ) : (
-            <Link to={`/sign-up?next=${encodeURIComponent(next)}`}>
-              Confirm you are a student
-            </Link>
-          )}
-        </p>
-      )}
+      <TermsFootnote />
     </div>
   );
 }
@@ -428,8 +442,7 @@ export function SignUpForm({
   const campuses = liveCampuses(allCampuses);
   const { shakeField, fieldClass } = useFieldShake();
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [errorCode, setErrorCode] = useState(""),
+    [exists, setExists] = useState(false),
     [success, setSuccess] = useState(""),
     [email, setEmailValue] = useState(seedEmail || ""),
     [name, setName] = useState(""),
@@ -450,7 +463,6 @@ export function SignUpForm({
     loadSchools().then(setSchools);
   }, []);
   const slideRef = useRef<HTMLDivElement>(null);
-  const [slideHeight, setSlideHeight] = useState<number>();
   const strength = passwordCheck(password, { email, name });
   const { done, settle } = useSettledSuccess(() => {
     if (joined) onDone?.(joined);
@@ -470,20 +482,34 @@ export function SignUpForm({
       current[key] ? { ...current, [key]: "" } : current,
     );
 
-  /* Keep the sliding step container as tall as the step on screen. */
+  /* The step container grows and shrinks with the card resize tokens rather
+     than snapping, then goes back to auto so nothing is ever held at a stale
+     height. transitions.dev card resize. */
+  const lastHeight = useRef<number | null>(null);
   useLayoutEffect(() => {
     const root = slideRef.current;
     if (!root) return;
-    const panel = root.querySelector<HTMLElement>(
-      `.t-page[data-page-id="${step}"]`,
-    );
-    if (!panel) return;
-    const measure = () => setSlideHeight(panel.offsetHeight);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, [step, error, emailReady, detected]);
+    const from = lastHeight.current;
+    root.style.height = "auto";
+    const to = root.offsetHeight;
+    lastHeight.current = to;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    if (from === null || from === to || reduced) return;
+    root.style.height = `${from}px`;
+    void root.offsetHeight;
+    root.style.height = `${to}px`;
+    let timer = 0;
+    const release = () => {
+      root.style.height = "";
+      window.clearTimeout(timer);
+      root.removeEventListener("transitionend", release);
+    };
+    root.addEventListener("transitionend", release);
+    timer = window.setTimeout(release, 600);
+    return release;
+  }, [step, exists, emailReady, detected, fieldErrors, strength.hint, photo]);
   /* Focus lands only once the slide has settled. Focusing mid transition
      scrolls the clipped track sideways, which is the bug this avoids. */
   useEffect(() => {
@@ -506,8 +532,6 @@ export function SignUpForm({
   /* Sign up steps. Enter advances, the last step submits. */
   async function advance(e: FormEvent) {
     e.preventDefault();
-    setError("");
-    setErrorCode("");
     if (step === 1) {
       const problems = checkFields(["email"], { email, name, password });
       setFieldErrors(problems);
@@ -515,17 +539,27 @@ export function SignUpForm({
         shakeField("email");
         return;
       }
-      // The school list may still be in flight on a fast first keystroke.
+      // One request, on Continue. An email that is already taken is stopped
+      // here rather than after four steps of typing.
+      setExists(false);
       setBusy(true);
-      const list = schools || (await loadSchools());
-      setSchools(list);
-      setBusy(false);
-      if (!schoolForEmail(email, list)) {
-        setError("Use your school email. We could not find that school yet.");
+      try {
+        const answer = await api<{
+          exists: boolean;
+          school: { name: string; domain: string; live: boolean };
+        }>("/auth/check-email", { method: "POST", body: json({ email }) });
+        if (answer.exists) {
+          setExists(true);
+          shakeField("email");
+          return;
+        }
+        setStep(2);
+      } catch (err) {
+        setFieldErrors({ email: errorMessage(err) });
         shakeField("email");
-        return;
+      } finally {
+        setBusy(false);
       }
-      setStep(2);
     } else if (step === 2) {
       const problems = checkFields(["name"], { email, name, password });
       setFieldErrors(problems);
@@ -545,8 +579,6 @@ export function SignUpForm({
       shakeField("password");
       return;
     }
-    setError("");
-    setErrorCode("");
     setBusy(true);
     try {
       const r = await api<{ user: User | null; message: string }>(
@@ -565,12 +597,16 @@ export function SignUpForm({
       );
     } catch (err) {
       const code = err instanceof ApiError ? err.code || "" : "";
-      setError(errorMessage(err));
-      setErrorCode(code);
-      // The email is the thing to fix, so that is the field that moves, and
-      // the student is put back on the step that owns it.
-      if (code === "account_exists") setStep(1);
-      shakeField(code === "account_exists" ? "email" : "password");
+      // The email is the thing to fix, so the student goes back to the step
+      // that owns it and the amber card explains the way out.
+      if (code === "account_exists") {
+        setExists(true);
+        setStep(1);
+        shakeField("email");
+      } else {
+        setFieldErrors({ password: errorMessage(err) });
+        shakeField("password");
+      }
     } finally {
       setBusy(false);
     }
@@ -594,7 +630,7 @@ export function SignUpForm({
       setUser(r.user);
       setJoined(r.user);
     } catch (err) {
-      setError(errorMessage(err));
+      setFieldErrors({ photo: errorMessage(err) });
       shakeField("photo");
       setBusy(false);
       return;
@@ -646,57 +682,67 @@ export function SignUpForm({
     email ? `&email=${encodeURIComponent(email)}` : ""
   }`;
 
+  /* The one row under the primary button: a quiet way back on the left, the
+     way over to sign in on the right. */
+  const footerRow = (back?: () => void) => (
+    <div className={`auth-row ${back ? "" : "is-single"}`}>
+      {back && (
+        <button
+          type="button"
+          className="button ghost small auth-back"
+          onClick={back}
+        >
+          <ArrowLeft size={15} />
+          Back
+        </button>
+      )}
+      <p className="auth-switch">
+        Already confirmed?{" "}
+        {onSwitch ? (
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => onSwitch("signin")}
+          >
+            Sign in
+          </button>
+        ) : (
+          <Link to={toSignIn}>Sign in</Link>
+        )}
+      </p>
+    </div>
+  );
+
+  const schoolLine = detected && (
+    <p className="auth-school-line auth-rise-in" key={detected.domain}>
+      <SchoolLogo src={`/api/logo/${encodeURIComponent(detected.domain)}`} />
+      <span>{detected.name}</span>
+      {!detected.live && (
+        <small>Browsing only for now, listings open soon</small>
+      )}
+    </p>
+  );
+
   return (
     <div className={blockClass(compact)}>
       <header className="auth-head">
         <h1>{signUpHeadline(next, reason)}</h1>
         <p>{STUDENTS_ONLY_LINE}</p>
       </header>
-      <p className="auth-step-name">
-        Step {step} of {STEPS} · {STEP_NAMES[step - 1]}
-      </p>
-      <ol className="auth-progress" aria-label={`Step ${step} of ${STEPS}`}>
-        {[1, 2, 3, 4].map((n) => (
-          <li
-            key={n}
-            className={n < step ? "is-done" : n === step ? "is-active" : ""}
-          />
-        ))}
-      </ol>
-      {error &&
-        (errorCode === "account_exists" ? (
-          <div className="auth-exists auth-fade-in" role="alert">
-            <AlertCircle size={18} />
-            <div>
-              <p>{error}</p>
-              {onSwitch ? (
-                <button
-                  type="button"
-                  className="button secondary small"
-                  onClick={() => onSwitch("signin")}
-                >
-                  Sign in
-                  <ArrowRight size={15} />
-                </button>
-              ) : (
-                <Link className="button secondary small" to={toSignIn}>
-                  Sign in
-                  <ArrowRight size={15} />
-                </Link>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="auth-fade-in">
-            <ErrorBox message={error} />
-          </div>
-        ))}
-      <div
-        className="auth-slide t-page-slide"
-        ref={slideRef}
-        data-step={step}
-        style={slideHeight ? { height: `${slideHeight}px` } : undefined}
-      >
+      <div className="auth-steps">
+        <p className="auth-step-name">
+          Step {step} of {STEPS} · {STEP_NAMES[step - 1]}
+        </p>
+        <ol className="auth-progress" aria-label={`Step ${step} of ${STEPS}`}>
+          {[1, 2, 3, 4].map((n) => (
+            <li
+              key={n}
+              className={n < step ? "is-done" : n === step ? "is-active" : ""}
+            />
+          ))}
+        </ol>
+      </div>
+      <div className="auth-slide t-page-slide" ref={slideRef} data-step={step}>
         <section
           className="t-page"
           data-page-id="1"
@@ -719,33 +765,36 @@ export function SignUpForm({
                 onChange={(e) => {
                   setEmail(e.target.value);
                   clearField("email");
-                  if (errorCode === "account_exists") {
-                    setError("");
-                    setErrorCode("");
-                  }
+                  setExists(false);
                 }}
                 placeholder={`you@${campuses[0]?.domain || "usc.edu"}`}
               />
             </Field>
-            {detected && (
-              <p className="auth-school-line auth-rise-in" key={detected.domain}>
-                <SchoolLogo
-                  src={`/api/logo/${encodeURIComponent(detected.domain)}`}
-                />
-                <span>{detected.name}</span>
-                {!detected.live && (
-                  <small>Browsing only for now, listings open soon</small>
-                )}
-              </p>
-            )}
-            {error && !detected && (
-              <p className="auth-hint">
-                Not seeing your school?{" "}
-                <Link to="/browse" tabIndex={step === 1 ? undefined : -1}>
-                  Join the waitlist
-                </Link>{" "}
-                and we will tell you when it opens.
-              </p>
+            {exists ? (
+              <div className="auth-exists auth-fade-in" role="alert">
+                <AlertCircle size={17} />
+                <div>
+                  <p>This email already has an account.</p>
+                  {onSwitch ? (
+                    <button
+                      type="button"
+                      className="button secondary small"
+                      tabIndex={step === 1 ? undefined : -1}
+                      onClick={() => onSwitch("signin")}
+                    >
+                      Sign in
+                      <ArrowRight size={15} />
+                    </button>
+                  ) : (
+                    <Link className="button secondary small" to={toSignIn}>
+                      Sign in
+                      <ArrowRight size={15} />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ) : (
+              schoolLine
             )}
             <Button
               type="submit"
@@ -756,6 +805,7 @@ export function SignUpForm({
               Continue
               <ArrowRight size={17} />
             </Button>
+            {footerRow()}
           </form>
         </section>
         <section
@@ -794,17 +844,7 @@ export function SignUpForm({
               onChange={setGender}
               tabIndex={step === 2 ? undefined : -1}
             />
-            {detected && (
-              <p className="auth-school-line auth-rise-in" key={detected.domain}>
-                <SchoolLogo
-                  src={`/api/logo/${encodeURIComponent(detected.domain)}`}
-                />
-                <span>{detected.name}</span>
-                {!detected.live && (
-                  <small>Browsing only for now, listings open soon</small>
-                )}
-              </p>
-            )}
+            {schoolLine}
             <Button
               type="submit"
               className="auth-cta"
@@ -813,15 +853,7 @@ export function SignUpForm({
               Continue
               <ArrowRight size={17} />
             </Button>
-            <button
-              type="button"
-              className="auth-back text-button"
-              tabIndex={step === 2 ? undefined : -1}
-              onClick={() => setStep(1)}
-            >
-              <ArrowLeft size={15} />
-              Back
-            </button>
+            {footerRow(() => setStep(1))}
           </form>
         </section>
         <section
@@ -833,6 +865,7 @@ export function SignUpForm({
           <form className="auth-form" noValidate onSubmit={submit}>
             <Field
               label="Password"
+              hint="At least 8 characters. Nothing else is required."
               error={fieldErrors.password}
               className={fieldClass("password")}
             >
@@ -841,7 +874,7 @@ export function SignUpForm({
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   required
-                  minLength={10}
+                  minLength={8}
                   maxLength={128}
                   tabIndex={step === 3 ? undefined : -1}
                   value={password}
@@ -878,15 +911,7 @@ export function SignUpForm({
               Confirm and continue
               <ArrowRight size={17} />
             </Button>
-            <button
-              type="button"
-              className="auth-back text-button"
-              tabIndex={step === 3 ? undefined : -1}
-              onClick={() => setStep(2)}
-            >
-              <ArrowLeft size={15} />
-              Back
-            </button>
+            {footerRow(() => setStep(2))}
           </form>
         </section>
         <section
@@ -903,13 +928,16 @@ export function SignUpForm({
               onPick={(file) => {
                 if (photo) URL.revokeObjectURL(photo.preview);
                 setPhoto({ file, preview: URL.createObjectURL(file) });
-                setError("");
+                clearField("photo");
               }}
               onRemove={() => {
                 if (photo) URL.revokeObjectURL(photo.preview);
                 setPhoto(null);
               }}
             />
+            {fieldErrors.photo && (
+              <span className="field-error">{fieldErrors.photo}</span>
+            )}
             <Button
               type="button"
               busy={busy}
@@ -920,37 +948,24 @@ export function SignUpForm({
               Finish
               <ArrowRight size={17} />
             </Button>
-            <button
-              type="button"
-              className="auth-back text-button"
-              tabIndex={step === 4 ? undefined : -1}
-              onClick={() => {
-                if (photo) URL.revokeObjectURL(photo.preview);
-                setPhoto(null);
-                settle();
-              }}
-            >
-              Skip for now
-            </button>
+            <div className="auth-row is-single">
+              <button
+                type="button"
+                className="button ghost small auth-back"
+                tabIndex={step === 4 ? undefined : -1}
+                onClick={() => {
+                  if (photo) URL.revokeObjectURL(photo.preview);
+                  setPhoto(null);
+                  settle();
+                }}
+              >
+                Skip for now
+              </button>
+            </div>
           </div>
         </section>
       </div>
-      <p className="auth-fineprint">
-        By confirming you agree to our <Link to="/terms">Terms of Service</Link>{" "}
-        and <Link to="/privacy">Privacy Policy</Link>.
-      </p>
-      {compact && (
-        <p className="auth-switch">
-          Already confirmed?{" "}
-          {onSwitch ? (
-            <button type="button" className="text-button" onClick={() => onSwitch("signin")}>
-              Sign in
-            </button>
-          ) : (
-            <Link to={toSignIn}>Sign in</Link>
-          )}
-        </p>
-      )}
+      <TermsFootnote />
     </div>
   );
 }
@@ -967,7 +982,6 @@ export function ForgotForm({
   const campuses = liveCampuses(allCampuses);
   const { ref, shake } = useShake();
   const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
     [email, setEmailValue] = useState(seedEmail || ""),
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -984,7 +998,6 @@ export function ForgotForm({
       shake();
       return;
     }
-    setError("");
     setBusy(true);
     try {
       const r = await api<{ message: string }>("/auth/forgot", {
@@ -993,7 +1006,7 @@ export function ForgotForm({
       });
       setSuccess(r.message);
     } catch (err) {
-      setError(errorMessage(err));
+      setFieldErrors({ email: errorMessage(err) });
       shake();
     } finally {
       setBusy(false);
@@ -1032,7 +1045,6 @@ export function ForgotForm({
         <h1>Let’s get you back in.</h1>
         <p>We will send a link to reset your password.</p>
       </header>
-      {error && <ErrorBox message={error} />}
       <form className="auth-form" noValidate onSubmit={submit}>
         <Field label="Student email" error={fieldErrors.email}>
           <input
@@ -1057,19 +1069,23 @@ export function ForgotForm({
           Send reset link
           <ArrowRight size={17} />
         </Button>
+        <div className="auth-row is-single">
+          <p className="auth-switch">
+            Remembered it?{" "}
+            {onSwitch ? (
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onSwitch("signin")}
+              >
+                Sign in
+              </button>
+            ) : (
+              <Link to="/sign-in">Sign in</Link>
+            )}
+          </p>
+        </div>
       </form>
-      {compact && (
-        <p className="auth-switch">
-          Remembered it?{" "}
-          {onSwitch ? (
-            <button type="button" className="text-button" onClick={() => onSwitch("signin")}>
-              Sign in
-            </button>
-          ) : (
-            <Link to="/sign-in">Sign in</Link>
-          )}
-        </p>
-      )}
     </div>
   );
 }

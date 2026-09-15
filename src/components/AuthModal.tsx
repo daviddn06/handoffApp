@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 import { useApp } from "../lib/context";
+import { backdropClick, trapTab, useDialogMotion } from "./ui";
 import {
   ForgotForm,
   SignInForm,
@@ -19,28 +20,14 @@ export function AuthModal() {
   const { auth, closeAuth, notify } = useApp();
   const navigate = useNavigate();
   const ref = useRef<HTMLDialogElement>(null);
-  const trigger = useRef<HTMLElement | null>(null);
   const [mode, setMode] = useState<AuthFormMode>(auth.mode);
   // Kept across a switch, so "Sign in instead" arrives with the email filled.
   const [email, setEmail] = useState("");
+  const motion = useDialogMotion(auth.open, ref);
 
   useEffect(() => {
     if (auth.open) setMode(auth.mode);
   }, [auth.open, auth.key, auth.mode]);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (auth.open && !el.open) {
-      trigger.current = document.activeElement as HTMLElement | null;
-      el.showModal();
-    }
-    if (!auth.open && el.open) {
-      el.close();
-      // Back to whatever they clicked, so the keyboard keeps its place.
-      trigger.current?.focus?.();
-    }
-  }, [auth.open]);
 
   function done() {
     closeAuth();
@@ -50,93 +37,64 @@ export function AuthModal() {
 
   return (
     <dialog
-      className="auth-modal"
+      className={`auth-modal ${motion}`.trim()}
       ref={ref}
       aria-label={mode === "signin" ? "Sign in" : "Confirm you are a student"}
       onCancel={(e) => {
         e.preventDefault();
         closeAuth();
       }}
-      onKeyDown={(e) => {
-        if (e.key !== "Tab") return;
-        const items = Array.from(
-          e.currentTarget.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
-          ),
-        ).filter((el) => el.offsetParent !== null && el.tabIndex !== -1);
-        const first = items[0],
-          last = items[items.length - 1];
-        if (!first) return;
-        if (
-          e.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === e.currentTarget)
-        ) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }}
-      onClick={(e) => {
-        if (e.target !== e.currentTarget) return;
-        const r = e.currentTarget.getBoundingClientRect();
-        if (
-          e.clientX < r.left ||
-          e.clientX > r.right ||
-          e.clientY < r.top ||
-          e.clientY > r.bottom
-        )
-          closeAuth();
-      }}
+      onKeyDown={trapTab}
+      onClick={(e) => backdropClick(e, closeAuth)}
     >
       <span className="sheet-grip" aria-hidden="true">
         <span />
       </span>
       <button
         type="button"
-        className="icon-button auth-modal-close"
+        className="icon-button modal-close auth-modal-close"
         aria-label="Close"
         onClick={closeAuth}
       >
         <X size={20} />
       </button>
       <div className="auth-modal-body" key={auth.key}>
-        {mode === "signup" && (
-          <SignUpForm
-            compact
-            next={auth.next}
-            reason={auth.reason}
-            email={email}
-            onEmail={setEmail}
-            onSwitch={setMode}
-            onDone={done}
-          />
-        )}
-        {mode === "signin" && (
-          <SignInForm
-            compact
-            next={auth.next}
-            reason={auth.reason}
-            email={email}
-            onEmail={setEmail}
-            onSwitch={setMode}
-            onDone={(user) => {
-              notify(`Welcome back, ${user.name.split(" ")[0]}.`);
-              done();
-            }}
-          />
-        )}
-        {mode === "forgot" && (
-          <ForgotForm
-            compact
-            next={auth.next}
-            email={email}
-            onEmail={setEmail}
-            onSwitch={setMode}
-          />
-        )}
+        <div className="auth-modal-inner">
+          {mode === "signup" && (
+            <SignUpForm
+              compact
+              next={auth.next}
+              reason={auth.reason}
+              email={email}
+              onEmail={setEmail}
+              onSwitch={setMode}
+              onDone={done}
+            />
+          )}
+          {mode === "signin" && (
+            <SignInForm
+              compact
+              next={auth.next}
+              reason={auth.reason}
+              email={email}
+              onEmail={setEmail}
+              onSwitch={setMode}
+              onDone={(user) => {
+                notify(`Welcome back, ${user.name.split(" ")[0]}.`);
+                done();
+              }}
+            />
+          )}
+          {mode === "forgot" && (
+            <ForgotForm
+              compact
+              next={auth.next}
+              email={email}
+              onEmail={setEmail}
+              onSwitch={setMode}
+            />
+          )}
+        </div>
       </div>
     </dialog>
   );

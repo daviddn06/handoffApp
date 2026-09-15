@@ -459,8 +459,8 @@ export function ConfirmModal({
       open={Boolean(pending)}
       onClose={() => (busy ? undefined : onClose())}
       title={pending?.title || ""}
+      description={pending?.body}
     >
-      <p className="muted">{pending?.body}</p>
       <div className="modal-actions">
         <Button variant="secondary" onClick={onClose} disabled={busy}>
           Cancel

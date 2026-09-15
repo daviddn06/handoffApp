@@ -106,7 +106,7 @@
   color: var(--muted-2);
 }
 .auth-cta {
-  min-height: 46px;
+  min-height: 48px;
   width: 100%;
   margin-top: var(--s-1);
   font-size: 15px;
@@ -130,17 +130,43 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* One small centered footnote under the switch row. */
 .auth-fineprint {
   font-size: 12px;
   line-height: 1.55;
   color: var(--muted-2);
   margin: 0;
-  max-width: 34ch;
+  text-align: center;
+  text-wrap: pretty;
+}
+.auth-fineprint a {
+  color: var(--muted);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--line-2);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.auth-fineprint a:hover {
+  color: var(--blue);
+  text-decoration-color: currentColor;
 }
 .auth-switch {
   font-size: 13px;
   color: var(--muted);
   margin: 0;
+  white-space: nowrap;
+}
+.auth-switch .text-button {
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 0;
+  color: var(--blue);
+}
+.auth-switch .text-button:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .auth-switch a {
   color: var(--blue);
@@ -152,10 +178,45 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* Under the primary button, one row: the way back on the left, the way
+   across to sign in on the right. */
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-top: calc(var(--s-2) * -1);
+}
+.auth-row.is-single {
+  justify-content: center;
+}
 .auth-back {
-  align-self: center;
   font-size: 13px;
-  min-height: 40px;
+  min-height: 36px;
+  padding: 0 10px;
+  margin-left: -10px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.auth-row.is-single .auth-back {
+  margin-left: 0;
+}
+.auth-back:hover {
+  color: var(--ink);
+}
+.auth-back svg {
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.auth-back:hover svg {
+  transform: translateX(-2px);
+}
+/* The eyebrow and the progress bar read as one unit. */
+.auth-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-top: calc(var(--s-1) * -1);
 }
 
 /* Stepped sign up */
@@ -181,7 +242,9 @@
 }
 .auth-slide {
   position: relative;
-  transition: height var(--duration-fast) var(--ease-smooth-out);
+  /* Animated on a step change with the card resize tokens, then released
+     back to auto so nothing is ever held at a stale height. */
+  transition: height var(--resize-dur) var(--resize-ease);
 }
 .auth-slide .t-page {
   position: absolute;
@@ -204,6 +267,8 @@
 .auth-slide[data-step="2"] .t-page[data-page-id="2"],
 .auth-slide[data-step="3"] .t-page[data-page-id="3"],
 .auth-slide[data-step="4"] .t-page[data-page-id="4"] {
+  /* The step on screen is the one in flow, so the track measures itself. */
+  position: relative;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -626,6 +691,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--s-3);
+  margin-top: calc(var(--s-2) * -1);
   padding: var(--s-3) var(--s-4);
   border-radius: var(--r-md);
   background: var(--amber-soft);

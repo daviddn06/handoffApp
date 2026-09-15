@@ -629,3 +629,13 @@
     font-size: 14px;
   }
 }
+
+/* The row level delete reads as destructive without shouting. */
+.mg-actions .button.quiet.danger {
+  color: var(--red, #c0392b);
+  background: transparent;
+  border-color: transparent;
+}
+.mg-actions .button.quiet.danger:hover:not(:disabled) {
+  background: rgb(192 57 43 / 0.08);
+}

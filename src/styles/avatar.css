@@ -124,13 +124,13 @@
   text-align: center;
 }
 .photo-step .photo-drop {
-  width: 104px;
-  height: 104px;
+  width: 96px;
+  height: 96px;
 }
 .photo-step .photo-drop .avatar-el.size-84 {
-  width: 104px;
-  height: 104px;
-  font-size: 30px;
+  width: 96px;
+  height: 96px;
+  font-size: 28px;
 }
 @media (prefers-reduced-motion: reduce) {
   .photo-drop {
