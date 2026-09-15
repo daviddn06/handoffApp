@@ -1179,7 +1179,8 @@ main,
   background: var(--soft);
 }
 .device-caption {
-  margin-top: 12px;
+  /* The frame starts 22px low and settles on scroll, keep clear of it. */
+  margin-top: 36px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1404,6 +1405,9 @@ main,
   gap: 10px;
   padding: 12px 14px;
   overflow: hidden;
+  /* The last card fades out at the frame edge instead of being sliced. */
+  -webkit-mask-image: linear-gradient(#000 78%, transparent 100%);
+  mask-image: linear-gradient(#000 78%, transparent 100%);
 }
 .shot-list .listing-card {
   flex: none;
