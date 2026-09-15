@@ -27,22 +27,6 @@ import { Button, ErrorBox } from "./ui";
 /** High resolution marks for the campuses we run, favicons are too soft. */
 const BRAND_LOGOS: Record<string, string> = { usc: "/logos/usc.svg" };
 
-/** A curated first page so an empty query still reads like a real list. */
-const FEATURED = [
-  "University of California, Los Angeles",
-  "Loyola Marymount University",
-  "California State University, Long Beach",
-  "California State University, Los Angeles",
-  "Pepperdine University",
-  "Chapman University",
-  "University of California, Berkeley",
-  "University of California, San Diego",
-  "Stanford University",
-  "Santa Clara University",
-  "New York University",
-  "Boston University",
-];
-
 type Row = {
   key: string;
   name: string;
@@ -165,12 +149,7 @@ export function SchoolSearch({
   const trimmed = query.trim();
   const searching = trimmed.length > 0;
   const rows = useMemo<Row[]>(() => {
-    if (!searching) {
-      const featured = (schools || [])
-        .filter((s) => FEATURED.includes(s.n))
-        .sort((a, b) => FEATURED.indexOf(a.n) - FEATURED.indexOf(b.n));
-      return [...live.map(campusRow), ...featured.map(schoolRow)];
-    }
+    if (!searching) return [];
     // A live campus that matches always leads, matched on its own fields so a
     // crowded query can never push it off the list.
     const needle = trimmed.toLowerCase();
@@ -191,7 +170,6 @@ export function SchoolSearch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schools, trimmed, searching, live]);
 
-  const liveCount = searching ? 0 : live.length;
   useEffect(() => setActive(0), [trimmed]);
   useEffect(() => {
     list.current
@@ -295,7 +273,12 @@ export function SchoolSearch({
         >
           <div className="school-rows" key={trimmed}>
             {!schools && <div className="school-note">Loading schools…</div>}
-            {schools && rows.length === 0 && (
+            {schools && !searching && (
+              <div className="school-idle">
+                <p>Start typing your school. Results appear as you type.</p>
+              </div>
+            )}
+            {schools && searching && rows.length === 0 && (
               <div className="school-empty">
                 <p>No school called {trimmed} yet.</p>
                 <button
@@ -310,12 +293,6 @@ export function SchoolSearch({
             )}
             {rows.map((row, index) => (
               <div key={row.key} className="school-slot">
-                {!searching && index === 0 && (
-                  <div className="school-group">Live now</div>
-                )}
-                {!searching && index === liveCount && (
-                  <div className="school-group">More schools</div>
-                )}
                 <button
                   type="button"
                   role="option"

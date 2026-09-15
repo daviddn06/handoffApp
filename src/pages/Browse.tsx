@@ -969,8 +969,7 @@ export default function Browse() {
         title="Where are you looking?"
       >
         <p className="muted">
-          Pick your school to see subleases nearby. We are open at USC today,
-          every other school can join the waitlist.
+          Search your school to see subleases nearby.
         </p>
         <SchoolSearch
           campuses={campuses}

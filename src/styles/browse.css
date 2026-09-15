@@ -1822,6 +1822,21 @@
   box-shadow: var(--ring);
   scrollbar-width: thin;
 }
+.school-idle {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 160px;
+  padding: 24px;
+  text-align: center;
+}
+.school-idle p {
+  margin: 0;
+  max-width: 26ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted-2);
+}
 .school-panel.plain {
   padding: 2px 0 0;
   background: transparent;
