@@ -31,6 +31,38 @@ export const GENDER_PREFERENCE_LABELS: Record<GenderPreference, string> = {
   men_preferred: "Men preferred",
   men_only: "Men only",
 };
+/**
+ * A way to reach a student once a request is accepted. Email is the verified
+ * identity, so it is always shared and can never be removed.
+ */
+export type ShareChannel = "email" | "phone" | "instagram" | "facebook";
+export const SHARE_CHANNELS: ShareChannel[] = [
+  "email",
+  "phone",
+  "instagram",
+  "facebook",
+];
+/** The three a student can add. Email is already theirs. */
+export const OPTIONAL_CHANNELS: Exclude<ShareChannel, "email">[] = [
+  "phone",
+  "instagram",
+  "facebook",
+];
+export const CHANNEL_LABELS: Record<ShareChannel, string> = {
+  email: "Email",
+  phone: "Phone",
+  instagram: "Instagram",
+  facebook: "Facebook",
+};
+/** What another student sees once the request is accepted. */
+export type Contact = {
+  name: string;
+  email: string;
+  phone?: string;
+  instagram?: string;
+  facebook?: string;
+};
+
 export type Campus = {
   id: string;
   name: string;
@@ -62,6 +94,14 @@ export type User = {
   gender: Gender;
   /** Optional profile photo, a public path, or null. */
   avatar: string | null;
+  /** Optional phone number in E.164, or null. */
+  phone: string | null;
+  /** Optional Instagram handle without the @, or null. */
+  instagram: string | null;
+  /** Optional Facebook profile link or username, or null. */
+  facebook: string | null;
+  /** The channels shared when a request is accepted. Always contains email. */
+  shareChannels: ShareChannel[];
   /** Opens the internal dashboard at /admin. False for every student. */
   isAdmin: boolean;
 };
@@ -124,7 +164,8 @@ export type HandoffRequest = {
   status: "pending" | "accepted" | "declined" | "withdrawn";
   createdAt: string;
   updatedAt: string;
-  contact?: { name: string; email: string };
+  /** Only the channels that student chose to share. Email is always there. */
+  contact?: Contact;
   /** Only sent to the lister, and only when the requester shared it. */
   requesterGender?: Gender;
 };

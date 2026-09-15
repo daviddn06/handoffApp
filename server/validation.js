@@ -54,6 +54,100 @@ export const date = z
     );
   }, "Enter a valid date.");
 /**
+ * Contact channels. Email is the verified identity, so it is always in the
+ * shared set and can never be taken out of it.
+ */
+export const CHANNELS = ["email", "phone", "instagram", "facebook"];
+export const OPTIONAL_CHANNELS = ["phone", "instagram", "facebook"];
+export const channel = z.enum(CHANNELS);
+
+/**
+ * A US phone number, stored in E.164. Ten digits, or eleven with a leading 1.
+ * An empty field clears the number.
+ */
+export function normalizePhone(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (/[^0-9()+\-.\s]/.test(raw))
+    throw new HttpError(400, "Enter a US phone number, like (213) 555-0142.");
+  const digits = raw.replace(/\D/g, "");
+  const national =
+    digits.length === 10
+      ? digits
+      : digits.length === 11 && digits.startsWith("1")
+        ? digits.slice(1)
+        : "";
+  if (!national)
+    throw new HttpError(400, "Enter a US phone number, like (213) 555-0142.");
+  return `+1${national}`;
+}
+
+/**
+ * An Instagram handle without the @. A pasted profile link is cut down to the
+ * handle, so a student can paste whatever they have.
+ */
+export function normalizeInstagram(value) {
+  let raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const link = raw.match(
+    /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)?instagram\.com\/([^/?#\s]+)/i,
+  );
+  if (link) raw = link[1];
+  raw = raw.replace(/^@+/, "").replace(/\/+$/, "");
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(raw))
+    throw new HttpError(
+      400,
+      "Enter an Instagram handle of letters, numbers, periods and underscores.",
+    );
+  return raw;
+}
+
+/**
+ * Facebook is either a profile link or a username. A link is kept as it was
+ * typed, because Facebook profile links take several shapes.
+ */
+export function normalizeFacebook(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (/^(?:https?:\/\/)?(?:[a-z0-9-]+\.)?facebook\.com\/\S*$/i.test(raw))
+    return raw;
+  const handle = raw.replace(/^@+/, "");
+  if (!/^[A-Za-z0-9.]{5,50}$/.test(handle))
+    throw new HttpError(
+      400,
+      "Enter a Facebook profile link or a username of at least 5 letters, numbers or periods.",
+    );
+  return handle;
+}
+
+/**
+ * The channels shared when a request is accepted. Email is always in, and a
+ * channel with nothing in it is dropped rather than promised.
+ */
+export function normalizeShareChannels(requested, values) {
+  const available = new Set(["email"]);
+  for (const name of OPTIONAL_CHANNELS)
+    if (values?.[name]) available.add(name);
+  const chosen = new Set(["email"]);
+  for (const name of Array.isArray(requested) ? requested : [])
+    if (available.has(name)) chosen.add(name);
+  return CHANNELS.filter((name) => chosen.has(name));
+}
+
+/** The stored JSON array, read back safely whatever is in the column. */
+export function readShareChannels(raw) {
+  try {
+    const parsed = JSON.parse(raw || "[]");
+    if (!Array.isArray(parsed)) return ["email"];
+    const chosen = new Set(parsed.filter((name) => CHANNELS.includes(name)));
+    chosen.add("email");
+    return CHANNELS.filter((name) => chosen.has(name));
+  } catch {
+    return ["email"];
+  }
+}
+
+/**
  * Signup takes no campus. The server reads the school out of the email, so a
  * student can never claim a campus that is not theirs.
  */
@@ -85,6 +179,11 @@ export const profileSchema = z
     name: text(80).min(2),
     bio: text(600),
     gender: gender.optional(),
+    /* Raw contact input. The server normalises and stores it. */
+    phone: text(40).optional(),
+    instagram: text(120).optional(),
+    facebook: text(200).optional(),
+    shareChannels: z.array(channel).max(CHANNELS.length).optional(),
   })
   .strict();
 export const listingSchema = z
@@ -173,6 +272,8 @@ export const requestSchema = z
       10,
       "Write a short introduction of at least 10 characters.",
     ),
+    /* What this one request shares, when it differs from the profile default. */
+    shareChannels: z.array(channel).max(CHANNELS.length).optional(),
   })
   .strict();
 export const requestUpdateSchema = z

@@ -48,9 +48,17 @@ import {
   type Gender,
   type HandoffRequest,
   type Listing,
+  type ShareChannel,
   type User,
 } from "../types";
 import { GenderChoice } from "../components/Gender";
+import {
+  channelSentence,
+  ContactChips,
+  ContactFields,
+  phoneLabel,
+  type ContactValues,
+} from "../components/Contact";
 import {
   Button,
   EmptyState,
@@ -852,6 +860,8 @@ export function Requests() {
                     <small>
                       Arrange a visit and talk through the lease together.
                     </small>
+                    {/* Every other channel they chose to share. */}
+                    <ContactChips contact={r.contact} />
                   </div>
                   <a
                     href={`mailto:${r.contact.email}`}
@@ -866,7 +876,7 @@ export function Requests() {
                 <div className="rq-actions">
                   {tab === "incoming" ? (
                     <>
-                      <p>Your emails are shared when you accept.</p>
+                      <p>Your chosen contact details are shared when you accept.</p>
                       <Button
                         variant="secondary"
                         className="small"
@@ -964,7 +974,7 @@ export function Requests() {
         }
         description={
           action?.status === "accepted"
-            ? `We’ll share your email (${user?.email}) with ${action.request.requesterName.split(" ")[0]} and reveal theirs to you. Nothing here commits you to a lease.`
+            ? `We’ll share ${channelSentence(user?.shareChannels || ["email"])} with ${action.request.requesterName.split(" ")[0]} and reveal what they chose to you. Nothing here commits you to a lease.`
             : action?.status === "declined"
               ? "The student will see that their request was declined. Your contact details stay private."
               : "The listing owner will see that you’ve withdrawn. You can send a new request later."
@@ -981,7 +991,7 @@ export function Requests() {
           </Button>
           <Button busy={busy} onClick={confirm}>
             {action?.status === "accepted"
-              ? "Accept & share emails"
+              ? "Accept & share contacts"
               : action?.status === "declined"
                 ? "Decline request"
                 : "Withdraw request"}
@@ -992,12 +1002,29 @@ export function Requests() {
   );
 }
 
+/** The stored channels as the form's own strings, phone in readable shape. */
+function contactValues(user: User | null | undefined): ContactValues {
+  return {
+    phone: user?.phone ? phoneLabel(user.phone) : "",
+    instagram: user?.instagram || "",
+    facebook: user?.facebook || "",
+  };
+}
+const sameContact = (a: ContactValues, b: ContactValues) =>
+  a.phone.trim() === b.phone.trim() &&
+  a.instagram.trim() === b.instagram.trim() &&
+  a.facebook.trim() === b.facebook.trim();
+
 export function Profile() {
   const { user, setUser, campuses, notify } = useApp();
   const navigate = useNavigate();
   const [name, setName] = useState(user?.name || ""),
     [bio, setBio] = useState(user?.bio || ""),
     [gender, setGender] = useState<Gender>(user?.gender || "unspecified"),
+    [contact, setContact] = useState<ContactValues>(contactValues(user)),
+    [channels, setChannels] = useState<ShareChannel[]>(
+      user?.shareChannels || ["email"],
+    ),
     [busy, setBusy] = useState(false),
     [photoBusy, setPhotoBusy] = useState(false),
     [signingOut, setSigningOut] = useState(false),
@@ -1040,6 +1067,8 @@ export function Profile() {
     setName(user?.name || "");
     setBio(user?.bio || "");
     setGender(user?.gender || "unspecified");
+    setContact(contactValues(user));
+    setChannels(user?.shareChannels || ["email"]);
   }, [user]);
   async function signOut() {
     setSigningOut(true);
@@ -1061,7 +1090,15 @@ export function Profile() {
     try {
       const r = await api<{ user: User }>("/profile", {
         method: "PATCH",
-        body: json({ name, bio, gender }),
+        body: json({
+          name,
+          bio,
+          gender,
+          phone: contact.phone,
+          instagram: contact.instagram,
+          facebook: contact.facebook,
+          shareChannels: channels,
+        }),
       });
       setUser(r.user);
       notify("Your profile is up to date.");
@@ -1140,16 +1177,25 @@ export function Profile() {
             />
             <dl className="pf-readonly">
               <div>
-                <dt>Student email</dt>
-                <dd>{user?.email}</dd>
-                <p>Verified, and never public.</p>
-              </div>
-              <div>
                 <dt>Campus</dt>
                 <dd>{campus?.name}</dd>
                 <p>Set from your student email domain.</p>
               </div>
             </dl>
+          </div>
+          <h2>Contact</h2>
+          <p className="field-hint pf-contact-note">
+            Nothing here is public. A student sees only what you choose, and
+            only once a request is accepted.
+          </p>
+          <div className="stack">
+            <ContactFields
+              email={user?.email || ""}
+              values={contact}
+              onValues={setContact}
+              channels={channels}
+              onChannels={setChannels}
+            />
           </div>
           {error && <ErrorBox message={error} />}
           <div className="pf-actions">
@@ -1162,7 +1208,10 @@ export function Profile() {
               disabled={
                 name === user?.name &&
                 bio === (user?.bio || "") &&
-                gender === (user?.gender || "unspecified")
+                gender === (user?.gender || "unspecified") &&
+                sameContact(contact, contactValues(user)) &&
+                channels.join(",") ===
+                  (user?.shareChannels || ["email"]).join(",")
               }
             >
               Save changes

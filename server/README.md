@@ -72,7 +72,7 @@ The dashboard's sections are at `/`, `/users`, `/listings` and so on on the inte
 
 ## Backup and recovery
 
-Use SQLite's backup API rather than copying the main database file while it is live. Run before deploying any schema migration. Copy uploads into the same dated backup set. New schema versions must add an explicit migration with backup and rollback instructions; startup creates the current schema for fresh databases and migrates older ones in order, most recently schema 9 which adds the `ai_usage` table. Version 1 upgrades to version 2 only after a consistent SQLite backup is written under `HANDOFF_DATA_DIR/backups/`. Unknown newer schemas and unversioned populated databases are refused.
+Use SQLite's backup API rather than copying the main database file while it is live. Run before deploying any schema migration. Copy uploads into the same dated backup set. New schema versions must add an explicit migration with backup and rollback instructions; startup creates the current schema for fresh databases and migrates older ones in order, most recently schema 12 which adds the contact channel columns (`users.phone`, `users.instagram`, `users.facebook`, `users.share_channels`) and `handoff_requests.share_channels`. Version 1 upgrades to version 2 only after a consistent SQLite backup is written under `HANDOFF_DATA_DIR/backups/`. Unknown newer schemas and unversioned populated databases are refused.
 
 ```bash
 sudo -u handoff env HANDOFF_DATA_DIR=/var/lib/handoff node server/operator.js backup /var/lib/handoff-backups/2026-09-14/handoff.sqlite

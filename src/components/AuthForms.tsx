@@ -10,7 +10,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { ApiError, api, errorMessage, json } from "../lib/api";
 import { useApp, type AuthReason } from "../lib/context";
 import { Button, Field } from "./ui";
-import type { Gender, User } from "../types";
+import type { Gender, ShareChannel, User } from "../types";
 import { GenderChoice } from "./Gender";
 import {
   liveCampuses,
@@ -21,6 +21,7 @@ import {
 import { passwordCheck, type PasswordCheck } from "../lib/password";
 import { SchoolLogo } from "./SchoolSearch";
 import { PhotoPicker } from "./PhotoPicker";
+import { ContactFields, type ContactValues } from "./Contact";
 
 /**
  * The three signed out forms, lifted out of the auth pages so the same code
@@ -144,6 +145,7 @@ export const STEP_NAMES = [
   "Your name",
   "A password",
   "Add a photo",
+  "How to reach you",
 ];
 export const STEPS = STEP_NAMES.length;
 
@@ -458,6 +460,12 @@ export function SignUpForm({
     [step, setStep] = useState(1),
     [joined, setJoined] = useState<User | null>(null),
     [photo, setPhoto] = useState<{ file: File; preview: string } | null>(null),
+    [contact, setContact] = useState<ContactValues>({
+      phone: "",
+      instagram: "",
+      facebook: "",
+    }),
+    [channels, setChannels] = useState<ShareChannel[]>(["email"]),
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const setEmail = (value: string) => {
     setEmailValue(value);
@@ -515,7 +523,7 @@ export function SignUpForm({
     root.addEventListener("transitionend", release);
     timer = window.setTimeout(release, 600);
     return release;
-  }, [step, exists, emailReady, detected, fieldErrors, strength.hint, photo]);
+  }, [step, exists, emailReady, detected, fieldErrors, strength.hint, photo, contact]);
   /* Focus lands only once the slide has settled. Focusing mid transition
      scrolls the clipped track sideways, which is the bug this avoids. */
   useEffect(() => {
@@ -620,9 +628,9 @@ export function SignUpForm({
 
   /* The photo step. It runs against the session the password step created,
      so skipping costs nothing and a failed upload never blocks anyone. */
-  async function finish() {
+  async function savePhoto() {
     if (!photo) {
-      settle();
+      setStep(5);
       return;
     }
     setBusy(true);
@@ -638,6 +646,39 @@ export function SignUpForm({
     } catch (err) {
       setFieldErrors({ photo: errorMessage(err) });
       shakeField("photo");
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    setStep(5);
+  }
+
+  /* The contact step. Optional like the photo, and skipping leaves the
+     student with email only, which is what every account starts with. */
+  async function finish() {
+    const nothingTyped = !Object.values(contact).some((value) => value.trim());
+    if (nothingTyped) {
+      settle();
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await api<{ user: User }>("/profile", {
+        method: "PATCH",
+        body: json({
+          name,
+          bio: joined?.bio || "",
+          phone: contact.phone,
+          instagram: contact.instagram,
+          facebook: contact.facebook,
+          shareChannels: channels,
+        }),
+      });
+      setUser(r.user);
+      setJoined(r.user);
+    } catch (err) {
+      setFieldErrors({ contact: errorMessage(err) });
+      shakeField("contact");
       setBusy(false);
       return;
     }
@@ -740,7 +781,7 @@ export function SignUpForm({
           Step {step} of {STEPS} · {STEP_NAMES[step - 1]}
         </p>
         <ol className="auth-progress" aria-label={`Step ${step} of ${STEPS}`}>
-          {[1, 2, 3, 4].map((n) => (
+          {STEP_NAMES.map((_, index) => index + 1).map((n) => (
             <li
               key={n}
               className={n < step ? "is-done" : n === step ? "is-active" : ""}
@@ -948,12 +989,12 @@ export function SignUpForm({
             )}
             <Button
               type="button"
-              busy={busy}
+              busy={busy && step === 4}
               className="auth-cta"
               tabIndex={step === 4 ? undefined : -1}
-              onClick={finish}
+              onClick={savePhoto}
             >
-              Finish
+              Continue
               <ArrowRight size={17} />
             </Button>
             <div className="auth-row is-single">
@@ -964,8 +1005,51 @@ export function SignUpForm({
                 onClick={() => {
                   if (photo) URL.revokeObjectURL(photo.preview);
                   setPhoto(null);
-                  settle();
+                  setStep(5);
                 }}
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        </section>
+        <section
+          className="t-page contact-step"
+          data-page-id="5"
+          aria-hidden={step !== 5}
+          style={{ "--t-page-from-x": "8px" } as React.CSSProperties}
+        >
+          <div className={`auth-form ${fieldClass("contact")}`}>
+            <p className="auth-step-lead">
+              How should students reach you once a request is accepted?
+            </p>
+            <ContactFields
+              email={email}
+              values={contact}
+              onValues={setContact}
+              channels={channels}
+              onChannels={setChannels}
+              tabIndex={step === 5 ? undefined : -1}
+            />
+            {fieldErrors.contact && (
+              <span className="field-error">{fieldErrors.contact}</span>
+            )}
+            <Button
+              type="button"
+              busy={busy && step === 5}
+              className="auth-cta"
+              tabIndex={step === 5 ? undefined : -1}
+              onClick={finish}
+            >
+              Finish
+              <ArrowRight size={17} />
+            </Button>
+            <div className="auth-row is-single">
+              <button
+                type="button"
+                className="button ghost small auth-back"
+                tabIndex={step === 5 ? undefined : -1}
+                onClick={settle}
               >
                 Skip for now
               </button>

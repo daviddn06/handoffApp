@@ -50,7 +50,7 @@ try {
   if (integrity !== "ok")
     throw new Error("SQLite backup failed its integrity check.");
   const schemaVersion = snapshot.pragma("user_version", { simple: true });
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(schemaVersion))
     throw new Error("Backup requires a recognized Handoff database schema.");
   const uploads = snapshot
     .prepare("SELECT filename,bytes FROM uploads ORDER BY filename")

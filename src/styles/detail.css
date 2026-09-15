@@ -845,3 +845,16 @@
   }
 }
 
+
+/* What this request will share, shown before it is sent. */
+.request-share {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--soft);
+}
+.request-contact-chips {
+  margin-bottom: var(--s-3);
+}

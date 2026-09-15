@@ -54,6 +54,12 @@ import {
   listingSchema,
   requestSchema,
   boostSchema,
+  OPTIONAL_CHANNELS,
+  normalizePhone,
+  normalizeInstagram,
+  normalizeFacebook,
+  normalizeShareChannels,
+  readShareChannels,
   requestUpdateSchema,
   reportSchema,
   today,
@@ -387,6 +393,12 @@ export function createApp({
     gender: user.gender || "unspecified",
     /** Optional profile photo, a public path like a listing photo, or null. */
     avatar: user.avatar || null,
+    /* Contact channels. These are the student's own, returned only to them,
+       and shared with another student only after a request is accepted. */
+    phone: user.phone || null,
+    instagram: user.instagram || null,
+    facebook: user.facebook || null,
+    shareChannels: readShareChannels(user.share_channels),
     // The allow list decides, so the client never offers a dashboard that the
     // API would answer 404 for.
     isAdmin: isAllowedAdmin(user),
@@ -915,12 +927,37 @@ ${button}
     limit("profile", 30, HOUR, (req) => req.user.id),
     (req, res) => {
       const input = parse(profileSchema, req.body);
+      /* An omitted channel keeps whatever is stored, an empty string clears
+         it. The shared set is then filtered against what actually has a
+         value, so the summary never promises a channel that is not there. */
+      const contact = {
+        phone:
+          input.phone === undefined
+            ? req.user.phone || null
+            : normalizePhone(input.phone),
+        instagram:
+          input.instagram === undefined
+            ? req.user.instagram || null
+            : normalizeInstagram(input.instagram),
+        facebook:
+          input.facebook === undefined
+            ? req.user.facebook || null
+            : normalizeFacebook(input.facebook),
+      };
+      const shareChannels = normalizeShareChannels(
+        input.shareChannels ?? readShareChannels(req.user.share_channels),
+        contact,
+      );
       db.prepare(
-        "UPDATE users SET name=?,bio=?,gender=?,updated_at=? WHERE id=?",
+        "UPDATE users SET name=?,bio=?,gender=?,phone=?,instagram=?,facebook=?,share_channels=?,updated_at=? WHERE id=?",
       ).run(
         input.name,
         input.bio,
         input.gender ?? req.user.gender ?? "unspecified",
+        contact.phone,
+        contact.instagram,
+        contact.facebook,
+        JSON.stringify(shareChannels),
         iso(),
         req.user.id,
       );
@@ -1815,6 +1852,17 @@ ${button}
   const requestSelect = `SELECT r.*,l.title AS listing_title,l.photos AS listing_photos,l.owner_id,l.status AS listing_status,l.available_to,requester.name AS requester_name,requester.avatar AS requester_avatar,requester.gender AS requester_gender,owner.name AS owner_name,owner.avatar AS owner_avatar FROM handoff_requests r JOIN listings l ON l.id=r.listing_id JOIN users requester ON requester.id=r.requester_id JOIN users owner ON owner.id=l.owner_id`;
   const getRequest = (id) =>
     db.prepare(`${requestSelect} WHERE r.id=?`).get(id);
+  /**
+   * Only the channels this student chose, and only the ones they filled in.
+   * Email is always present, because it is the verified identity.
+   */
+  const contactFor = (person, raw) => {
+    const chosen = new Set(readShareChannels(raw));
+    const contact = { name: person.name, email: person.email };
+    for (const name of OPTIONAL_CHANNELS)
+      if (chosen.has(name) && person[name]) contact[name] = person[name];
+    return contact;
+  };
   const serializeRequest = (row, viewerId) => {
     if (![row.owner_id, row.requester_id].includes(viewerId))
       throw new HttpError(404, "Request not found.");
@@ -1843,10 +1891,19 @@ ${button}
     )
       result.requesterGender = row.requester_gender;
     if (row.status === "accepted") {
+      const seesRequester = viewerId === row.owner_id;
       const person = db
-        .prepare("SELECT name,email FROM users WHERE id=?")
-        .get(viewerId === row.owner_id ? row.requester_id : row.owner_id);
-      result.contact = { name: person.name, email: person.email };
+        .prepare(
+          "SELECT name,email,phone,instagram,facebook,share_channels FROM users WHERE id=?",
+        )
+        .get(seesRequester ? row.requester_id : row.owner_id);
+      /* The requester's own choice for this one place wins over their profile
+         default. The lister has no per request choice, so theirs is the
+         profile default. */
+      result.contact = contactFor(
+        person,
+        seesRequester ? (row.share_channels ?? person.share_channels) : person.share_channels,
+      );
     }
     return result;
   };
@@ -1906,10 +1963,24 @@ ${button}
         throw new HttpError(400, "You cannot request your own listing.");
       const id = randomUUID();
       const timestamp = iso();
+      /* What this request shares. Omitted means the profile default, and a
+         channel the student never filled in is dropped either way. */
+      const shareChannels = normalizeShareChannels(
+        input.shareChannels ?? readShareChannels(req.user.share_channels),
+        req.user,
+      );
       try {
         db.prepare(
-          "INSERT INTO handoff_requests(id,listing_id,requester_id,message,status,created_at,updated_at) VALUES(?,?,?,?,'pending',?,?)",
-        ).run(id, listing.id, req.user.id, input.message, timestamp, timestamp);
+          "INSERT INTO handoff_requests(id,listing_id,requester_id,message,status,share_channels,created_at,updated_at) VALUES(?,?,?,?,'pending',?,?,?)",
+        ).run(
+          id,
+          listing.id,
+          req.user.id,
+          input.message,
+          JSON.stringify(shareChannels),
+          timestamp,
+          timestamp,
+        );
       } catch (error) {
         if (error.code === "SQLITE_CONSTRAINT_UNIQUE")
           throw new HttpError(
