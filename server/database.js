@@ -14,7 +14,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 12) {
+  if (version > 13) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -342,6 +342,11 @@ export function openDatabase(dataDir) {
     })();
   }
   if (db.pragma("user_version", { simple: true }) === 11) {
+    const backupDir = join(dataDir, "backups");
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const backup = join(backupDir, `before-schema-12-${Date.now()}.sqlite`);
+    db.prepare("VACUUM INTO ?").run(backup);
+    chmodSync(backup, 0o600);
     db.transaction(() => {
       // Contact channels. A student may add a phone number, an Instagram
       // handle and a Facebook profile, and choose which of them travel with
@@ -373,5 +378,57 @@ export function openDatabase(dataDir) {
       db.pragma("user_version = 12");
     })();
   }
+  if (db.pragma("user_version", { simple: true }) === 12) {
+    const backupDir = join(dataDir, "backups");
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const backup = join(backupDir, `before-schema-13-${Date.now()}.sqlite`);
+    db.prepare("VACUUM INTO ?").run(backup);
+    chmodSync(backup, 0o600);
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE referrals (
+          id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, source_key TEXT NOT NULL UNIQUE,
+          source_url TEXT NOT NULL, source_name TEXT NOT NULL, author_name TEXT NOT NULL,
+          author_profile_url TEXT NOT NULL DEFAULT '', source_text TEXT NOT NULL, source_posted_at TEXT,
+          evidence TEXT NOT NULL, listing_data TEXT NOT NULL DEFAULT '{}',
+          status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','claimed','revoked')),
+          created_by TEXT NOT NULL REFERENCES users(id), claimed_by TEXT REFERENCES users(id),
+          claimed_at TEXT, ownership_attested_at TEXT, terms_accepted_at TEXT,
+          listing_id TEXT REFERENCES listings(id) ON DELETE SET NULL, listing_created_at TEXT,
+          outreach_status TEXT NOT NULL DEFAULT 'draft' CHECK(outreach_status IN ('draft','ready','sent','replied','declined','do_not_contact')),
+          outreach_notes TEXT NOT NULL DEFAULT '', outreach_draft TEXT NOT NULL DEFAULT '',
+          revoked_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE INDEX referrals_created ON referrals(created_at);
+        CREATE INDEX referrals_claimed ON referrals(claimed_by);
+        CREATE TABLE referral_photos (
+          id TEXT PRIMARY KEY, referral_id TEXT NOT NULL REFERENCES referrals(id),
+          filename TEXT NOT NULL UNIQUE, bytes INTEGER NOT NULL,
+          claimed_upload_id TEXT REFERENCES uploads(id) ON DELETE SET NULL, created_at TEXT NOT NULL
+        );
+        CREATE INDEX referral_photos_referral ON referral_photos(referral_id);
+        CREATE TABLE referral_visits (
+          referral_id TEXT NOT NULL REFERENCES referrals(id), visitor_hash TEXT NOT NULL,
+          first_at TEXT NOT NULL, last_at TEXT NOT NULL, opens INTEGER NOT NULL DEFAULT 1,
+          PRIMARY KEY(referral_id,visitor_hash)
+        );
+        CREATE TABLE referral_attributions (
+          referral_id TEXT NOT NULL REFERENCES referrals(id), user_id TEXT NOT NULL REFERENCES users(id),
+          kind TEXT NOT NULL CHECK(kind IN ('signup','login')), visitor_hash TEXT, created_at TEXT NOT NULL,
+          PRIMARY KEY(referral_id,user_id)
+        );
+        CREATE TABLE referral_events (
+          id TEXT PRIMARY KEY, referral_id TEXT NOT NULL REFERENCES referrals(id), type TEXT NOT NULL,
+          actor_id TEXT REFERENCES users(id), visitor_hash TEXT, details TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
+        );
+        CREATE INDEX referral_events_timeline ON referral_events(referral_id,created_at);
+        CREATE UNIQUE INDEX referral_events_once ON referral_events(referral_id,actor_id,type)
+          WHERE type IN ('account_created','verified','claimed');
+        PRAGMA user_version = 13;
+      `);
+    })();
+  }
+  mkdirSync(join(dataDir, "uploads", "referrals"), { recursive: true, mode: 0o700 });
+
   return db;
 }

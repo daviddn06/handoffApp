@@ -121,6 +121,7 @@ export function adminRouter({
   // The allow list gate. The app builds it once at startup and shares it with
   // serializeUser so the client and the API always agree.
   isAllowedAdmin = adminGate(),
+  referralsRouter,
 } = {}) {
   const router = express.Router();
   const data = resolve(dataDir);
@@ -163,6 +164,7 @@ export function adminRouter({
 
   router.use(limit("admin", 3000, 15 * 60 * 1000, (req) => req.user?.id || req.ip));
   router.use(requireAdmin);
+  if (referralsRouter) router.use("/referrals", referralsRouter);
 
   const since = (days) => new Date(Date.now() - days * DAY).toISOString();
   const countQuery = (sql, ...params) =>

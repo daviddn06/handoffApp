@@ -70,7 +70,8 @@ export const money = (value: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
   }).format(value);
 export function dateLabel(value: string, year = false) {
   return new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString(
@@ -87,7 +88,10 @@ export function safeNext(value: string | null) {
     : "/browse";
 }
 /** Monthly savings against the original lease, or null when not shared or not lower. */
-export function savings(listing: { price: number; originalPrice?: number | null }) {
+export function savings(listing: {
+  price: number;
+  originalPrice?: number | null;
+}) {
   const original = listing.originalPrice;
   if (!original || original <= listing.price) return null;
   const amount = original - listing.price;

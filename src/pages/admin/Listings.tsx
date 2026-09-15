@@ -45,7 +45,7 @@ export default function Listings() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(() => new URLSearchParams(window.location.search).get("listing"));
   const [pending, setPending] = useState<Pending>(null);
   const search = useDebounced(query);
   const { data, error, loading, refresh } = useResource<ListingsPage>(

@@ -1,6 +1,25 @@
 # Handoff scripts
 
-Helper scripts for local development. None of them are part of a release and none of them are safe to point at production data.
+Development helpers and explicitly scoped operator tools. The referral importer below is intended for the production VPS. Demo and QA scripts remain separate.
+
+## import-referrals.js
+
+Imports manually reviewed USC student sublease sources and their actual local photos into private referral drafts. It never sends outreach, creates accounts, grants roles, claims drafts, or publishes listings. Use an existing active, verified USC administrator whose email is already in `HANDOFF_ADMIN_EMAILS`.
+
+Run from the matching deployed release on the VPS as the service user, with the existing production environment. Replace `EXISTING_ADMIN_EMAIL` and the batch path with reviewed values.
+
+```bash
+sudo -u handoff node --env-file=/etc/handoff/app.env scripts/import-referrals.js \
+  --admin-email EXISTING_ADMIN_EMAIL --batch /var/lib/handoff/imports/reviewed.json
+```
+
+The JSON envelope is `{ "reviewed": true, "referrals": [...] }`. Each referral contains the admin creation API fields plus a `photos` array of local file paths relative to the JSON folder. Include `sourceUrl`, `sourceName`, `authorName`, optional `authorProfileUrl` and `sourcePostedAt`, literal `sourceText`, `evidence` with `student`, `usc` and `sublease` excerpts, and the known fields in `listing`. Optional `outreachStatus`, `outreachNotes` and `outreachDraft` are saved as text only. Use `{{link}}` where the private link should appear in a draft message. Leave unknown factual fields absent. `photos: []` is valid when no source photos were available. Do not add invented data to make an incomplete draft look complete.
+
+Bounds are 20 entries, 16 photos per referral, 8 MB per original photo, and a 2 MB JSON batch. Images must be supported raster photographs between 100 by 100 pixels and 24 megapixels. Paths cannot escape the batch folder, including through symlinks. Only the configured exact `https://app.handofflease.com` and `https://internal.handofflease.com` origins are accepted. All referral mutations use the authenticated internal HTTPS API with redirects disabled. The local DB is used only for existing-account checks, registered photo reads, and one temporary session with a five-minute expiry. The session is removed in `finally`; interrupt signals also trigger cleanup. The importer never prints authentication material.
+
+Reruns reuse the canonical source's existing private link and preserve its outreach state and edited source data. Identical source photos are compared against the exact server encoding, so an interrupted run can be retried even if a successful upload response was lost. New photos can be appended only while the referral remains pending and below its limit. Existing claimed or revoked data is preserved. A local `.referral-import.lock` prevents overlapping operator runs. After a forced process kill, confirm its recorded PID is no longer active before removing that stale lock; any remaining session expires within five minutes. Import errors stop the batch, so earlier completed entries may remain and can be safely retried.
+
+Successful stdout is a JSON array containing only `id`, `link`, `photoCount` and `outreachStatus`. Links are private capabilities, so keep the output with the reviewed source records. No reviewed source JSON or actual source photos belong in Git.
 
 ## seed-demo.js
 

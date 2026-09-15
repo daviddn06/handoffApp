@@ -160,9 +160,9 @@ function parseSystem(campus) {
     "title: short and specific, 8 to 70 characters, no emojis, no all caps, no phone numbers.",
     "description: clean prose between 40 and 800 characters, rewritten in plain sentences. Remove phone numbers, email addresses, social handles, links and prices per person that contradict the rent. Keep the useful detail about the room, the roommates and the lease.",
     "address: street address plus the city when the source gives one. Never a full unit number.",
-    "price: monthly rent in whole US dollars.",
-    "deposit: security deposit in whole US dollars, only when stated.",
-    "originalPrice: what the current lister pays on the original lease, only when stated. It is not the asking price.",
+    "price: monthly rent in US dollars. Preserve any stated cents, using at most two decimal places. Never round to whole dollars.",
+    "deposit: security deposit in US dollars, only when stated. Preserve any stated cents, using at most two decimal places.",
+    "originalPrice: what the current lister pays on the original lease, only when stated. Preserve stated cents. It is not the asking price.",
     "bedrooms: bedrooms in the whole home. bathrooms: bathrooms in the whole home, halves allowed.",
     "roomType: private for a bedroom of their own, shared for a room with a roommate, entire for the whole home.",
     "availableFrom and availableTo: ISO dates, YYYY-MM-DD. Infer the year from today and the semester. Summer means about May 15 to August 15 of the coming summer, a fall semester about August 15 to December 20, a spring semester about January 10 to May 15. Say May to August with no year as the next such window from today.",
@@ -311,6 +311,12 @@ const num = (value, { min = 0, max = 1_000_000, integer = true } = {}) => {
   if (!Number.isFinite(parsed) || parsed < min || parsed > max) return null;
   return integer ? Math.round(parsed) : parsed;
 };
+const cents = z.number().multipleOf(0.01);
+const money = (value, max) => {
+  const parsed = num(value, { max, integer: false });
+  // Invalid precision stays missing for student review, never silently rounded.
+  return cents.safeParse(parsed).success ? parsed : null;
+};
 const str = (value, max) => {
   const text = String(value ?? "")
     .replace(/\s+/g, " ")
@@ -352,9 +358,9 @@ function cleanDraft(raw) {
     title: stripContacts(str(source.title, 100)),
     description: stripContacts(str(source.description, 800)),
     address: str(source.address, 200),
-    price: num(source.price, { max: 50000 }),
-    deposit: num(source.deposit, { max: 100000 }),
-    originalPrice: num(source.originalPrice, { max: 50000 }),
+    price: money(source.price, 50000),
+    deposit: money(source.deposit, 100000),
+    originalPrice: money(source.originalPrice, 50000),
     bedrooms: num(source.bedrooms, { max: 20 }),
     bathrooms: num(source.bathrooms, { max: 20, integer: false }),
     roomType,
