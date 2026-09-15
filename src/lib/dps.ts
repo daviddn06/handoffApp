@@ -46,10 +46,24 @@ export function milesBetween(
     Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * EARTH_MILES * Math.asin(Math.sqrt(h));
 }
+/** "0.6 mi" style distance. */
 export function distanceLabel(miles: number) {
   if (miles < 0.1) return "On campus";
-  if (miles < 1) return `${Math.round(miles * 20) * 1} min walk`;
-  return `${miles.toFixed(1)} mi`;
+  return `${miles < 10 ? miles.toFixed(1) : Math.round(miles)} mi`;
+}
+/**
+ * Rough door to door time from campus. Walking pace of 3 mph up to a mile
+ * and a half, then city driving at about 20 mph plus time to park.
+ */
+export function travelLabel(miles: number) {
+  if (miles < 0.1) return "On campus";
+  if (miles <= 1.5) return `${Math.max(2, Math.round(miles * 20))} min walk`;
+  return `${Math.round(miles * 3 + 4)} min drive`;
+}
+/** "0.6 mi · 12 min walk" for cards, "12 min walk" alone when space is tight. */
+export function tripLabel(miles: number, short = false) {
+  if (miles < 0.1) return "On campus";
+  return short ? travelLabel(miles) : `${distanceLabel(miles)} · ${travelLabel(miles)}`;
 }
 
 export type MapBounds = {

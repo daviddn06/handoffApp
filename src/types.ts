@@ -5,6 +5,8 @@ export type Campus = {
   lat: number;
   lng: number;
   domain: string;
+  /** Campuses students can pick today. The rest are waitlist only. */
+  live?: boolean;
 };
 export type User = {
   id: string;
@@ -39,7 +41,16 @@ export type Listing = {
   status: "draft" | "active" | "handed_off" | "archived";
   createdAt: string;
   updatedAt: string;
+  /** End of the current boost window, ISO timestamp, or null. */
+  boostUntil: string | null;
+  /** True while boostUntil is still in the future. */
+  boosted: boolean;
   saved?: boolean;
+};
+export type BoostStats = {
+  views: number;
+  requests: number;
+  boostUntil: string | null;
 };
 export type HandoffRequest = {
   id: string;

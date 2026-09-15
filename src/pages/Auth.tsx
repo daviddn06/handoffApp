@@ -21,6 +21,7 @@ import { api, errorMessage, json, safeNext } from "../lib/api";
 import { useApp } from "../lib/context";
 import { Button, ErrorBox, Field, Loading } from "../components/ui";
 import type { Campus, User } from "../types";
+import { liveCampuses } from "../lib/schools";
 type Mode =
   | "sign-in"
   | "sign-up"
@@ -194,6 +195,7 @@ function OtpInput({
   );
 }
 
+/** Only campuses that are live today can take a signup. */
 function campusFor(email: string, campuses: Campus[]) {
   const domain = email.trim().toLowerCase().split("@")[1];
   if (!domain) return null;
@@ -205,7 +207,7 @@ function campusFor(email: string, campuses: Campus[]) {
 }
 
 export default function Auth({ mode }: { mode: Mode }) {
-  const { user, setUser, campuses, emailReady, notify } = useApp(),
+  const { user, setUser, campuses: allCampuses, emailReady, notify } = useApp(),
     navigate = useNavigate(),
     [params] = useSearchParams();
   const [busy, setBusy] = useState(false),
@@ -223,6 +225,7 @@ export default function Auth({ mode }: { mode: Mode }) {
     [digits, setDigits] = useState(["", "", "", "", "", ""]),
     [fieldErrors, setFieldErrors] = useState<Record<string, string>>({}),
     [cooldown, setCooldown] = useState(0);
+  const campuses = liveCampuses(allCampuses);
   const verifiedToken = useRef("");
   const shakeRef = useRef<HTMLDivElement>(null);
   const slideRef = useRef<HTMLDivElement>(null);

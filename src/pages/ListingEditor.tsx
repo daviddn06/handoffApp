@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   ImagePlus,
   ListChecks,
+  LocateFixed,
   MapPin,
   Rocket,
   Save,
@@ -44,7 +45,9 @@ import {
 } from "../lib/api";
 import { useApp } from "../lib/context";
 import { Button, ErrorBox, Field, Loading } from "../components/ui";
+import { DateField } from "../components/DateField";
 const Map = lazy(() => import("../components/Map"));
+type AddressMatch = { line: string; place: string; lat: number; lng: number };
 type Draft = {
   title: string;
   description: string;
@@ -143,6 +146,10 @@ export default function ListingEditor() {
     [reached, setReached] = useState(0),
     [dir, setDir] = useState<"fwd" | "back">("fwd"),
     [pinPlaced, setPinPlaced] = useState(false),
+    [pinSource, setPinSource] = useState<"" | "auto" | "manual">(""),
+    [locating, setLocating] = useState(false),
+    [matches, setMatches] = useState<AddressMatch[]>([]),
+    [lookupNote, setLookupNote] = useState(""),
     [dirty, setDirty] = useState(false),
     [saving, setSaving] = useState(false),
     [uploading, setUploading] = useState(false),
@@ -156,6 +163,80 @@ export default function ListingEditor() {
     bodyRef = useRef<HTMLDivElement>(null),
     timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const termsAccepted = Boolean(user?.termsAccepted);
+  const addressWrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!matches.length) return;
+    const away = (e: PointerEvent) => {
+      if (!addressWrap.current?.contains(e.target as Node)) setMatches([]);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMatches([]);
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [matches.length]);
+  const placedRef = useRef(false);
+  placedRef.current = pinPlaced;
+  const lookedUp = useRef(""),
+    lookupPromise = useRef<Promise<void> | null>(null);
+  /** Put the pin where the typed address is. Listers confirm or drag it. */
+  function locate(force = false) {
+    const q = draft.address.trim();
+    if (q.length < 5) return;
+    if (!force && (pinSource === "manual" || lookedUp.current === q)) return;
+    lookedUp.current = q;
+    setLocating(true);
+    setLookupNote("");
+    setMatches([]);
+    const run = (async () => {
+      try {
+        const { results } = await api<{ results: AddressMatch[] }>(
+          `/geocode?q=${encodeURIComponent(q)}&campusId=${encodeURIComponent(campus?.id || "")}`,
+        );
+        if (lookedUp.current !== q) return;
+        if (!results.length) {
+          setLookupNote("We could not find that address. Tap the map to place the pin.");
+          return;
+        }
+        const [best] = results;
+        setDraft((d) => ({ ...d, lat: best.lat, lng: best.lng }));
+        placedRef.current = true;
+        setPinPlaced(true);
+        setPinSource("auto");
+        setDirty(true);
+        setErrors((e) => ({ ...e, pin: "" }));
+        setMatches(results.length > 1 ? results : []);
+      } catch (e) {
+        setLookupNote(errorMessage(e));
+      } finally {
+        if (lookedUp.current === q) setLocating(false);
+      }
+    })();
+    lookupPromise.current = run;
+    return run;
+  }
+  // Look the address up once typing pauses, so the pin lands without a
+  // blur or Enter. Manual pins are never overridden.
+  useEffect(() => {
+    if (step !== 1 || pinSource === "manual") return;
+    const q = draft.address.trim();
+    if (q.length < 5 || lookedUp.current === q) return;
+    const t = setTimeout(() => locate(), 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.address, step, pinSource]);
+  function choose(m: AddressMatch) {
+    setDraft((d) => ({ ...d, address: `${m.line}, ${m.place}`, lat: m.lat, lng: m.lng }));
+    lookedUp.current = `${m.line}, ${m.place}`;
+    setPinPlaced(true);
+    setPinSource("auto");
+    setMatches([]);
+    setDirty(true);
+  }
   // Error shake, transitions.dev 12-error-state-shake.
   function shake() {
     const el = bodyRef.current;
@@ -191,6 +272,8 @@ export default function ListingEditor() {
         photos: l.photos,
       });
       setPinPlaced(true);
+      setPinSource("manual");
+      lookedUp.current = l.address.trim();
       setDirty(false);
     }
   }, [data]);
@@ -226,7 +309,7 @@ export default function ListingEditor() {
     if (part === 1) {
       if (draft.address.trim().length < 5)
         found.address = "Add the street address or building name.";
-      if (!pinPlaced)
+      if (!placedRef.current)
         found.pin = "Place a pin on the map so students can find the area.";
       else if (
         !Number.isFinite(draft.lat) ||
@@ -279,11 +362,15 @@ export default function ListingEditor() {
     bodyRef.current?.scrollTo({ top: 0 });
     window.scrollTo({ top: 0 });
   }
-  function next(e: FormEvent) {
+  async function next(e: FormEvent) {
     e.preventDefault();
     if (step === LAST) {
       publish();
       return;
+    }
+    if (step === 1 && !pinPlaced) {
+      // Blur already started the lookup, give it a moment to land the pin.
+      await (locate() || lookupPromise.current);
     }
     const found = checkStep(step);
     if (Object.keys(found).length) {
@@ -620,6 +707,7 @@ export default function ListingEditor() {
                   )}
                   {i === 1 && (
                     <div className="stack">
+                      <div className="address-wrap" ref={addressWrap}>
                       <Field
                         label="Street address or building"
                         hint="This is visible on your listing. Leave out your unit number."
@@ -632,10 +720,51 @@ export default function ListingEditor() {
                           maxLength={200}
                           autoComplete="street-address"
                           value={draft.address}
-                          onChange={(e) => update("address", e.target.value)}
+                          onChange={(e) => {
+                            update("address", e.target.value);
+                            setMatches([]);
+                            setLookupNote("");
+                            if (pinSource === "auto") setPinSource("");
+                          }}
+                          onBlur={() => locate()}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              locate(true);
+                            }
+                          }}
                           placeholder="123 West 30th Street, Los Angeles"
                         />
                       </Field>
+                      {matches.length > 1 && (
+                        <div
+                          className="address-matches t-dropdown is-open"
+                          role="group"
+                          aria-label="Did you mean"
+                        >
+                          <span className="matches-title">Did you mean</span>
+                          {matches.slice(0, 4).map((m) => (
+                            <button
+                              type="button"
+                              key={`${m.lat},${m.lng}`}
+                              className={
+                                m.lat === draft.lat && m.lng === draft.lng ? "is-on" : ""
+                              }
+                              onClick={() => choose(m)}
+                            >
+                              <MapPin size={14} aria-hidden="true" />
+                              <span>
+                                <strong>{m.line}</strong>
+                                <small>{m.place}</small>
+                              </span>
+                              {m.lat === draft.lat && m.lng === draft.lng && (
+                                <Check size={14} aria-hidden="true" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      </div>
                       <div className="field map-field">
                         <div className="field-label">
                           <MapPin size={14} aria-hidden="true" />
@@ -657,6 +786,9 @@ export default function ListingEditor() {
                                 onPin={(point) => {
                                   setDraft((d) => ({ ...d, ...point }));
                                   setPinPlaced(true);
+                                  setPinSource("manual");
+                                  setMatches([]);
+                                  setLookupNote("");
                                   setDirty(true);
                                   setFormError("");
                                   setErrors((e) => ({ ...e, pin: "" }));
@@ -667,12 +799,23 @@ export default function ListingEditor() {
                         )}
                         <div className="map-foot">
                           <span
-                            className={`pin-status ${pinPlaced ? "placed" : ""}`}
+                            className={`pin-status ${locating ? "busy" : pinPlaced ? (pinSource === "auto" ? "check" : "placed") : ""}`}
+                            aria-live="polite"
                           >
-                            <MapPin size={13} />
-                            {pinPlaced
-                              ? "Location pin placed"
-                              : "Tap the map to place your pin"}
+                            {locating ? (
+                              <LocateFixed size={13} className="spin" />
+                            ) : (
+                              <MapPin size={13} />
+                            )}
+                            {locating
+                              ? "Finding it on the map…"
+                              : lookupNote
+                                ? lookupNote
+                                : pinPlaced
+                                  ? pinSource === "auto"
+                                    ? "Pin placed from your address. Check it and drag to adjust."
+                                    : "Location pin placed"
+                                  : "Type the address and we will place the pin, or tap the map."}
                           </span>
                           <details className="coordinate-fields">
                             <summary>Enter coordinates instead</summary>
@@ -687,6 +830,7 @@ export default function ListingEditor() {
                                   onChange={(e) => {
                                     update("lat", Number(e.target.value));
                                     setPinPlaced(true);
+                                    setPinSource("manual");
                                   }}
                                 />
                               </Field>
@@ -700,6 +844,7 @@ export default function ListingEditor() {
                                   onChange={(e) => {
                                     update("lng", Number(e.target.value));
                                     setPinPlaced(true);
+                                    setPinSource("manual");
                                   }}
                                 />
                               </Field>
@@ -715,35 +860,55 @@ export default function ListingEditor() {
                   {i === 2 && (
                     <div className="stack">
                       <div className="field-row">
-                        <Field
-                          label="Available from"
-                          error={errors.availableFrom}
-                          className={errors.availableFrom ? "is-error" : ""}
+                        <div
+                          className={`field ${errors.availableFrom ? "is-error" : ""}`}
                         >
-                          <input
-                            type="date"
+                          <label
+                            className="field-label"
+                            htmlFor="available-from"
+                          >
+                            Available from
+                          </label>
+                          <DateField
+                            id="available-from"
+                            name="availableFrom"
+                            label="Available from"
                             required
+                            placeholder="Pick a start date"
                             value={draft.availableFrom}
-                            onChange={(e) =>
-                              update("availableFrom", e.target.value)
-                            }
+                            onChange={(v) => update("availableFrom", v)}
                           />
-                        </Field>
-                        <Field
-                          label="Available until"
-                          error={errors.availableTo}
-                          className={errors.availableTo ? "is-error" : ""}
+                          {errors.availableFrom && (
+                            <span className="field-error">
+                              {errors.availableFrom}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          className={`field ${errors.availableTo ? "is-error" : ""}`}
                         >
-                          <input
-                            type="date"
+                          <label
+                            className="field-label"
+                            htmlFor="available-until"
+                          >
+                            Available until
+                          </label>
+                          <DateField
+                            id="available-until"
+                            name="availableTo"
+                            label="Available until"
                             required
+                            placeholder="Pick an end date"
                             min={draft.availableFrom || undefined}
                             value={draft.availableTo}
-                            onChange={(e) =>
-                              update("availableTo", e.target.value)
-                            }
+                            onChange={(v) => update("availableTo", v)}
                           />
-                        </Field>
+                          {errors.availableTo && (
+                            <span className="field-error">
+                              {errors.availableTo}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="field-row">
                         <Field
@@ -1241,6 +1406,9 @@ export default function ListingEditor() {
             </span>
             <strong>Your listing is live</strong>
             <span>Taking you to it now.</span>
+            <span className="editor-success-boost">
+              Boost it there to sit at the top for seven days.
+            </span>
           </div>
         )}
       </section>

@@ -13,7 +13,7 @@ export function openDatabase(dataDir) {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 5000");
   const version = db.pragma("user_version", { simple: true });
-  if (version > 5) {
+  if (version > 6) {
     db.close();
     throw new Error(
       "Database schema is newer than this release. Restore the matching application release.",
@@ -71,6 +71,7 @@ export function openDatabase(dataDir) {
         status TEXT NOT NULL CHECK(status IN ('draft','active','handed_off','archived')),
         moderation_locked INTEGER NOT NULL DEFAULT 0,
         original_price INTEGER,
+        boost_until TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE INDEX listings_discovery ON listings(status, campus_id, available_to);
@@ -97,7 +98,19 @@ export function openDatabase(dataDir) {
         id TEXT PRIMARY KEY, listing_id TEXT NOT NULL REFERENCES listings(id), reporter_id TEXT NOT NULL REFERENCES users(id),
         reason TEXT NOT NULL, details TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'open', created_at TEXT NOT NULL
       );
-      PRAGMA user_version = 5;
+      CREATE TABLE boosts (
+        id TEXT PRIMARY KEY, listing_id TEXT NOT NULL REFERENCES listings(id), user_id TEXT NOT NULL REFERENCES users(id),
+        kind TEXT NOT NULL CHECK(kind IN ('launch','paid')), price_cents INTEGER NOT NULL DEFAULT 0,
+        starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, created_at TEXT NOT NULL
+      );
+      CREATE INDEX boosts_listing ON boosts(listing_id, created_at);
+      CREATE INDEX boosts_user ON boosts(user_id, created_at);
+      CREATE TABLE listing_views (
+        listing_id TEXT NOT NULL REFERENCES listings(id), viewer_key TEXT NOT NULL, hour TEXT NOT NULL,
+        created_at TEXT NOT NULL, PRIMARY KEY(listing_id, viewer_key, hour)
+      );
+      CREATE INDEX listing_views_listing ON listing_views(listing_id, created_at);
+      PRAGMA user_version = 6;
     `);
     })();
   if (version === 1) {
@@ -149,6 +162,36 @@ export function openDatabase(dataDir) {
       if (!columns.includes("terms_accepted_at"))
         db.exec("ALTER TABLE users ADD COLUMN terms_accepted_at TEXT");
       db.pragma("user_version = 5");
+    })();
+  }
+  if (db.pragma("user_version", { simple: true }) === 5) {
+    db.transaction(() => {
+      // Boost: a paid or free window that lifts one listing to the top.
+      const columns = db
+        .prepare("PRAGMA table_info(listings)")
+        .all()
+        .map((column) => column.name);
+      if (!columns.includes("boost_until"))
+        db.exec("ALTER TABLE listings ADD COLUMN boost_until TEXT");
+      db.exec(`CREATE TABLE IF NOT EXISTS boosts (
+        id TEXT PRIMARY KEY, listing_id TEXT NOT NULL REFERENCES listings(id), user_id TEXT NOT NULL REFERENCES users(id),
+        kind TEXT NOT NULL CHECK(kind IN ('launch','paid')), price_cents INTEGER NOT NULL DEFAULT 0,
+        starts_at TEXT NOT NULL, ends_at TEXT NOT NULL, created_at TEXT NOT NULL
+      )`);
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS boosts_listing ON boosts(listing_id, created_at)",
+      );
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS boosts_user ON boosts(user_id, created_at)",
+      );
+      db.exec(`CREATE TABLE IF NOT EXISTS listing_views (
+        listing_id TEXT NOT NULL REFERENCES listings(id), viewer_key TEXT NOT NULL, hour TEXT NOT NULL,
+        created_at TEXT NOT NULL, PRIMARY KEY(listing_id, viewer_key, hour)
+      )`);
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS listing_views_listing ON listing_views(listing_id, created_at)",
+      );
+      db.pragma("user_version = 6");
     })();
   }
   return db;

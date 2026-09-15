@@ -1,5 +1,6 @@
 /* Handoff homepage behavior. Vanilla, no build step.
-   Scroll reveals, cloud parallax, hero frame tilt, savings counter. */
+   Scroll reveals, cloud parallax, the flat app frame settling, the FAQ
+   accordion, and the savings counter. */
 (function () {
   "use strict";
 
@@ -48,11 +49,26 @@
       .catch(function () {});
   })();
 
-  // Deep link from the footer opens the contact sharing answer.
+  /* The FAQ accordion. The height is a grid track, 0fr to 1fr, so nothing is
+     measured; CSS owns the motion and this owns the state. */
+  var setOpen = function (item, open) {
+    if (!item) return;
+    item.setAttribute("data-open", open ? "true" : "false");
+    var head = item.querySelector(".faq-head");
+    if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  document.querySelectorAll(".faq-item").forEach(function (item) {
+    var head = item.querySelector(".faq-head");
+    if (!head) return;
+    head.addEventListener("click", function () {
+      setOpen(item, item.getAttribute("data-open") !== "true");
+    });
+  });
+
+  /* Deep link from the footer opens the contact sharing answer. */
   document.querySelectorAll('a[href="#contact-privacy"]').forEach(function (a) {
     a.addEventListener("click", function () {
-      var target = document.getElementById("contact-privacy");
-      if (target) target.open = true;
+      setOpen(document.getElementById("contact-privacy"), true);
     });
   });
 
@@ -65,12 +81,11 @@
   if (!hasScrollDriven) document.documentElement.classList.add("no-sda");
 
   if (reduceMotion) {
-    document.querySelectorAll(".reveal, .stagger").forEach(function (el) {
-      el.classList.add("is-in");
-    });
-    document.querySelectorAll(".step, [data-shot]").forEach(function (el) {
-      el.classList.add("is-in");
-    });
+    document
+      .querySelectorAll(".reveal, .stagger, [data-shot], [data-savings-card]")
+      .forEach(function (el) {
+        el.classList.add("is-in");
+      });
     var staticCount = document.querySelector("[data-count]");
     if (staticCount) staticCount.textContent = "$1,200";
     var staticCard = document.querySelector("[data-savings-card]");
@@ -90,7 +105,7 @@
     { rootMargin: "0px 0px -10% 0px", threshold: 0.12 },
   );
   document
-    .querySelectorAll(".reveal, .stagger, .step, [data-shot]")
+    .querySelectorAll(".reveal, .stagger, [data-shot]")
     .forEach(function (el) {
       revealObserver.observe(el);
     });
@@ -126,18 +141,19 @@
           cardObserver.disconnect();
         });
       },
-      { threshold: 0.55 },
+      { threshold: 0.4 },
     );
     cardObserver.observe(card);
   })();
 
   /* One rAF loop. Cloud parallax, the header shadow, and, where the browser
-     has no scroll driven animations, the hero frame tilt. */
+     has no scroll driven animations, the app frame settling and the cluster
+     split. The frame only ever translates. Nothing on this page tilts. */
   var clouds = Array.prototype.slice.call(
     document.querySelectorAll("[data-parallax]"),
   );
   var header = document.querySelector(".site-header");
-  var tiltEl = document.querySelector("[data-tilt]");
+  var riseEl = document.querySelector("[data-rise]");
   var shotEl = document.querySelector("[data-shot]");
   var ticking = false;
 
@@ -153,9 +169,9 @@
     return false;
   };
   var checkTimelines = function () {
-    if (scrollTimelineLive(tiltEl)) tiltEl = null;
+    if (scrollTimelineLive(riseEl)) riseEl = null;
     if (scrollTimelineLive(shotEl)) shotEl = null;
-    if (tiltEl || shotEl) document.documentElement.classList.add("no-sda");
+    if (riseEl || shotEl) document.documentElement.classList.add("no-sda");
     frame();
   };
 
@@ -169,9 +185,9 @@
       var progress = rect.top + rect.height / 2 - viewH / 2;
       cloud.style.setProperty("--py", (-progress * factor).toFixed(1) + "px");
     });
-    if (tiltEl) {
-      var t = Math.min(1, Math.max(0, window.scrollY / 460));
-      tiltEl.style.setProperty("--tilt", (1 - t).toFixed(3));
+    if (riseEl) {
+      var t = Math.min(1, Math.max(0, window.scrollY / 340));
+      riseEl.style.setProperty("--rise", (1 - t).toFixed(3));
     }
     if (shotEl) {
       /* The cluster split runs on this, forward and back. */

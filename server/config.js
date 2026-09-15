@@ -8,6 +8,9 @@ export const CAMPUSES = Object.freeze([
     lat: 34.0224,
     lng: -118.2851,
     domain: "usc.edu",
+    city: "Los Angeles",
+    state: "CA",
+    live: true,
   },
   {
     id: "ucla",
@@ -16,6 +19,9 @@ export const CAMPUSES = Object.freeze([
     lat: 34.0689,
     lng: -118.4452,
     domain: "ucla.edu",
+    city: "Los Angeles",
+    state: "CA",
+    live: false,
   },
   {
     id: "lmu",
@@ -24,6 +30,9 @@ export const CAMPUSES = Object.freeze([
     lat: 33.9701,
     lng: -118.4165,
     domain: "lmu.edu",
+    city: "Los Angeles",
+    state: "CA",
+    live: false,
   },
   {
     id: "csulb",
@@ -32,6 +41,9 @@ export const CAMPUSES = Object.freeze([
     lat: 33.7838,
     lng: -118.1141,
     domain: "csulb.edu",
+    city: "Long Beach",
+    state: "CA",
+    live: false,
   },
 ]);
 

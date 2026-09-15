@@ -2,13 +2,14 @@ import express from "express";
 import multer from "multer";
 import sharp from "sharp";
 import { randomInt, randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { existsSync, mkdirSync } from "node:fs";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { CAMPUSES, configuredMailTransport } from "./config.js";
 import { openDatabase } from "./database.js";
+import { geocode } from "./geocode.js";
 import {
   hashToken,
   randomToken,
@@ -31,6 +32,7 @@ import {
   listingQuerySchema,
   listingSchema,
   requestSchema,
+  boostSchema,
   requestUpdateSchema,
   reportSchema,
   today,
@@ -52,6 +54,82 @@ const escapeHtml = (value) =>
         character
       ],
   );
+
+const LOGO_HOSTNAME =
+  /^(?=.{4,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+const LOGO_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+const LOGO_TYPES = {
+  png: "image/png",
+  ico: "image/x-icon",
+  jpg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+};
+/** Trust the bytes over the header, icon services mislabel plenty of files. */
+function logoExtension(contentType, body) {
+  if (body.length >= 8 && body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
+    return "png";
+  if (body.length >= 3 && body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff)
+    return "jpg";
+  if (body.length >= 6 && body.subarray(0, 6).toString("latin1").startsWith("GIF8"))
+    return "gif";
+  if (body.length >= 12 && body.subarray(0, 4).toString("latin1") === "RIFF" && body.subarray(8, 12).toString("latin1") === "WEBP")
+    return "webp";
+  if (body.length >= 4 && body[0] === 0x00 && body[1] === 0x00 && body[2] === 0x01 && body[3] === 0x00)
+    return "ico";
+  const type = String(contentType || "").split(";")[0].trim().toLowerCase();
+  if (type === "image/svg+xml") return "svg";
+  return null;
+}
+async function readLogoCache(logoDir, domain) {
+  for (const ext of [...Object.keys(LOGO_TYPES), "none"]) {
+    const file = join(logoDir, `${domain}.${ext}`);
+    try {
+      const info = await stat(file);
+      if (Date.now() - info.mtimeMs > LOGO_MAX_AGE) continue;
+      if (ext === "none") return "missing";
+      return { ext, body: await readFile(file) };
+    } catch {
+      // Not cached under this extension, try the next one.
+    }
+  }
+  return null;
+}
+async function writeLogoCache(logoDir, domain, ext, body) {
+  try {
+    await writeFile(join(logoDir, `${domain}.${ext}`), body, { mode: 0o600 });
+  } catch {
+    // A cache write failure must never fail the response.
+  }
+}
+async function fetchLogo(domain) {
+  const sources = [
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`,
+    `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`,
+  ];
+  for (const url of sources) {
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(6000),
+        redirect: "follow",
+        headers: { Accept: "image/*" },
+      });
+      if (!response.ok) continue;
+      const body = Buffer.from(await response.arrayBuffer());
+      if (body.length < 120 || body.length > 512 * 1024) continue;
+      const ext = logoExtension(response.headers.get("content-type"), body);
+      if (ext) return { ext, body };
+    } catch {
+      // Icon services fail often. Fall through to the next source.
+    }
+  }
+  return null;
+}
+function sendLogo(res, ext, body) {
+  res.set("Cache-Control", "public, max-age=604800");
+  res.type(LOGO_TYPES[ext] || "application/octet-stream").send(body);
+}
 
 export function createApp({
   dataDir = process.env.HANDOFF_DATA_DIR || resolve("data"),
@@ -84,6 +162,8 @@ export function createApp({
   );
   const db = openDatabase(resolve(dataDir));
   const uploadDir = join(resolve(dataDir), "uploads");
+  const logoDir = join(resolve(dataDir), "logos");
+  mkdirSync(logoDir, { recursive: true, mode: 0o700 });
   const app = express();
   const limit = rateLimiter(db);
   const cookieName = useSecureCookies
@@ -359,10 +439,62 @@ ${button}
       });
     },
   );
+  // Address suggestions for the listing editor. Any session may ask, the
+  // lister is typing their own street, and the answer places the pin.
+  app.get(
+    "/api/geocode",
+    requireUser,
+    limit("geocode-ip", 120, 15 * 60 * 1000),
+    async (req, res, next) => {
+      try {
+        const input = parse(
+          z.object({
+            q: z.string().trim().min(3).max(200),
+            campusId: z.string().max(40).optional(),
+          }),
+          req.query,
+        );
+        const campus =
+          CAMPUSES.find((c) => c.id === (input.campusId || req.user.campusId)) ||
+          CAMPUSES[0];
+        res.json({ results: await geocode(input.q, campus) });
+      } catch (error) {
+        if (error?.name === "TimeoutError" || error?.message?.startsWith("geocoder"))
+          return res.status(503).json({ error: "Address lookup is unavailable right now. Place the pin by hand." });
+        next(error);
+      }
+    },
+  );
   app.get("/api/health", (req, res) => {
     db.prepare("SELECT 1").get();
     res.json({ ok: true, version: "1.0.0" });
   });
+  // School logos for the campus picker. Public, cached on disk for 30 days so
+  // the icon services see one request per school, and 404 when nothing usable
+  // comes back so the client can draw its own fallback mark.
+  app.get(
+    "/api/logo/:domain",
+    limit("logo-ip", 300, 15 * 60 * 1000),
+    async (req, res, next) => {
+      try {
+        const domain = String(req.params.domain || "").toLowerCase();
+        if (!LOGO_HOSTNAME.test(domain))
+          throw new HttpError(404, "Logo not found.");
+        const cached = await readLogoCache(logoDir, domain);
+        if (cached === "missing") throw new HttpError(404, "Logo not found.");
+        if (cached) return sendLogo(res, cached.ext, cached.body);
+        const fetched = await fetchLogo(domain);
+        if (!fetched) {
+          await writeLogoCache(logoDir, domain, "none", Buffer.alloc(0));
+          throw new HttpError(404, "Logo not found.");
+        }
+        await writeLogoCache(logoDir, domain, fetched.ext, fetched.body);
+        sendLogo(res, fetched.ext, fetched.body);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
   app.get("/api/config", (req, res) =>
     res.json({ emailReady, campuses: CAMPUSES }),
   );
@@ -595,6 +727,8 @@ ${button}
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    boostUntil: row.boost_until ?? null,
+    boosted: Boolean(row.boost_until && row.boost_until > iso()),
     saved: userId
       ? Boolean(
           db
@@ -700,9 +834,11 @@ ${button}
       savings:
         "CASE WHEN l.original_price IS NOT NULL AND l.original_price>l.price THEN l.original_price-l.price ELSE 0 END DESC,l.created_at DESC",
     }[query.sort];
+    // A boost lifts the listing above the rest inside whichever sort is asked for.
+    parameters.push(iso());
     const rows = db
       .prepare(
-        `SELECT ${listingFields} FROM ${listingJoin} WHERE ${clauses.join(" AND ")} ORDER BY ${order} LIMIT 500`,
+        `SELECT ${listingFields} FROM ${listingJoin} WHERE ${clauses.join(" AND ")} ORDER BY CASE WHEN l.boost_until > ? THEN 0 ELSE 1 END,${order} LIMIT 500`,
       )
       .all(...parameters);
     res.json({
@@ -723,6 +859,7 @@ ${button}
     const row = getListing(req.params.id);
     if (!row || (!isPublic(row) && row.owner_id !== req.user?.id))
       throw new HttpError(404, "This listing is no longer available.");
+    countView(row, req);
     res.json({ listing: serializeListing(row, req.user?.id) });
   });
   app.post(
@@ -863,6 +1000,98 @@ ${button}
       res.json({ listing: serializeListing(getListing(row.id), req.user.id) });
     },
   );
+
+  /* ------------------------------------------------------------- boost */
+
+  const BOOST_DAYS = 7;
+  /** One view per listing per student (or per address when signed out) per hour. */
+  const countView = (row, req) => {
+    if (!row || row.owner_id === req.user?.id) return;
+    const viewerKey = req.user?.id || `ip:${req.ip || "unknown"}`;
+    const now = iso();
+    db.prepare(
+      "INSERT OR IGNORE INTO listing_views(listing_id,viewer_key,hour,created_at) VALUES(?,?,?,?)",
+    ).run(row.id, viewerKey, now.slice(0, 13), now);
+  };
+  const latestBoost = (listingId) =>
+    db
+      .prepare(
+        "SELECT * FROM boosts WHERE listing_id=? ORDER BY starts_at DESC LIMIT 1",
+      )
+      .get(listingId);
+  app.post(
+    "/api/listings/:id/boost",
+    requireVerified,
+    limit("listing-boost", 20, HOUR, (req) => req.user.id),
+    (req, res) => {
+      const input = parse(boostSchema, req.body);
+      const row = getListing(req.params.id);
+      assertOwner(row, req.user);
+      if (input.kind === "paid")
+        throw new HttpError(402, "Payments open soon.");
+      if (row.status !== "active")
+        throw new HttpError(
+          400,
+          "Publish this listing before you boost it, so students can see it.",
+        );
+      const now = iso();
+      if (row.boost_until && row.boost_until > now)
+        throw new HttpError(
+          409,
+          `This listing is already boosted until ${new Date(row.boost_until).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}.`,
+        );
+      if (
+        db
+          .prepare(
+            "SELECT 1 FROM boosts WHERE listing_id=? AND kind='launch'",
+          )
+          .get(row.id)
+      )
+        throw new HttpError(
+          409,
+          "The free launch boost was already used on this listing.",
+        );
+      const endsAt = new Date(
+        Date.now() + BOOST_DAYS * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      db.transaction(() => {
+        db.prepare(
+          "INSERT INTO boosts(id,listing_id,user_id,kind,price_cents,starts_at,ends_at,created_at) VALUES(?,?,?,'launch',0,?,?,?)",
+        ).run(randomUUID(), row.id, req.user.id, now, endsAt, now);
+        db.prepare("UPDATE listings SET boost_until=? WHERE id=? AND owner_id=?").run(
+          endsAt,
+          row.id,
+          req.user.id,
+        );
+      })();
+      res.json({ listing: serializeListing(getListing(row.id), req.user.id) });
+    },
+  );
+  app.get("/api/listings/:id/boost-stats", requireUser, (req, res) => {
+    const row = getListing(req.params.id);
+    assertOwner(row, req.user);
+    const boost = latestBoost(row.id);
+    const since = boost?.starts_at;
+    const count = (sql, ...values) =>
+      db.prepare(sql).get(...values)?.n || 0;
+    res.json({
+      views: since
+        ? count(
+            "SELECT COUNT(*) AS n FROM listing_views WHERE listing_id=? AND created_at>=?",
+            row.id,
+            since,
+          )
+        : 0,
+      requests: since
+        ? count(
+            "SELECT COUNT(*) AS n FROM handoff_requests WHERE listing_id=? AND created_at>=?",
+            row.id,
+            since,
+          )
+        : 0,
+      boostUntil: row.boost_until ?? null,
+    });
+  });
 
   const uploadAccounts = new Set();
   let uploadsInFlight = 0;

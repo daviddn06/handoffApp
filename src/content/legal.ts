@@ -56,6 +56,15 @@ export const TERMS: LegalSection[] = [
     ],
   },
   {
+    title: "Boosts",
+    body: [
+      "A boost is a paid promotion for one listing you own. For seven days that listing sits at the top of the list for the map area it appears in, shows a filled pin on the map, carries a Boosted tag on its card, and shows you views and requests counted from the moment the boost started. A boost costs $9 for the seven days. One boost runs on a listing at a time, and you can boost the same listing again once the current one ends.",
+      "During the launch phase Handoff is offering a free launch boost, limited to one per listing. Free boosts carry the same seven days and the same placement, and Handoff can end the launch offer at any time.",
+      "Refunds. If your listing had no views during a boost, write to the contact address below within 24 hours of the start and we will refund it in full. Otherwise boosts are not refundable, including when you archive the listing, mark it handed off, or edit it during the boost.",
+      "A boost buys placement and nothing else. It does not guarantee views, requests, a handoff, or any outcome, and it does not change anything else in these terms. Handoff may pause or remove a boost, with a refund of the unused days, if the listing breaks these terms or is removed after review.",
+    ],
+  },
+  {
     title: "Disputes",
     body: [
       "These terms are governed by the laws of the State of California. Any dispute that cannot be resolved informally will be brought in the state or federal courts located in Los Angeles County, California, and you consent to their jurisdiction.",

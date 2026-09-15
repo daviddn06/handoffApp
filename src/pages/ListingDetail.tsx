@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Sofa,
   Wallet,
+  Zap,
 } from "lucide-react";
 import {
   ROOM_LABELS,
@@ -46,7 +47,8 @@ import {
 import { useApp } from "../lib/context";
 import { BackLink, Button, ErrorBox, Field, Loading, Modal } from "../components/ui";
 import { SaveButton } from "../components/ListingCard";
-import { distanceLabel, milesBetween } from "../lib/dps";
+import { BoostModal, daysLeft } from "../components/BoostModal";
+import { milesBetween, tripLabel } from "../lib/dps";
 const Map = lazy(() => import("../components/Map"));
 
 function DetailSkeleton() {
@@ -106,7 +108,8 @@ export default function ListingDetail() {
     [reportReason, setReportReason] = useState("Misleading listing"),
     [reportDetails, setReportDetails] = useState(""),
     [reportError, setReportError] = useState(""),
-    [reportBusy, setReportBusy] = useState(false);
+    [reportBusy, setReportBusy] = useState(false),
+    [boostOpen, setBoostOpen] = useState(false);
   useEffect(() => {
     setPhoto(null);
     setGalleryIndex(0);
@@ -116,6 +119,7 @@ export default function ListingDetail() {
     setRequestOpen(false);
     setReportOpen(false);
     setReportError("");
+    setBoostOpen(false);
   }, [id]);
   const listing = data?.listing,
     campus = campuses.find((c) => c.id === listing?.campusId),
@@ -339,7 +343,7 @@ export default function ListingDetail() {
             {miles !== null && campus && (
               <p className="detail-distance">
                 <Footprints size={15} />
-                {distanceLabel(miles)} to {campus.shortName}
+                {tripLabel(miles)} to {campus.name}
               </p>
             )}
           </header>
@@ -431,6 +435,12 @@ export default function ListingDetail() {
               <strong>{money(listing.price)}</strong>
               <span>/ month</span>
               {save && <s className="request-original">{money(save.original)}</s>}
+              {listing.boosted && (
+                <span className="boost-tag" title="Boosted listing">
+                  <Zap size={11} fill="currentColor" strokeWidth={0} />
+                  Boosted
+                </span>
+              )}
             </div>
             {save && (
               <div className="savings-box">
@@ -470,6 +480,26 @@ export default function ListingDetail() {
                     Manage listing
                   </Link>
                 </div>
+                {listing.status === "active" && (
+                  <div className="boost-callout">
+                    <div className="boost-callout-head">
+                      <Zap size={17} fill="currentColor" strokeWidth={0} />
+                      {listing.boosted ? "This listing is boosted" : "Boost this listing"}
+                    </div>
+                    <p>
+                      {listing.boosted
+                        ? `Top of the list with a filled pin for ${daysLeft(listing.boostUntil)} more day${daysLeft(listing.boostUntil) === 1 ? "" : "s"}. Open it for views and requests.`
+                        : "Seven days at the top of its map area, a filled pin, a Boosted tag, and stats. The launch boost is free."}
+                    </p>
+                    <button
+                      className="button primary full-width"
+                      onClick={() => setBoostOpen(true)}
+                    >
+                      <Zap size={16} />
+                      {listing.boosted ? "See boost stats" : "Boost this listing"}
+                    </button>
+                  </div>
+                )}
               </>
             ) : request ? (
               <>
@@ -590,6 +620,15 @@ export default function ListingDetail() {
           </div>
         )}
       </Modal>
+
+      {own && (
+        <BoostModal
+          listing={listing}
+          open={boostOpen}
+          onClose={() => setBoostOpen(false)}
+          onBoosted={() => refresh()}
+        />
+      )}
 
       <Modal
         open={requestOpen}

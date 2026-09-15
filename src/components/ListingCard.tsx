@@ -1,11 +1,11 @@
 import { useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Heart, Image } from "lucide-react";
+import { ChevronLeft, ChevronRight, Heart, Image, Zap } from "lucide-react";
 import type { Campus, Listing } from "../types";
 import { ROOM_LABELS } from "../types";
 import { api, dateLabel, errorMessage, money, savings } from "../lib/api";
 import { useApp } from "../lib/context";
-import { distanceLabel, milesBetween } from "../lib/dps";
+import { distanceLabel, milesBetween, travelLabel } from "../lib/dps";
 
 export function SaveButton({
   listing,
@@ -186,6 +186,12 @@ export function ListingCard({
             <strong>{money(listing.price)}</strong>
             <span>/mo</span>
           </div>
+          {listing.boosted && (
+            <span className="boost-tag" title="Boosted listing">
+              <Zap size={11} fill="currentColor" strokeWidth={0} />
+              Boosted
+            </span>
+          )}
           {save && (
             <span
               className="savings-tag"
@@ -204,7 +210,12 @@ export function ListingCard({
           {miles !== null && (
             <>
               {" · "}
-              <span className="card-distance">{distanceLabel(miles)}</span>
+              <span
+                className="card-distance"
+                title={`${distanceLabel(miles)} from ${campus?.name}`}
+              >
+                {travelLabel(miles)}
+              </span>
             </>
           )}
         </p>

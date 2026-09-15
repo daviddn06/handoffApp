@@ -27,6 +27,7 @@ import {
   RotateCcw,
   ChevronRight,
   LogOut,
+  Zap,
 } from "lucide-react";
 import {
   api,
@@ -53,6 +54,7 @@ import {
   PageHeading,
 } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
+import { BoostModal, daysLeft } from "../components/BoostModal";
 
 type TabItem = { value: string; label: string; count?: number };
 
@@ -264,6 +266,7 @@ export function MyListings() {
       listing: Listing;
       status: Listing["status"];
     } | null>(null),
+    [boost, setBoost] = useState<Listing | null>(null),
     [busy, setBusy] = useState(false),
     [actionError, setActionError] = useState("");
   const listings =
@@ -408,6 +411,25 @@ export function MyListings() {
                 </Link>
                 {l.status === "active" ? (
                   <>
+                    {l.boosted ? (
+                      <button
+                        type="button"
+                        className="boost-pill"
+                        onClick={() => setBoost(l)}
+                      >
+                        <Zap size={13} fill="currentColor" strokeWidth={0} />
+                        Boosted · {daysLeft(l.boostUntil)} day
+                        {daysLeft(l.boostUntil) === 1 ? "" : "s"} left
+                      </button>
+                    ) : (
+                      <button
+                        className="button small secondary"
+                        onClick={() => setBoost(l)}
+                      >
+                        <Zap size={14} />
+                        Boost
+                      </button>
+                    )}
                     <Link className="button small ghost" to="/requests">
                       Requests
                       <ArrowUpRight size={14} />
@@ -474,6 +496,17 @@ export function MyListings() {
             </Link>
           )}
         </EmptyState>
+      )}
+      {boost && (
+        <BoostModal
+          listing={boost}
+          open={!!boost}
+          onClose={() => {
+            setBoost(null);
+            refresh();
+          }}
+          onBoosted={() => refresh()}
+        />
       )}
       <Modal
         open={!!action}

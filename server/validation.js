@@ -111,6 +111,9 @@ export const listingQuerySchema = z
   .refine((data) => !data.from || !data.to || data.from <= data.to, {
     message: "Move-out must be on or after move-in.",
   });
+export const boostSchema = z
+  .object({ kind: z.enum(["launch", "paid"]) })
+  .strict();
 export const requestSchema = z
   .object({
     listingId: z.string().uuid(),

@@ -41,12 +41,20 @@ export function searchSchools(schools: School[], query: string, limit = 12) {
 export const emailDomain = (email: string) =>
   email.trim().toLowerCase().split("@")[1] || "";
 
-/** Supported campus for an email, matching the campus domain or a subdomain of it. */
+/** Campuses students can pick today. Everything else is waitlist material. */
+export const liveCampuses = (campuses: Campus[]) =>
+  campuses.filter((c) => c.live !== false);
+
+/**
+ * Live campus for an email, matching the campus domain or a subdomain of it.
+ * A campus that is not live yet never matches, so the student is offered the
+ * waitlist instead of an empty campus.
+ */
 export function campusForEmail(email: string, campuses: Campus[]) {
   const domain = emailDomain(email);
   if (!domain) return null;
   return (
-    campuses.find(
+    liveCampuses(campuses).find(
       (c) => domain === c.domain || domain.endsWith(`.${c.domain}`),
     ) || null
   );

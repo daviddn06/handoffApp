@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, readFile, readdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile, readdir, writeFile } from "node:fs/promises";
 import { request as httpRequest } from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -413,6 +413,25 @@ test("waitlist takes an email for an unsupported school once", async (t) => {
     (await env.client().call("/api/waitlist", { method: "POST", body: { email: "nope", school: "X" } })).status,
     400,
   );
+});
+
+test("school logos are served from the disk cache, bad hostnames and misses are 404", async (t) => {
+  const env = await setup(t);
+  const png = await sharp({
+    create: { width: 32, height: 32, channels: 3, background: "#990000" },
+  })
+    .png()
+    .toBuffer();
+  await writeFile(join(env.dataDir, "logos", "usc.edu.png"), png);
+  await writeFile(join(env.dataDir, "logos", "nologo.edu.none"), "");
+  const hit = await env.client().call("/api/logo/usc.edu", { raw: true });
+  assert.equal(hit.status, 200);
+  assert.equal(hit.headers.get("content-type"), "image/png");
+  assert.equal(hit.headers.get("cache-control"), "public, max-age=604800");
+  assert.ok(hit.body.equals(png));
+  assert.equal((await env.client().call("/api/logo/nologo.edu")).status, 404);
+  for (const bad of ["not-a-host", "..", "usc.edu%2F..%2Fx"])
+    assert.equal((await env.client().call(`/api/logo/${bad}`)).status, 404);
 });
 
 test("two-student workflow preserves ownership and hides contacts until acceptance", async (t) => {
@@ -1064,7 +1083,7 @@ test("secure host cookies and database persistence survive restart", async (t) =
       .count,
     2,
   );
-  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 5);
+  assert.equal(reopened.locals.db.pragma("user_version", { simple: true }), 6);
   assert.throws(
     () =>
       createApp({
@@ -1380,7 +1399,7 @@ test("version one upgrade makes a consistent backup before preserving data in sc
   try {
     assert.equal(
       migrated.locals.db.pragma("user_version", { simple: true }),
-      5,
+      6,
     );
     assert.equal(
       migrated.locals.db.prepare("SELECT name FROM users").get().name,
@@ -1462,4 +1481,110 @@ test("expired password reset tokens and cross-purpose tokens cannot change accou
     (await student.call("/api/session")).body.user.email,
     "expiredreset@usc.edu",
   );
+});
+
+test("boost lifts one listing, once, for its owner only", async (t) => {
+  const env = await setup(t);
+  const owner = await env.verified("boost.owner@usc.edu", "Boost Owner");
+  const other = await env.verified("boost.other@usc.edu", "Other Student");
+  const listing = await env.publish(owner);
+
+  // A free launch boost runs for seven days and marks the listing.
+  const boosted = await owner.call(`/api/listings/${listing.id}/boost`, {
+    method: "POST",
+    body: { kind: "launch" },
+  });
+  assert.equal(boosted.status, 200, JSON.stringify(boosted.body));
+  assert.equal(boosted.body.listing.boosted, true);
+  assert.ok(new Date(boosted.body.listing.boostUntil) > new Date());
+  const days =
+    (new Date(boosted.body.listing.boostUntil) - Date.now()) / 86400000;
+  assert.ok(days > 6.9 && days <= 7, `seven day window, got ${days}`);
+  const row = env.app.locals.db
+    .prepare("SELECT kind,price_cents FROM boosts WHERE listing_id=?")
+    .get(listing.id);
+  assert.deepEqual(row, { kind: "launch", price_cents: 0 });
+
+  // A second launch boost on the same listing is refused.
+  const again = await owner.call(`/api/listings/${listing.id}/boost`, {
+    method: "POST",
+    body: { kind: "launch" },
+  });
+  assert.equal(again.status, 409);
+  assert.match(again.body.error, /already boosted until/);
+
+  // Paid boosts wait for payments.
+  const paid = await owner.call(`/api/listings/${listing.id}/boost`, {
+    method: "POST",
+    body: { kind: "paid" },
+  });
+  assert.equal(paid.status, 402);
+  assert.equal(paid.body.error, "Payments open soon.");
+
+  // Another student can neither boost it nor read its stats.
+  assert.equal(
+    (
+      await other.call(`/api/listings/${listing.id}/boost`, {
+        method: "POST",
+        body: { kind: "launch" },
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (await other.call(`/api/listings/${listing.id}/boost-stats`)).status,
+    404,
+  );
+
+  // Views and requests are counted from the start of the boost.
+  await other.call(`/api/listings/${listing.id}`);
+  await owner.call(`/api/listings/${listing.id}`);
+  const requested = await other.call("/api/requests", {
+    method: "POST",
+    body: { listingId: listing.id, message: "I would like to take this over for the spring term please." },
+  });
+  assert.equal(requested.status, 201, JSON.stringify(requested.body));
+  const stats = await owner.call(`/api/listings/${listing.id}/boost-stats`);
+  assert.equal(stats.status, 200);
+  assert.equal(stats.body.views, 1, "the owner's own view is not counted");
+  assert.equal(stats.body.requests, 1);
+  assert.equal(stats.body.boostUntil, boosted.body.listing.boostUntil);
+
+  // A boost that has run out no longer refuses a new one on its dates.
+  env.app.locals.db
+    .prepare("UPDATE listings SET boost_until=? WHERE id=?")
+    .run("2020-01-01T00:00:00.000Z", listing.id);
+  const expired = await owner.call(`/api/listings/${listing.id}/boost`, {
+    method: "POST",
+    body: { kind: "launch" },
+  });
+  assert.equal(expired.status, 409);
+  assert.equal(
+    expired.body.error,
+    "The free launch boost was already used on this listing.",
+  );
+});
+
+test("boosted listings come first in browse, inside the requested sort", async (t) => {
+  const env = await setup(t);
+  const owner = await env.verified("boost.rank@usc.edu", "Rank Owner");
+  const cheap = await env.publish(owner, { title: "Cheapest room on the block", price: 700 });
+  const middle = await env.publish(owner, { title: "Middle priced room nearby", price: 900 });
+  const dear = await env.publish(owner, { title: "Most expensive room nearby", price: 2400 });
+  const order = async (sort) =>
+    (await owner.call(`/api/listings?sort=${sort}`)).body.listings.map(
+      (item) => item.id,
+    );
+  assert.deepEqual(await order("price_asc"), [cheap.id, middle.id, dear.id]);
+  const boosted = await owner.call(`/api/listings/${dear.id}/boost`, {
+    method: "POST",
+    body: { kind: "launch" },
+  });
+  assert.equal(boosted.status, 200, JSON.stringify(boosted.body));
+  assert.deepEqual(await order("price_asc"), [dear.id, cheap.id, middle.id]);
+  assert.deepEqual(await order("newest"), [dear.id, middle.id, cheap.id]);
+  const listed = (await owner.call("/api/listings")).body.listings;
+  assert.equal(listed[0].boosted, true);
+  assert.equal(listed[1].boosted, false);
+  assert.equal(listed[1].boostUntil, null);
 });

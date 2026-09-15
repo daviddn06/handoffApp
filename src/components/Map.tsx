@@ -21,7 +21,7 @@ import { ROOM_LABELS } from "../types";
 import { dateLabel, money, savings } from "../lib/api";
 import {
   PATROL_ZONES,
-  distanceLabel,
+  travelLabel,
   milesBetween,
   type MapBounds,
 } from "../lib/dps";
@@ -46,6 +46,8 @@ type Props = {
   bottomInset?: number;
   /** Listing to glide to, used by the phone carousel. */
   focusId?: string | null;
+  /** Bump to fly back to the campus, used by the empty state. */
+  homeSignal?: number;
 };
 
 // OpenFreeMap serves the Positron style without an API key.
@@ -103,6 +105,7 @@ export default function Map({
   compact = false,
   bottomInset = 0,
   focusId = null,
+  homeSignal = 0,
 }: Props) {
   const element = useRef<HTMLDivElement>(null),
     map = useRef<maplibregl.Map | null>(null),
@@ -407,7 +410,7 @@ export default function Map({
       if (!Number.isFinite(item.lat) || !Number.isFinite(item.lng)) continue;
       const save = savings(item);
       const node = el(
-        `price-marker-wrap${item.id === activeId ? " is-active" : ""}${save ? " has-savings" : ""}`,
+        `price-marker-wrap${item.id === activeId ? " is-active" : ""}${save ? " has-savings" : ""}${item.boosted ? " is-boosted" : ""}`,
         `<button type="button" class="price-marker" aria-label="${item.title.replace(/"/g, "&quot;")}, ${money(item.price)} per month">${money(item.price)}</button>`,
       );
       node.addEventListener("click", (e) => {
@@ -580,6 +583,9 @@ export default function Map({
     setPreview(null);
     frame(true);
   };
+  useEffect(() => {
+    if (homeSignal) frameRef.current(true);
+  }, [homeSignal]);
   const zoomBy = (delta: number) => {
     setPreview(null);
     if (delta > 0) map.current?.zoomIn({ duration: 250 });
@@ -624,7 +630,7 @@ export default function Map({
           <span>
             {dateLabel(preview.listing.availableFrom)} to{" "}
             {dateLabel(preview.listing.availableTo)} ·{" "}
-            <b>{distanceLabel(milesBetween(campus, preview.listing))}</b>
+            <b>{travelLabel(milesBetween(campus, preview.listing))}</b>
           </span>
         </div>
       </div>
@@ -711,6 +717,15 @@ export default function Map({
                   $
                 </span>
                 <span>Below the original lease</span>
+              </li>
+              <li>
+                <span
+                  className="legend-swatch price boosted"
+                  aria-hidden="true"
+                >
+                  $
+                </span>
+                <span>Boosted</span>
               </li>
               {zoomLevel < 15 && (
                 <li>

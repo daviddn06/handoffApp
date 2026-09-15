@@ -16,7 +16,6 @@ import {
   Plus,
   Map as MapIcon,
   List,
-  GraduationCap,
   CalendarDays,
   BedDouble,
   Check,
@@ -25,13 +24,18 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useApp } from "../lib/context";
-import { useResource, money } from "../lib/api";
+import { useResource, money, dateLabel, today } from "../lib/api";
 import { AMENITIES, ROOM_LABELS, type Listing } from "../types";
 import { Button, EmptyState, ErrorBox, Loading, Modal } from "../components/ui";
 import { ListingCard } from "../components/ListingCard";
 import { Popover } from "../components/Popover";
-import { inBounds, type MapBounds } from "../lib/dps";
-import { CampusPicker } from "../components/CampusPicker";
+import { Calendar } from "../components/Calendar";
+import { inBounds, milesBetween, type MapBounds } from "../lib/dps";
+import {
+  SchoolSearch,
+  SchoolLogo,
+  campusLogo,
+} from "../components/SchoolSearch";
 import { isEmbed } from "../components/Layout";
 const Map = lazy(() => import("../components/Map"));
 
@@ -115,7 +119,22 @@ export default function Browse() {
     }
     setParam("campusId", id);
     setPickCampus(false);
+    setSwitchCampus(false);
   };
+  // The switch opens a popover on desktop and the sheet on phones, where a
+  // popover would be too cramped for a search panel.
+  const [switchCampus, setSwitchCampus] = useState(false);
+  const [phone, setPhone] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 760px)").matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 760px)");
+    const sync = () => setPhone(query.matches);
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
   // Phones choose between a full map with a card carousel and a full list.
   const [mobileView, setMobileView] = useState<"map" | "list">(() => {
     try {
@@ -140,8 +159,8 @@ export default function Browse() {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [search, setSearch] = useState(params.get("query") || "");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [inViewOnly, setInViewOnly] = useState(false);
   const [bounds, setBounds] = useState<MapBounds | null>(null);
+  const [homeSignal, setHomeSignal] = useState(0);
   const [panelWidth, setPanelWidth] = useState(readPanelWidth);
   const [resizing, setResizing] = useState(false);
   const cardRefs = useRef<globalThis.Map<string, HTMLElement>>(
@@ -155,7 +174,9 @@ export default function Browse() {
     const value = params.get(key);
     if (value) query.set(key, value);
   }
-  query.set("campusId", campus?.id || "usc");
+  // Every live listing comes down, the map viewport decides what the list
+  // shows. The campus is the reference point for distance and travel time.
+  if (query.get("sort") === "closest") query.delete("sort");
   const { data, loading, error, refresh } = useResource<{
     listings: Listing[];
   }>(`/listings?${query}`);
@@ -286,17 +307,20 @@ export default function Browse() {
   }
 
   const listings = data?.listings || [];
+  const sortKey = params.get("sort") || "closest";
   const visible = useMemo(() => {
-    if (!inViewOnly || !bounds) return listings;
-    return listings.filter((l) => inBounds(bounds, l.lat, l.lng));
-  }, [listings, inViewOnly, bounds]);
-  const inViewCount = useMemo(
-    () =>
-      bounds
-        ? listings.filter((l) => inBounds(bounds, l.lat, l.lng)).length
-        : listings.length,
-    [listings, bounds],
-  );
+    const scoped = bounds
+      ? listings.filter((l) => inBounds(bounds, l.lat, l.lng))
+      : listings;
+    if (sortKey !== "closest" || !campus) return scoped;
+    // Boosted places stay on top, closest first inside each group.
+    return [...scoped].sort(
+      (a, b) =>
+        Number(!!b.boosted) - Number(!!a.boosted) ||
+        milesBetween(campus, a) - milesBetween(campus, b),
+    );
+  }, [listings, bounds, sortKey, campus]);
+  const offMap = !loading && listings.length > 0 && visible.length === 0;
 
   // Chip labels reflect the active value.
   const minPrice = params.get("minPrice") || "",
@@ -355,34 +379,50 @@ export default function Browse() {
       <aside className="browse-panel" aria-label="Listings">
         <div className="panel-head">
           <div className="head-row">
-            <Popover
-              width={360}
-              trigger={(props) => (
-                <button type="button" className="campus-switch" {...props}>
-                  <span className="campus-icon">
-                    <GraduationCap size={15} />
-                  </span>
-                  <span className="campus-text">
-                    <strong>Near {campus.name}</strong>
-                    <small>Tap to change campus</small>
-                  </span>
-                  <ChevronDown size={15} className="chip-chevron" />
-                </button>
-              )}
-            >
-              {(close) => (
-                <div className="popover-body">
-                  <CampusPicker
-                    campuses={campuses}
-                    current={campus.id}
-                    onChoose={(id) => {
-                      chooseCampus(id);
-                      close();
-                    }}
-                  />
-                </div>
-              )}
-            </Popover>
+            {phone ? (
+              <button
+                type="button"
+                className="campus-switch"
+                aria-haspopup="dialog"
+                aria-expanded={switchCampus}
+                onClick={() => setSwitchCampus(true)}
+              >
+                <SchoolLogo src={campusLogo(campus)} />
+                <span className="campus-text">
+                  <strong>Near {campus.name}</strong>
+                  <small>Tap to change campus</small>
+                </span>
+                <ChevronDown size={15} className="chip-chevron" />
+              </button>
+            ) : (
+              <Popover
+                width={380}
+                trigger={(props) => (
+                  <button type="button" className="campus-switch" {...props}>
+                    <SchoolLogo src={campusLogo(campus)} />
+                    <span className="campus-text">
+                      <strong>Near {campus.name}</strong>
+                      <small>Tap to change campus</small>
+                    </span>
+                    <ChevronDown size={15} className="chip-chevron" />
+                  </button>
+                )}
+              >
+                {(close) => (
+                  <div className="popover-body">
+                    <SchoolSearch
+                      campuses={campuses}
+                      current={campus.id}
+                      onClose={close}
+                      onChoose={(id) => {
+                        chooseCampus(id);
+                        close();
+                      }}
+                    />
+                  </div>
+                )}
+              </Popover>
+            )}
           </div>
           <label className="search-field">
             <Search size={16} />
@@ -408,7 +448,7 @@ export default function Browse() {
           </label>
           <div className="chip-row" role="group" aria-label="Filters">
             <Popover
-              width={300}
+              width={340}
               trigger={(props) => (
                 <button
                   type="button"
@@ -422,27 +462,28 @@ export default function Browse() {
               )}
             >
               {(close) => (
-              <div className="popover-body">
+              <div className="popover-body date-range-pop">
                 <div className="popover-title">When do you need it?</div>
-                <div className="field-row">
-                  <label className="field">
-                    <span className="field-label">Move in</span>
-                    <input
-                      type="date"
-                      value={from}
-                      onChange={(e) => setParam("from", e.target.value)}
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Move out</span>
-                    <input
-                      type="date"
-                      min={from || undefined}
-                      value={to}
-                      onChange={(e) => setParam("to", e.target.value)}
-                    />
-                  </label>
+                <div className="date-range-summary">
+                  <span className="dr-cell">
+                    <span className="dr-label">Move in</span>
+                    <span className={`dr-value ${from ? "" : "is-empty"}`}>
+                      {from ? dateLabel(from, true) : "Add a date"}
+                    </span>
+                  </span>
+                  <ArrowRight size={14} className="dr-arrow" />
+                  <span className="dr-cell">
+                    <span className="dr-label">Move out</span>
+                    <span className={`dr-value ${to ? "" : "is-empty"}`}>
+                      {to ? dateLabel(to, true) : "Add a date"}
+                    </span>
+                  </span>
                 </div>
+                <Calendar
+                  range={{ from, to }}
+                  onRangeChange={(r) => setMany({ from: r.from, to: r.to })}
+                  min={today()}
+                />
                 <div className="popover-footer">
                   <button
                     type="button"
@@ -687,25 +728,16 @@ export default function Browse() {
             <span className="results-count">
               <strong>{loading ? "…" : visible.length}</strong>{" "}
               {visible.length === 1 ? "place" : "places"}
-              {!loading && bounds && inViewCount !== listings.length && (
-                <button
-                  type="button"
-                  className={`inview-toggle ${inViewOnly ? "is-on" : ""}`}
-                  aria-pressed={inViewOnly}
-                  onClick={() => setInViewOnly((v) => !v)}
-                >
-                  <Crosshair size={12} />
-                  {inViewOnly ? "Map area" : `${inViewCount} on the map`}
-                </button>
-              )}
+              <span className="results-scope">on the map</span>
             </span>
             <label className="sort-select">
               <span className="sr-only">Sort listings</span>
               <select
-                value={params.get("sort") || "newest"}
+                value={sortKey}
                 onChange={(e) => setParam("sort", e.target.value)}
               >
                 <option value="newest">Newest</option>
+                <option value="closest">Closest to campus</option>
                 <option value="savings">Biggest savings</option>
                 <option value="price_asc">Price, low to high</option>
                 <option value="price_desc">Price, high to low</option>
@@ -750,23 +782,27 @@ export default function Browse() {
           ) : (
             <EmptyState
               title={
-                inViewOnly && listings.length
+                offMap
                   ? "Nothing in this part of the map."
                   : filtered
                     ? "No places match just yet."
                     : `Be the first at ${campus.name}.`
               }
               description={
-                inViewOnly && listings.length
-                  ? "Pan the map back toward campus or show every place."
+                offMap
+                  ? `Move the map or jump back to ${campus.name}.`
                   : filtered
                     ? "Try a wider budget, different dates, or fewer filters."
                     : "There are no live listings here yet. Have a room opening up? Put it on the map."
               }
             >
-              {inViewOnly && listings.length ? (
-                <Button variant="secondary" onClick={() => setInViewOnly(false)}>
-                  Show all places
+              {offMap ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => setHomeSignal((n) => n + 1)}
+                >
+                  <Crosshair size={15} />
+                  Back to campus
                 </Button>
               ) : filtered ? (
                 <Button variant="secondary" onClick={clearFilters}>
@@ -798,6 +834,7 @@ export default function Browse() {
           <Map
             campus={campus}
             listings={listings}
+            homeSignal={homeSignal}
             activeId={activeId}
             onActive={handleMapActive}
             onListing={navigateListing}
@@ -880,13 +917,31 @@ export default function Browse() {
         onClose={() => chooseCampus(campus.id)}
         title="Where are you looking?"
       >
-        <p className="muted">Pick a campus to see subleases nearby.</p>
-        <CampusPicker
+        <p className="muted">
+          Pick your school to see subleases nearby. We are open at USC today,
+          every other school can join the waitlist.
+        </p>
+        <SchoolSearch
           campuses={campuses}
           current={campus.id}
           onChoose={chooseCampus}
+          onClose={() => chooseCampus(campus.id)}
         />
       </Modal>
+      {phone && (
+        <Modal
+          open={switchCampus}
+          onClose={() => setSwitchCampus(false)}
+          title="Change school"
+        >
+          <SchoolSearch
+            campuses={campuses}
+            current={campus.id}
+            onChoose={chooseCampus}
+            onClose={() => setSwitchCampus(false)}
+          />
+        </Modal>
+      )}
     </div>
   );
 }

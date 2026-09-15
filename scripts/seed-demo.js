@@ -958,6 +958,12 @@ if (existing.length) {
     db.prepare(
       `DELETE FROM saved_listings WHERE user_id IN (${idHoles}) OR listing_id IN (SELECT id FROM listings WHERE owner_id IN (${idHoles}))`,
     ).run(...ids, ...ids);
+    db.prepare(
+      `DELETE FROM boosts WHERE user_id IN (${idHoles}) OR listing_id IN (SELECT id FROM listings WHERE owner_id IN (${idHoles}))`,
+    ).run(...ids, ...ids);
+    db.prepare(
+      `DELETE FROM listing_views WHERE listing_id IN (SELECT id FROM listings WHERE owner_id IN (${idHoles}))`,
+    ).run(...ids);
     db.prepare(`DELETE FROM listings WHERE owner_id IN (${idHoles})`).run(...ids);
     db.prepare(`DELETE FROM uploads WHERE owner_id IN (${idHoles})`).run(...ids);
     db.prepare(`DELETE FROM sessions WHERE user_id IN (${idHoles})`).run(...ids);
@@ -1066,6 +1072,33 @@ process.stdout.write("\n");
 
 const byOwner = (key, status = "active") =>
   listingIds.filter((row) => row.owner === key && row.status === status);
+
+/* Two boosted listings so the ranking, the filled pins and the tag show up
+   with demo data. Five days left on a seven day window. Idempotent: the
+   re-seed above removes every demo listing and boost first. */
+const boostTargets = [byOwner("owner")[0], byOwner("jordan")[0]].filter(
+  Boolean,
+);
+const boostEnds = new Date(Date.now() + 5 * 86_400_000).toISOString();
+const boostStarts = new Date(Date.now() - 2 * 86_400_000).toISOString();
+for (const target of boostTargets) {
+  db.prepare(
+    "INSERT INTO boosts(id,listing_id,user_id,kind,price_cents,starts_at,ends_at,created_at) VALUES(?,?,?,?,?,?,?,?)",
+  ).run(
+    randomUUID(),
+    target.id,
+    userIds[target.owner],
+    "launch",
+    0,
+    boostStarts,
+    boostEnds,
+    boostStarts,
+  );
+  db.prepare("UPDATE listings SET boost_until=? WHERE id=?").run(
+    boostEnds,
+    target.id,
+  );
+}
 
 // Saved listings for the demo owner.
 const savedTargets = [
@@ -1193,6 +1226,7 @@ console.log(
 );
 console.log(`  saved     ${savedTargets.length}`);
 console.log(`  requests  ${requestCount}`);
+console.log(`  boosted   ${boostTargets.length} listings, until ${boostEnds.slice(0, 10)}`);
 console.log(`  today     ${TODAY}`);
 console.log("");
 console.log("Demo credentials, every account uses the same password");

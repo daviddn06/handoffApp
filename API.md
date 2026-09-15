@@ -16,13 +16,15 @@ POST /api/auth/forgot {email} -> {message:string}
 POST /api/auth/reset {token,password} -> {message:string}
 PATCH /api/profile {name,bio} -> {user:User}
 
-Listing {id,ownerId,ownerName,campusId,title,description,address,lat,lng,price,deposit,originalPrice:number|null,bedrooms,bathrooms,roomType:'private'|'shared'|'entire',availableFrom,availableTo,amenities:string[],photos:string[],status:'draft'|'active'|'handed_off'|'archived',createdAt,updatedAt,saved?:boolean}
-GET /api/listings?campusId=&query=&minPrice=&maxPrice=&from=&to=&roomType=&bedrooms=&amenities=&sort=newest|price_asc|price_desc|savings -> {listings:Listing[]}. Active public listings only, no private contact data. Dates must cover the requested stay.
-GET /api/listings/:id -> {listing:Listing}. Public active or owner only.
+Listing {id,ownerId,ownerName,campusId,title,description,address,lat,lng,price,deposit,originalPrice:number|null,bedrooms,bathrooms,roomType:'private'|'shared'|'entire',availableFrom,availableTo,amenities:string[],photos:string[],status:'draft'|'active'|'handed_off'|'archived',createdAt,updatedAt,boostUntil:string|null,boosted:boolean,saved?:boolean}
+GET /api/listings?campusId=&query=&minPrice=&maxPrice=&from=&to=&roomType=&bedrooms=&amenities=&sort=newest|price_asc|price_desc|savings -> {listings:Listing[]}. Active public listings only, no private contact data. Dates must cover the requested stay. Boosted listings come first inside whichever sort is asked for.
+GET /api/listings/:id -> {listing:Listing}. Public active or owner only. A view by anyone other than the owner is counted once per session or IP per hour.
 GET /api/my-listings -> {listings:Listing[]}
 POST /api/listings {title,description,address,lat,lng,price,deposit,originalPrice?,bedrooms,bathrooms,roomType,availableFrom,availableTo,amenities,photos,status:'draft'|'active'} -> {listing:Listing}
 PATCH /api/listings/:id same partial fields incl status -> {listing:Listing}. Owner only.
 POST /api/uploads multipart field photos up to 8 files -> {photos:string[]}. Auth required, raster validated/reencoded, maximum 8 MB each, stored on VPS.
+POST /api/listings/:id/boost {kind:'launch'} -> {listing:Listing}. Owner only, verified, listing must be active. Starts a seven day boost with price_cents 0 and sets boostUntil. 409 when a boost is still running, 409 when the free launch boost was already used on that listing. {kind:'paid'} returns 402 {error:"Payments open soon."} until Stripe is connected.
+GET /api/listings/:id/boost-stats -> {views:number,requests:number,boostUntil:string|null}. Owner only. Views and requests are counted from the start of the current or most recent boost.
 GET /api/saved -> {listings:Listing[]}
 POST /api/saved/:listingId -> {saved:true}
 DELETE /api/saved/:listingId -> {saved:false}
@@ -37,6 +39,8 @@ GET /api/health -> {ok:true,version:string}
 No seed listings in production. Separate test fixtures can populate temporary QA data directories. App root is browse, routes /browse, /listings/:id, /listings/new, /listings/:id/edit, /saved, /requests, /my-listings, /profile, /sign-in, /sign-up, /verify?token=, /forgot-password, /reset-password?token=, /terms, /privacy.
 
 POST /api/auth/accept-terms (needs a session) -> {user}. Records terms_accepted_at. Publishing a listing (creating as active or patching to active) and sending a handoff request return 403 until the user has accepted the terms.
+
+GET /api/geocode?q=&campusId= (needs a session, 120 per 15 minutes) -> {results:[{line,place,lat,lng}]}. Server side proxy to the US Census geocoder for street numbers with a Nominatim fallback bounded to the campus for building names. 503 when both are unreachable.
 
 POST /api/waitlist {school,email} -> 202. Stores interest in an unsupported campus.
 

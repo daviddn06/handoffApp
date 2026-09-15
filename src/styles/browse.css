@@ -60,16 +60,6 @@
 .campus-switch .chip-chevron {
   color: var(--muted);
 }
-.campus-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--blue-soft);
-  color: var(--blue);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
 .campus-text {
   display: flex;
   flex-direction: column;
@@ -421,6 +411,11 @@
 }
 .results-hint svg {
   color: var(--green);
+}
+.results-scope {
+  margin-left: 4px;
+  color: var(--muted);
+  font-weight: 400;
 }
 .inview-toggle {
   display: inline-flex;
@@ -1704,53 +1699,6 @@
   }
 }
 
-/* First visit campus picker */
-.campus-picker-grid {
-  display: grid;
-  gap: 8px;
-}
-.campus-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: var(--r-md);
-  box-shadow: var(--ring);
-  text-align: left;
-  transition:
-    background-color var(--duration-quick) var(--ease-out),
-    box-shadow var(--duration-quick) var(--ease-out),
-    transform var(--duration-quick) var(--ease-out);
-}
-.campus-option:hover {
-  background: var(--soft);
-  box-shadow: var(--ring-strong);
-}
-.campus-option:active {
-  transform: scale(0.98);
-}
-.campus-option .campus-icon {
-  width: 36px;
-  height: 36px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--blue-ink);
-}
-.campus-option strong {
-  display: block;
-  font-size: 15px;
-  font-weight: 600;
-}
-.campus-option small {
-  display: block;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.campus-option svg {
-  margin-left: auto;
-  color: var(--muted-2);
-}
-
 /* Map loading veil, fades away once the style has rendered */
 .map-veil {
   position: absolute;
@@ -1775,126 +1723,340 @@
   pointer-events: none;
 }
 
-/* Campus picker with search and waitlist */
-.campus-picker {
+
+/* ------------------------------------------------------------------
+   Shared school search, used by the first visit modal and the campus
+   switch popover. The frame height never changes, only the panel
+   scrolls, and a school we have not opened slides across to a waitlist
+   form on the transitions.dev page clock.
+   ------------------------------------------------------------------ */
+.school-search {
+  position: relative;
+  height: 428px;
+}
+.school-search > .t-page {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(var(--t-page-from-x, 10px));
+  filter: blur(var(--blur-medium));
+  transition:
+    opacity var(--page-slide-dur) var(--page-slide-ease),
+    transform var(--page-slide-dur) var(--page-slide-ease),
+    filter var(--page-slide-dur) var(--page-slide-ease),
+    visibility 0s linear var(--page-slide-dur);
+  will-change: opacity, transform, filter;
 }
-.campus-search {
-  min-height: 46px;
-  border-radius: var(--r-md);
+.school-search[data-view="waitlist"] > .t-page[data-page-id="search"] {
+  --t-page-from-x: -10px;
 }
-.campus-search input {
-  font-size: 15px;
+.school-search[data-view="search"] > .t-page[data-page-id="search"],
+.school-search[data-view="waitlist"] > .t-page[data-page-id="waitlist"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+  filter: blur(0);
+  transition-delay: 0s;
 }
-.campus-group-label {
-  font-size: 11.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-  margin: 6px 2px -4px;
-}
-.campus-results {
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border-radius: var(--r-md);
-  box-shadow: var(--ring);
-  overflow: hidden;
-  max-height: min(48vh, 380px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.campus-hint {
-  font-size: 13.5px;
-  padding: 14px;
-}
-.campus-option {
+.school-field {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 9px;
+  flex: 0 0 46px;
+  height: 46px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  color: var(--muted);
+  transition:
+    border-color var(--duration-quick) var(--ease-out),
+    box-shadow var(--duration-quick) var(--ease-out);
+}
+.school-field:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgb(59 120 215 / 0.16);
+}
+.school-field input {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+}
+.school-field input:focus {
+  box-shadow: none;
+}
+.school-field .clear {
+  min-width: 30px;
+  min-height: 30px;
+}
+.school-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--ring);
+  scrollbar-width: thin;
+}
+.school-panel.plain {
+  padding: 2px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+.school-rows {
+  display: flex;
+  flex-direction: column;
+}
+.school-group {
+  padding: 12px 10px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+.school-slot:first-child .school-group {
+  padding-top: 4px;
+}
+.school-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
   width: 100%;
-  min-height: 54px;
-  padding: 8px 14px 8px 10px;
+  min-height: 52px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
   text-align: left;
   color: var(--ink);
   transition: background-color var(--duration-quick) var(--ease-out);
+  animation: school-row-in var(--duration-fast) var(--ease-smooth-out) backwards;
+  animation-delay: calc(var(--duration-stagger) * var(--i, 0));
 }
-.campus-option + .campus-option {
-  border-top: 1px solid var(--line);
+.school-row.is-active {
+  background: var(--soft);
 }
-@media (hover: hover) {
-  .campus-option:hover {
-    background: var(--soft);
-  }
-}
-.campus-option:active {
+.school-row:active {
   background: var(--soft-2);
 }
-.campus-option .campus-icon {
-  width: 34px;
-  height: 34px;
+@keyframes school-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
-.campus-option-text {
-  min-width: 0;
+.school-row-text {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
 }
-.campus-option-text strong {
-  font-size: 15px;
+.school-row-text strong {
+  font-size: 14.5px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
 }
-.campus-arrow {
-  color: var(--muted-2);
-  transition: transform var(--duration-fast) var(--ease-smooth-out);
+.school-row-text small {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-@media (hover: hover) {
-  .campus-option:hover .campus-arrow {
-    transform: translateX(3px);
-    color: var(--blue);
-  }
-}
-.campus-check {
+.school-row mark {
+  background: transparent;
   color: var(--blue);
+  font-weight: 600;
 }
-.campus-waitlist-tag {
+.school-logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--ring);
+  color: var(--muted-2);
+}
+.school-logo img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+/* Real brand marks are already shaped, they take the circle plain. */
+.school-logo img.brand {
+  width: 26px;
+  height: 26px;
+  border-radius: 0;
+  box-shadow: none;
+}
+.school-logo.big {
+  width: 44px;
+  height: 44px;
+}
+.school-logo.big img {
+  width: 28px;
+  height: 28px;
+}
+.school-logo.big img.brand {
+  width: 32px;
+  height: 32px;
+}
+.school-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 3px 9px 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--green-soft);
+  color: var(--green-ink);
   font-size: 12px;
   font-weight: 500;
-  color: var(--muted);
-  background: var(--soft-2);
-  border-radius: var(--r-pill);
+}
+.school-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.school-tag {
+  flex-shrink: 0;
   padding: 3px 9px;
-}
-.campus-foot {
-  font-size: 12.5px;
+  border-radius: var(--r-pill);
+  background: var(--soft-2);
   color: var(--muted);
-  line-height: 1.5;
-  margin: 2px 2px 0;
+  font-size: 12px;
+  font-weight: 500;
 }
-.campus-waitlist {
+.school-check {
+  flex-shrink: 0;
+  color: var(--blue);
+}
+.school-note {
+  padding: 14px 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.school-empty {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 12px;
 }
-.campus-waitlist-head {
+.school-empty p {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.school-waitlist-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-height: 46px;
 }
-.campus-waitlist-head strong {
-  display: block;
+.school-waitlist-name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.school-waitlist-name strong {
   font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.campus-waitlist-head small {
-  display: block;
+.school-waitlist-name small {
   font-size: 12.5px;
   color: var(--muted);
 }
-.popover .campus-results {
-  max-height: 300px;
+.school-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 36px 16px;
+  text-align: center;
+}
+.school-done p {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.5;
+  text-wrap: balance;
+}
+.school-done-mark {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
+.popover .school-search {
+  height: 400px;
+}
+.campus-switch .school-logo {
+  width: 30px;
+  height: 30px;
+}
+.campus-switch .school-logo img {
+  width: 19px;
+  height: 19px;
+}
+.campus-switch .school-logo img.brand {
+  width: 22px;
+  height: 22px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .school-row {
+    animation: none;
+  }
+  .school-search > .t-page {
+    transition-duration: 0s;
+    filter: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .school-search,
+  .popover .school-search {
+    height: min(62dvh, 520px);
+    min-height: 320px;
+  }
+  .school-field {
+    flex-basis: 48px;
+    height: 48px;
+  }
+  .school-field input {
+    font-size: 16px;
+  }
+  .school-row {
+    min-height: 56px;
+  }
 }

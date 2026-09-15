@@ -475,6 +475,79 @@
   background: var(--green-soft);
   color: var(--green-ink);
 }
+.pin-status.check {
+  background: var(--blue-soft);
+  color: var(--blue-ink, #24519b);
+}
+.pin-status.busy {
+  background: var(--soft);
+  color: var(--muted);
+}
+/* Alternatives when the address matched more than one place. */
+.address-wrap {
+  position: relative;
+}
+.address-matches {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg), var(--ring);
+  transform-origin: top left;
+}
+.matches-title {
+  padding: 0 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.address-matches > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  text-align: left;
+  color: var(--muted);
+  background: transparent;
+  transition:
+    background var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.address-matches > button:hover,
+.address-matches > button.is-on {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.address-matches > button > span {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.address-matches strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.address-matches small {
+  font-size: 12px;
+  color: var(--muted);
+}
 .coordinate-fields summary {
   display: inline-flex;
   align-items: center;
@@ -881,6 +954,66 @@
 }
 
 /* ---------- Phone: one step per screen ---------- */
+/* ---------- Desktop: one centered box ----------
+   The rail, step body and footer live inside a single card in the middle of
+   the page, the same shell the auth pages use. Nothing floats at the edges. */
+@media (min-width: 761px) {
+  main:has(> .editor-shell) {
+    background: var(--soft);
+  }
+  .editor-shell {
+    --box-h: min(720px, calc(100dvh - var(--header-h) - 48px));
+    grid-template-columns: 236px minmax(0, 1fr);
+    width: min(1040px, calc(100% - 48px));
+    height: var(--box-h);
+    min-height: 480px;
+    margin: max(24px, calc((100dvh - var(--header-h) - var(--box-h)) / 2)) auto;
+    background: var(--surface);
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg), var(--ring);
+  }
+  .editor-rail {
+    padding: 22px 18px;
+    background: var(--soft);
+    border-right: 1px solid var(--line);
+  }
+  .rail-head h1 {
+    font-size: 20px;
+  }
+  .step-item > button {
+    padding: 8px 10px;
+  }
+  .editor-main {
+    background: var(--surface);
+  }
+  .editor-head {
+    padding: 22px 32px 0;
+    border-bottom: 0;
+  }
+  .head-text h2 {
+    font-size: 21px;
+  }
+  .editor-body > .t-page {
+    padding: 18px 32px 24px;
+  }
+  .step-inner {
+    max-width: none;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .editor-foot {
+    padding: 12px 32px 14px;
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .editor-success {
+    border-radius: 20px;
+  }
+}
+
 @media (max-width: 760px) {
   .editor-shell {
     display: block;
