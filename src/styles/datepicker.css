@@ -37,7 +37,7 @@
 .date-field:focus {
   outline: none;
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgb(59 120 215 / 0.16);
+  box-shadow: 0 0 0 3px rgb(47 104 196 / 0.16);
 }
 .date-field:focus-visible {
   outline: 2px solid var(--focus);
@@ -63,7 +63,7 @@
   white-space: nowrap;
 }
 .date-field-text.is-placeholder {
-  color: var(--muted-2);
+  color: var(--muted);
 }
 .date-field.has-value {
   padding-right: 36px;
@@ -308,7 +308,7 @@
   text-overflow: ellipsis;
 }
 .date-range-summary .dr-value.is-empty {
-  color: var(--muted-2);
+  color: var(--muted);
   font-weight: 500;
 }
 .date-range-summary .dr-arrow {

@@ -238,10 +238,15 @@ export function ListingCard({
         <h2 className="card-title">{listing.title}</h2>
         <CardFacts listing={listing} />
         <p className="card-meta card-dates">
-          {dateLabel(listing.availableFrom)} to {dateLabel(listing.availableTo)}
+          <span className="card-window">
+            {dateLabel(listing.availableFrom)} to{" "}
+            {dateLabel(listing.availableTo)}
+          </span>
           {miles !== null && (
             <>
-              {" · "}
+              <span className="card-sep" aria-hidden="true">
+                {" · "}
+              </span>
               <span
                 className="card-distance"
                 title={`${distanceLabel(miles)} from ${campus?.name}`}

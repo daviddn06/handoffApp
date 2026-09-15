@@ -11,6 +11,58 @@
 /* ── Chooser ─────────────────────────────────────────────────── */
 .start-page {
   padding-block: var(--s-6) var(--s-12);
+  /* The page used to stop at 250px in a 900px viewport. */
+  min-height: calc(100dvh - var(--header-h));
+  display: flex;
+  flex-direction: column;
+}
+.start-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  max-width: 940px;
+}
+/* The one path that works today leads, as a card with a real button. */
+.start-lead {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-5) var(--s-5) var(--s-5);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-md), 0 0 0 1px var(--blue-soft-2);
+}
+.start-lead .start-icon {
+  width: 48px;
+  height: 48px;
+}
+.start-lead-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.start-lead-text h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.start-lead-text p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+  max-width: 62ch;
+}
+.start-alt-label {
+  margin: var(--s-2) 0 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  color: var(--muted);
 }
 .start-head {
   max-width: 640px;
@@ -30,21 +82,22 @@
 }
 .start-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--s-4);
   align-items: stretch;
 }
+/* The two assisted paths are secondary: flat ground, hairline only. */
 .start-card {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
-  min-height: 210px;
+  min-height: 190px;
   padding: var(--pad-card);
   text-align: left;
-  background: var(--surface);
+  background: var(--soft);
   border: 0;
   border-radius: var(--r-xl);
-  box-shadow: var(--shadow-sm), var(--ring);
+  box-shadow: var(--ring);
   color: var(--ink);
   font: inherit;
   cursor: pointer;
@@ -64,7 +117,7 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-.start-card .start-icon {
+.start-icon {
   display: grid;
   place-items: center;
   width: 42px;
@@ -72,6 +125,11 @@
   border-radius: var(--r-md);
   background: var(--blue-soft);
   color: var(--blue);
+}
+.start-card .start-icon {
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--ring);
 }
 .start-card.plain .start-icon {
   background: var(--soft-2);
@@ -120,11 +178,18 @@
   margin: var(--s-6) 0 0;
   color: var(--muted);
   font-size: 13px;
+  /* Capped to the card grid rather than running the full 1240 container. */
+  max-width: 62ch;
 }
 
 /* ── Import screen ───────────────────────────────────────────── */
 .import-page {
   padding-block: var(--s-6) var(--s-12);
+}
+/* Intro and hints keep a measure inside the form column. */
+.import-page .start-head p,
+.import-card .field-hint {
+  max-width: 66ch;
 }
 .import-card {
   display: flex;
@@ -424,6 +489,26 @@
 .chat-composer input {
   flex: 1;
   min-width: 0;
+  /* The field is a sentence box, not a 758px rule across the screen. */
+  max-width: 640px;
+}
+.draft-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.draft-empty svg {
+  margin-top: 3px;
+  color: var(--muted);
+}
+.draft-remaining {
+  padding-top: var(--s-2);
+  font-size: 12px;
+  color: var(--muted);
 }
 .chat-open {
   padding: 0 var(--s-5) var(--s-4);
@@ -476,7 +561,7 @@
   overflow-wrap: anywhere;
 }
 .draft-list li.is-missing strong {
-  color: var(--muted-2);
+  color: var(--muted);
   font-weight: 400;
 }
 
@@ -577,6 +662,15 @@
   }
   .start-card {
     min-height: 0;
+  }
+  .start-lead {
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: start;
+    row-gap: var(--s-3);
+  }
+  .start-lead .button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
 @media (max-width: 760px) {

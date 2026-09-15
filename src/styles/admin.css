@@ -31,7 +31,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted-2);
+  color: var(--muted);
   padding: var(--s-2) var(--s-3);
 }
 .admin-nav a {
@@ -240,13 +240,15 @@
   line-height: 1.35;
   min-width: 0;
 }
+/* Two columns moved into the drawer, so the identifying cell gets the room
+   it needs before anything is trimmed. */
 .admin-person strong {
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 240px;
+  max-width: 340px;
 }
 .admin-person span {
   font-size: 12px;
@@ -254,7 +256,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 240px;
+  max-width: 340px;
 }
 .admin-tags {
   display: flex;
@@ -293,12 +295,17 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--s-3);
+  max-width: 100%;
   font-size: 13px;
   color: var(--muted);
 }
 .admin-pager > div {
   display: flex;
   gap: 6px;
+}
+.admin-pager button {
+  min-width: 40px;
+  min-height: 40px;
 }
 
 /* ------------------------------------------------------------ stat cards */
@@ -318,7 +325,7 @@
   box-shadow: var(--shadow-sm), var(--ring);
 }
 .admin-stat .eyebrow {
-  color: var(--muted-2);
+  color: var(--ink-2);
 }
 .admin-stat strong {
   font-family: "Plus Jakarta Sans", "Geist", system-ui, sans-serif;
@@ -434,7 +441,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: var(--muted-2);
+  color: var(--muted);
 }
 
 /* --------------------------------------------------------------- groups */
@@ -659,15 +666,32 @@
   padding: var(--s-5) var(--s-5) var(--s-8);
   overflow-y: auto;
 }
+/* The actions sit under everything a reader needs to decide. */
 .admin-drawer-actions {
   display: flex;
   gap: var(--s-2);
   flex-wrap: wrap;
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
 }
 .admin-drawer-actions .button {
-  height: 34px;
+  height: 36px;
   padding: 0 12px;
   font-size: 13px;
+}
+.admin-drawer-actions .button.danger {
+  background: var(--red-ink);
+}
+.admin-copy-id {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+.admin-copy-id .text-button {
+  font-size: 12px;
+  min-height: 28px;
 }
 
 /* ---------------------------------------------------------------- phone */

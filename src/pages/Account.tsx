@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -29,6 +30,7 @@ import {
   ChevronRight,
   LogOut,
   Zap,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   api,
@@ -62,8 +64,117 @@ import { BoostModal, daysLeft } from "../components/BoostModal";
 import { SchoolNotLive } from "../components/SchoolNotLive";
 import { Avatar } from "../components/Avatar";
 import { PhotoPicker } from "../components/PhotoPicker";
+import { Popover } from "../components/Popover";
+import { createPortal } from "react-dom";
 
 type TabItem = { value: string; label: string; count?: number };
+
+/* Phones get the account style bottom sheet instead of an anchored popover. */
+function useIsPhone() {
+  const query = "(max-width: 760px)";
+  const [phone, setPhone] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const sync = () => setPhone(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return phone;
+}
+
+type RowMenuItem = {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  onSelect: () => void;
+  danger?: boolean;
+};
+
+/* One overflow menu for the secondary listing actions. Desktop anchors it to
+   the trigger, phones raise the same list as the account style sheet. */
+function RowMenu({ label, items }: { label: string; items: RowMenuItem[] }) {
+  const phone = useIsPhone();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [open]);
+  const rows = (close: () => void) => (
+    <div className="account-menu row-menu">
+      {items.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          className={item.danger ? "is-danger" : undefined}
+          onClick={() => {
+            close();
+            item.onSelect();
+          }}
+        >
+          {item.icon}
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+  if (phone)
+    return (
+      <>
+        <button
+          type="button"
+          className="icon-button row-menu-trigger"
+          aria-label={label}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+        {open &&
+          createPortal(
+            <div className="m-sheet" role="presentation">
+              <button
+                type="button"
+                className="m-sheet-scrim"
+                aria-label="Close menu"
+                onClick={() => setOpen(false)}
+              />
+              <div className="m-sheet-panel" role="dialog" aria-label={label}>
+                <span className="m-sheet-grip" aria-hidden="true" />
+                <div className="m-sheet-list">{rows(() => setOpen(false))}</div>
+              </div>
+            </div>,
+            document.body,
+          )}
+      </>
+    );
+  return (
+    <Popover
+      align="right"
+      width={232}
+      className="row-menu-anchor"
+      trigger={(props) => (
+        <button
+          type="button"
+          className="icon-button row-menu-trigger"
+          aria-label={label}
+          {...props}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+      )}
+    >
+      {(close) => rows(close)}
+    </Popover>
+  );
+}
 
 /* Sliding tabs, transitions.dev 16-tabs-sliding. JS writes the active
    tab's offsetLeft and offsetWidth onto the pill, CSS owns the tween. */
@@ -268,6 +379,7 @@ export function MyListings() {
       listings: Listing[];
     }>("/my-listings"),
     { notify, user } = useApp();
+  const navigate = useNavigate();
   // Listing is the one thing a school that is not open yet holds back.
   const canPost = Boolean(user?.campusId);
   const [filter, setFilter] = useState("all"),
@@ -414,89 +526,99 @@ export function MyListings() {
                 <ChevronRight size={18} />
               </span>
               <div className="mg-actions">
+                {l.status === "active" && l.boosted && (
+                  <span className="boost-pill is-static">
+                    <Zap size={13} fill="currentColor" strokeWidth={0} />
+                    Boosted · {daysLeft(l.boostUntil)} day
+                    {daysLeft(l.boostUntil) === 1 ? "" : "s"} left
+                  </span>
+                )}
                 <Link
-                  className="button small secondary"
+                  className="button small primary"
                   to={`/listings/${l.id}/edit`}
                 >
                   <Pencil size={14} />
                   {l.status === "draft" ? "Finish" : "Edit"}
                 </Link>
-                <Link className="button small ghost" to={`/listings/${l.id}`}>
+                <Link
+                  className="button small secondary"
+                  to={`/listings/${l.id}`}
+                >
                   <Eye size={14} />
                   View
                 </Link>
-                {l.status === "active" ? (
-                  <>
-                    {!canPost ? null : l.boosted ? (
-                      <button
-                        type="button"
-                        className="boost-pill"
-                        onClick={() => setBoost(l)}
-                      >
-                        <Zap size={13} fill="currentColor" strokeWidth={0} />
-                        Boosted · {daysLeft(l.boostUntil)} day
-                        {daysLeft(l.boostUntil) === 1 ? "" : "s"} left
-                      </button>
-                    ) : (
-                      <button
-                        className="button small secondary"
-                        onClick={() => setBoost(l)}
-                      >
-                        <Zap size={14} />
-                        Boost
-                      </button>
-                    )}
-                    <Link className="button small ghost" to="/requests">
-                      Requests
-                      <ArrowUpRight size={14} />
-                    </Link>
-                    <button
-                      className="button small ghost"
-                      onClick={() => {
-                        setAction({ listing: l, status: "handed_off" });
+                <RowMenu
+                  label={`More actions for ${l.title || "this draft"}`}
+                  items={[
+                    ...(l.status === "active"
+                      ? [
+                          ...(canPost
+                            ? [
+                                {
+                                  key: "boost",
+                                  label: l.boosted
+                                    ? "Extend the boost"
+                                    : "Boost this listing",
+                                  icon: <Zap size={17} />,
+                                  onSelect: () => setBoost(l),
+                                },
+                              ]
+                            : []),
+                          {
+                            key: "requests",
+                            label: "View requests",
+                            icon: <Inbox size={17} />,
+                            onSelect: () => navigate("/requests"),
+                          },
+                          {
+                            key: "handed",
+                            label: "Mark handed off",
+                            icon: <CheckCircle2 size={17} />,
+                            onSelect: () => {
+                              setAction({ listing: l, status: "handed_off" });
+                              setActionError("");
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(l.status !== "active" && l.status !== "draft"
+                      ? [
+                          {
+                            key: "relist",
+                            label: "Relist this place",
+                            icon: <RotateCcw size={17} />,
+                            onSelect: () => {
+                              setAction({ listing: l, status: "active" });
+                              setActionError("");
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(l.status !== "archived"
+                      ? [
+                          {
+                            key: "archive",
+                            label: "Archive",
+                            icon: <Archive size={17} />,
+                            onSelect: () => {
+                              setAction({ listing: l, status: "archived" });
+                              setActionError("");
+                            },
+                          },
+                        ]
+                      : []),
+                    {
+                      key: "delete",
+                      label: "Delete",
+                      icon: <Trash2 size={17} />,
+                      danger: true,
+                      onSelect: () => {
+                        setAction({ listing: l, status: "deleted" });
                         setActionError("");
-                      }}
-                    >
-                      <CheckCircle2 size={14} />
-                      Handed off
-                    </button>
-                  </>
-                ) : (
-                  l.status !== "draft" && (
-                    <button
-                      className="button small ghost"
-                      onClick={() => {
-                        setAction({ listing: l, status: "active" });
-                        setActionError("");
-                      }}
-                    >
-                      <RotateCcw size={14} />
-                      Publish
-                    </button>
-                  )
-                )}
-                {l.status !== "archived" && (
-                  <button
-                    className="button small ghost quiet"
-                    onClick={() => {
-                      setAction({ listing: l, status: "archived" });
-                      setActionError("");
-                    }}
-                  >
-                    <Archive size={14} />
-                    Archive
-                  </button>
-                )}
-                <button
-                  className="button small ghost quiet danger"
-                  onClick={() => {
-                    setAction({ listing: l, status: "deleted" });
-                    setActionError("");
-                  }}
-                >
-                  <Trash2 size={14} />
-                  Delete
-                </button>
+                      },
+                    },
+                  ]}
+                />
               </div>
             </article>
           ))}
@@ -715,7 +837,7 @@ export function Requests() {
                 </span>
               </div>
               <blockquote className="rq-quote">
-                <span className="eyebrow">
+                <span className="rq-quote-label">
                   {tab === "incoming" ? "Their message" : "Your message"}
                 </span>
                 <p>{r.message}</p>
@@ -734,9 +856,10 @@ export function Requests() {
                   <a
                     href={`mailto:${r.contact.email}`}
                     className="button small secondary"
+                    title={r.contact.email}
                   >
                     <Mail size={14} />
-                    <span>{r.contact.email}</span>
+                    <span>Email {r.contact.name.split(" ")[0]}</span>
                   </a>
                 </div>
               ) : r.status === "pending" ? (
@@ -788,10 +911,12 @@ export function Requests() {
                 <div className="rq-actions">
                   <p>
                     {r.status === "declined"
-                      ? "This request was declined."
+                      ? tab === "incoming"
+                        ? "Nothing more to do here."
+                        : "Keep looking, there are other places near campus."
                       : r.status === "withdrawn"
-                        ? "This request was withdrawn."
-                        : "The connection is accepted. Refresh to load contact details."}
+                        ? "You can request this place again while it is live."
+                        : "Refresh to load the contact details."}
                   </p>
                 </div>
               )}
@@ -960,9 +1085,6 @@ export function Profile() {
             size={84}
             className="pf-avatar"
           />
-          <h2>{user?.name}</h2>
-          <p className="pf-email">{user?.email}</p>
-          <p className="pf-campus">{campus?.name}</p>
           {user?.verified && (
             <span className="pill green pf-verified">
               <ShieldCheck size={13} />
@@ -1016,14 +1138,18 @@ export function Profile() {
               value={gender}
               onChange={setGender}
             />
-            <div className="field-row">
-              <Field label="Student email" hint="Verified, and never public.">
-                <input value={user?.email || ""} readOnly disabled />
-              </Field>
-              <Field label="Campus" hint="Set from your student email domain.">
-                <input value={campus?.name || ""} readOnly disabled />
-              </Field>
-            </div>
+            <dl className="pf-readonly">
+              <div>
+                <dt>Student email</dt>
+                <dd>{user?.email}</dd>
+                <p>Verified, and never public.</p>
+              </div>
+              <div>
+                <dt>Campus</dt>
+                <dd>{campus?.name}</dd>
+                <p>Set from your student email domain.</p>
+              </div>
+            </dl>
           </div>
           {error && <ErrorBox message={error} />}
           <div className="pf-actions">

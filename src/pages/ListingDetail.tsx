@@ -10,7 +10,7 @@ import {
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowRight,
-  ArrowUpRight,
+  Pencil,
   Bath,
   BedDouble,
   CalendarDays,
@@ -62,17 +62,30 @@ const Map = lazy(() => import("../components/Map"));
 
 /**
  * A locked preview keeps the shape of the real thing without ever carrying
- * text. The server already sends null for the address, the description and
- * the lister when nobody is signed in, and what stands in for them here is a
- * row of neutral bars with no words in them at all, out of the accessibility
- * tree. There is nothing to unblur, because there is nothing underneath.
+ * the real thing. The server sends null for the address, the description and
+ * the lister when nobody is signed in, so what stands in for them here is
+ * fixed filler written into this file. It is blurred, unselectable and out of
+ * the accessibility tree, and it has nothing to do with the listing, so there
+ * is nothing to unblur and nothing to read out.
  */
-const LOCKED_LINES = [92, 78, 96, 64, 88, 52];
-function LockedLines({ lines = LOCKED_LINES }: { lines?: number[] }) {
+const LOCKED_FILLER = [
+  "A bright room in a shared student house, a short walk from campus and the bus line that runs along the main avenue every ten minutes.",
+  "The lease runs through the end of the spring term. Furniture stays, the kitchen is shared, and laundry is in the building.",
+  "Message the student for a tour and to talk through dates, deposit and how the handoff would work.",
+];
+const LOCKED_ADDRESS = "1200 Example Avenue, Apt 4";
+const LOCKED_NAME = "A verified student";
+function LockedText({
+  lines = LOCKED_FILLER,
+  className = "",
+}: {
+  lines?: string[];
+  className?: string;
+}) {
   return (
-    <span className="locked-lines" aria-hidden="true">
-      {lines.map((width, i) => (
-        <span key={i} style={{ width: `${width}%` }} />
+    <span className={`locked-text ${className}`.trim()} aria-hidden="true">
+      {lines.map((line, i) => (
+        <span key={i}>{line}</span>
       ))}
     </span>
   );
@@ -85,20 +98,22 @@ function StudentsOnlyChip() {
     </span>
   );
 }
-/** The one block that explains the hold and opens all of it. */
+/** The one row that explains the hold and opens all of it. */
 function LockedGate({ onUnlock }: { onUnlock: () => void }) {
   return (
     <div className="locked-gate">
-      <span className="locked-gate-icon" aria-hidden="true">
-        <Lock size={16} />
-      </span>
-      <strong>Students only</strong>
-      <p>
-        Confirm you are a student to see the address, description and lister.
-      </p>
-      <button className="button primary" onClick={onUnlock}>
-        Confirm you are a student
-      </button>
+      <div className="locked-gate-row">
+        <span className="locked-gate-icon" aria-hidden="true">
+          <Lock size={16} />
+        </span>
+        <span className="locked-gate-text">
+          <strong>Students only</strong>
+          <span>Confirm your student email to see the full listing.</span>
+        </span>
+        <button className="button primary" onClick={onUnlock}>
+          Confirm you are a student
+        </button>
+      </div>
     </div>
   );
 }
@@ -161,7 +176,8 @@ export default function ListingDetail() {
     [reportDetails, setReportDetails] = useState(""),
     [reportError, setReportError] = useState(""),
     [reportBusy, setReportBusy] = useState(false),
-    [boostOpen, setBoostOpen] = useState(false);
+    [boostOpen, setBoostOpen] = useState(false),
+    [preferenceWarning, setPreferenceWarning] = useState(false);
   /* Confirming who you are unlocks the address, the description and the
      lister, so the listing is fetched again the moment the session changes. */
   const signedInId = user?.id || "";
@@ -181,6 +197,7 @@ export default function ListingDetail() {
     setReportOpen(false);
     setReportError("");
     setBoostOpen(false);
+    setPreferenceWarning(false);
   }, [id]);
   const listing = data?.listing,
     campus = campuses.find((c) => c.id === listing?.campusId),
@@ -197,6 +214,18 @@ export default function ListingDetail() {
         r.listingId === id &&
         (r.status === "pending" || r.status === "accepted"),
     );
+  /* A lister who asked for women only or men only is a hard preference, so a
+     requester who does not match is warned before the request sheet opens.
+     The soft "preferred" cases keep the inline note inside the sheet. */
+  const hardPreference =
+    listing?.genderPreference === "women_only" ||
+    listing?.genderPreference === "men_only";
+  const blockedByPreference =
+    hardPreference && preferenceMismatch(listing!.genderPreference, user?.gender);
+  function openRequest() {
+    if (blockedByPreference) setPreferenceWarning(true);
+    else setRequestOpen(true);
+  }
   async function sendRequest(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -313,7 +342,7 @@ export default function ListingDetail() {
         </button>
       );
     return (
-      <button className={cls} onClick={() => setRequestOpen(true)}>
+      <button className={cls} onClick={openRequest}>
         <MessageSquare size={17} />
         Request handoff
       </button>
@@ -335,8 +364,8 @@ export default function ListingDetail() {
               className="button secondary small"
               to={`/listings/${listing.id}/edit`}
             >
+              <Pencil size={15} />
               Edit listing
-              <ArrowUpRight size={15} />
             </Link>
           )}
         </div>
@@ -404,7 +433,7 @@ export default function ListingDetail() {
             {locked ? (
               <p className="detail-address is-locked">
                 <MapPin size={15} />
-                <span className="locked-bar" aria-hidden="true" />
+                <LockedText className="is-inline" lines={[LOCKED_ADDRESS]} />
                 <span className="sr-only">
                   The address is hidden until you confirm you are a student.
                 </span>
@@ -448,7 +477,7 @@ export default function ListingDetail() {
             <h2>About the place</h2>
             {locked ? (
               <div className="locked-block">
-                <LockedLines />
+                <LockedText />
                 <LockedGate onUnlock={() => unlock("details")} />
               </div>
             ) : (
@@ -498,7 +527,7 @@ export default function ListingDetail() {
             <section className="host-card is-locked">
               <span className="locked-avatar" aria-hidden="true" />
               <div className="host-text">
-                <span className="locked-bar short" aria-hidden="true" />
+                <LockedText className="is-inline" lines={[LOCKED_NAME]} />
                 <span className="host-verified">
                   <ShieldCheck size={14} />
                   Verified student
@@ -565,16 +594,28 @@ export default function ListingDetail() {
                 </span>
               )}
             </div>
-            {save && (
-              <div className="savings-box">
-                <strong>You save {money(save.amount)} a month</strong>
-                <span>
-                  {save.percent}% below the original lease of{" "}
-                  {money(save.original)}. Both sides win, the lister covers
-                  their rent and you pay less.
-                </span>
-              </div>
-            )}
+            {save &&
+              (own ? (
+                <div className="savings-box">
+                  <strong>
+                    Subleasers save {money(save.amount)} a month against your
+                    lease
+                  </strong>
+                  <span>
+                    {save.percent}% below your original {money(save.original)}.
+                    That gap is the reason students open your listing first.
+                  </span>
+                </div>
+              ) : (
+                <div className="savings-box">
+                  <strong>You save {money(save.amount)} a month</strong>
+                  <span>
+                    {save.percent}% below the original lease of{" "}
+                    {money(save.original)}. Both sides win, the lister covers
+                    their rent and you pay less.
+                  </span>
+                </div>
+              ))}
             <div className="request-dates">
               <CalendarDays size={16} />
               <div>
@@ -614,11 +655,11 @@ export default function ListingDetail() {
                         : "Seven days at the top of its map area, a filled pin, a Boosted tag, and stats. The launch boost is free."}
                     </p>
                     <button
-                      className="button primary full-width"
+                      className="button secondary full-width"
                       onClick={() => setBoostOpen(true)}
                     >
                       <Zap size={16} />
-                      {listing.boosted ? "See boost stats" : "Boost this listing"}
+                      {listing.boosted ? "See boost stats" : "Start the boost"}
                     </button>
                   </div>
                 )}
@@ -752,6 +793,35 @@ export default function ListingDetail() {
         />
       )}
 
+      {/* A hard preference gets an interstitial, not a note the requester
+          only meets after writing the message. */}
+      <Modal
+        open={preferenceWarning}
+        onClose={() => setPreferenceWarning(false)}
+        title={`This lister asked for ${preferenceSentence(
+          listing.genderPreference,
+        )}`}
+        description="Your profile does not match that, so the chances of being accepted are low. You can still send a request and the lister decides."
+      >
+        <div className="modal-actions">
+          <Button
+            variant="secondary"
+            onClick={() => setPreferenceWarning(false)}
+          >
+            Go back
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setPreferenceWarning(false);
+              setRequestOpen(true);
+            }}
+          >
+            Send anyway
+          </Button>
+        </div>
+      </Modal>
+
       <Modal
         open={requestOpen}
         onClose={() => setRequestOpen(false)}
@@ -809,13 +879,14 @@ export default function ListingDetail() {
                 At least 20 characters, no contact details.
               </span>
             </Field>
-            {preferenceMismatch(listing.genderPreference, user?.gender) && (
-              <p className="notice request-preference-note">
-                This lister asked for{" "}
-                {preferenceSentence(listing.genderPreference)}. You can still
-                send a request, the lister decides.
-              </p>
-            )}
+            {!hardPreference &&
+              preferenceMismatch(listing.genderPreference, user?.gender) && (
+                <p className="notice request-preference-note">
+                  This lister asked for{" "}
+                  {preferenceSentence(listing.genderPreference)}. You can still
+                  send a request, the lister decides.
+                </p>
+              )}
             {requestError && <ErrorBox message={requestError} />}
             <div className="modal-actions spread">
               <span className="request-fineprint">

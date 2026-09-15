@@ -177,11 +177,13 @@ export function Layout() {
         <div className="header-inner">
           <Brand />
           <nav className="desktop-nav" aria-label="Main navigation">
-            {links.map(({ to, label }) => (
-              <NavLink key={to} to={to} onClick={guard(to)}>
-                {label}
-              </NavLink>
-            ))}
+            {links
+              .filter(({ to }) => user || !GUARDED.has(to))
+              .map(({ to, label }) => (
+                <NavLink key={to} to={to} onClick={guard(to)}>
+                  {label}
+                </NavLink>
+              ))}
           </nav>
           <div className="header-actions">
             {!onAuthRoute && !onEditor && (
@@ -288,7 +290,7 @@ export function Layout() {
           <span className="mobile-list-button">
             <Plus size={22} strokeWidth={2.4} />
           </span>
-          <span>List</span>
+          <span>Post</span>
         </Link>
         {links.slice(2).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} onClick={guard(to)}>

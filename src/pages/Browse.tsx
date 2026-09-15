@@ -116,6 +116,12 @@ export default function Browse() {
           user?.campusId ||
           firstLive?.id),
     ) || firstLive;
+  // A remembered id that no longer matches a campus is dropped rather than
+  // left to resolve silently every visit.
+  useEffect(() => {
+    if (!campuses.length || !remembered) return;
+    if (!campuses.some((c) => c.id === remembered)) rememberCampus(campus.id);
+  }, [campuses, remembered, campus.id]);
   // First visit without an account or a remembered campus asks where to look.
   const [pickCampus, setPickCampus] = useState(() => {
     if (user || isEmbed()) return false;
@@ -466,6 +472,9 @@ export default function Browse() {
                     {...props}
                   >
                     <SchoolLogo src={campusLogo(campus)} />
+                    <span className="school-chip-name">
+                      {campus.shortName}
+                    </span>
                     <ChevronDown size={14} className="campus-chevron" />
                   </button>
                 )}
@@ -561,7 +570,7 @@ export default function Browse() {
               )}
             </Popover>
             <Popover
-              width={300}
+              width={340}
               trigger={(props) => (
                 <button
                   type="button"
@@ -641,7 +650,7 @@ export default function Browse() {
               )}
             </Popover>
             <Popover
-              width={300}
+              width={340}
               trigger={(props) => (
                 <button
                   type="button"
@@ -730,8 +739,7 @@ export default function Browse() {
               )}
             </Popover>
             <Popover
-              width={320}
-              align="right"
+              width={340}
               trigger={(props) => (
                 <button
                   type="button"
@@ -823,8 +831,8 @@ export default function Browse() {
             >
               <LogIn size={14} />
               <span>
-                <strong>Sign in with your .edu</strong> to save places and
-                request handoffs.
+                <strong>Sign in with your school email</strong> to save places
+                and request handoffs.
               </span>
             </button>
           )}

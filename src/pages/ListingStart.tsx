@@ -16,13 +16,25 @@ type Choice = {
   to: string;
   ai: boolean;
 };
+/* The working path leads. The two AI paths follow it, and their card bodies
+   are the same length as the lead so the three do not read as unfinished. */
+const LEAD: Choice = {
+  key: "manual",
+  icon: PenLine,
+  title: "Fill it in myself",
+  description:
+    "Six short steps. Rent, dates, the room, photos, then a review before it goes live.",
+  action: "Open the form",
+  to: "/listings/new?mode=manual",
+  ai: false,
+};
 const CHOICES: Choice[] = [
   {
     key: "import",
     icon: Sparkles,
     title: "Smart import",
     description:
-      "Paste a post, drop screenshots or a PDF. We fill in the form.",
+      "Paste a post, drop screenshots or a PDF, and we fill the form in for you.",
     action: "Paste or drop it",
     to: "/listings/new?mode=import",
     ai: true,
@@ -31,19 +43,11 @@ const CHOICES: Choice[] = [
     key: "chat",
     icon: MessageCircle,
     title: "Talk it through",
-    description: "Answer a few questions and we write the listing.",
+    description:
+      "Answer a few questions in a chat and we write the listing from them.",
     action: "Start the chat",
     to: "/listings/new?mode=chat",
     ai: true,
-  },
-  {
-    key: "manual",
-    icon: PenLine,
-    title: "Fill it in myself",
-    description: "The six step form.",
-    action: "Open the form",
-    to: "/listings/new?mode=manual",
-    ai: false,
   },
 ];
 
@@ -62,9 +66,28 @@ export default function ListingStart() {
       <BackLink to="/my-listings">My listings</BackLink>
       <div className="start-head">
         <h1>How do you want to list?</h1>
-        <p>Smart import and the chat helper do the typing.</p>
+        <p>The form is ready now. The two assisted paths are on their way.</p>
       </div>
-      <div className="start-grid enter-stagger">
+      <div className="start-body enter-stagger">
+        <div className="start-lead">
+          <span className="start-icon" aria-hidden="true">
+            <LEAD.icon size={22} strokeWidth={1.8} />
+          </span>
+          <div className="start-lead-text">
+            <h2>{LEAD.title}</h2>
+            <p>{LEAD.description}</p>
+          </div>
+          <button
+            type="button"
+            className="button primary large"
+            onClick={() => navigate(LEAD.to)}
+          >
+            {LEAD.action}
+            <ArrowRight size={17} aria-hidden="true" />
+          </button>
+        </div>
+        <p className="start-alt-label">Or let us do the typing</p>
+        <div className="start-grid">
         {CHOICES.map((choice) => {
           const Icon = choice.icon;
           const locked = choice.ai && !verified;
@@ -105,6 +128,7 @@ export default function ListingStart() {
             </button>
           );
         })}
+        </div>
       </div>
       <p className="start-foot">
         Nothing goes live until you review it and publish.

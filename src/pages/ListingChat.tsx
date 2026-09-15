@@ -111,6 +111,7 @@ export default function ListingChat() {
       </div>
     );
   const canOpen = done || readyForEditor(draft);
+  const filled = PANEL_FIELDS.filter((field) => show(draft, field));
   return (
     <div className="page-container chat-page">
       <section className="chat-column">
@@ -165,25 +166,30 @@ export default function ListingChat() {
       </section>
       <aside className="chat-side">
         <h2>Your listing so far</h2>
-        <ul className="draft-list">
-          {PANEL_FIELDS.map((field) => {
-            const value = show(draft, field);
-            return (
-              <li
-                key={field}
-                className={value ? "is-filled" : "is-missing"}
-              >
+        {/* One empty state until something lands, then a row per answer. */}
+        {filled.length === 0 ? (
+          <p className="draft-empty">
+            <Minus size={14} aria-hidden="true" />
+            Nothing yet. Answers appear here as you give them.
+          </p>
+        ) : (
+          <ul className="draft-list">
+            {filled.map((field) => (
+              <li key={field} className="is-filled">
                 <span className="draft-mark" aria-hidden="true">
-                  {value ? <Check size={14} /> : <Minus size={14} />}
+                  <Check size={14} />
                 </span>
                 <span>
                   <small>{FIELD_LABELS[field]}</small>
-                  <strong>{value || "Not yet"}</strong>
+                  <strong>{show(draft, field)}</strong>
                 </span>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+            <li className="draft-remaining">
+              {PANEL_FIELDS.length - filled.length} still to go
+            </li>
+          </ul>
+        )}
       </aside>
     </div>
   );

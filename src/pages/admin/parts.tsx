@@ -440,10 +440,37 @@ export function StatSkeletons({ count = 8 }: { count?: number }) {
 }
 
 /** Every destructive dashboard action confirms through the app's own modal. */
+/** Raw database values are not labels. */
+export const titleCase = (value: string | null | undefined) =>
+  value ? value.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : "";
+
+/** A bare UUID is unreadable, so it comes with a copy control. */
+export function CopyId({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className="admin-copy-id">
+      <code>{value}</code>
+      <button
+        type="button"
+        className="text-button"
+        onClick={() => {
+          navigator.clipboard?.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </span>
+  );
+}
+
 export type Pending = {
   title: string;
   body: string;
   label: string;
+  /* A destructive action keeps its red all the way to the confirm. */
+  danger?: boolean;
   run: () => Promise<void>;
 } | null;
 export function ConfirmModal({
@@ -467,6 +494,7 @@ export function ConfirmModal({
         </Button>
         <Button
           busy={busy}
+          variant={pending?.danger ? "danger" : "primary"}
           onClick={async () => {
             if (!pending) return;
             setBusy(true);

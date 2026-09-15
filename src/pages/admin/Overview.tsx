@@ -10,6 +10,12 @@ import {
 } from "./parts";
 import type { Overview as OverviewData } from "./types";
 
+/** Raw database values are not labels. */
+const titleCase = (value: string) =>
+  value.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const plural = (count: number, one: string, many = `${one}s`) =>
+  `${count} ${count === 1 ? one : many}`;
+
 const GENDER_LABELS: Record<string, string> = {
   woman: "Women",
   man: "Men",
@@ -38,7 +44,12 @@ export default function Overview() {
   return (
     <AdminPage
       title="Overview"
-      description={`Live counts and the last 30 days. Read at ${new Date(data.generatedAt).toLocaleTimeString("en-US")}.`}
+      description={`Live counts and the last 30 days. Updated ${new Date(
+        data.generatedAt,
+      ).toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      })}.`}
     >
       <div className="admin-stat-grid enter-stagger">
         <StatCard
@@ -69,7 +80,12 @@ export default function Overview() {
         <StatCard
           label="Saved places"
           value={number(totals.saved)}
-          hint={`${number(totals.uploads)} photos stored`}
+          hint="Shortlist entries across all students"
+        />
+        <StatCard
+          label="Photos stored"
+          value={number(totals.uploads)}
+          hint="Uploaded to listings and profiles"
         />
         <StatCard
           label="Waitlist"
@@ -85,7 +101,12 @@ export default function Overview() {
         <StatCard
           label="Active sessions"
           value={number(totals.sessionsActive)}
-          hint={`${number(totals.admins)} admins, ${number(totals.disabledUsers)} disabled`}
+          hint="Signed in right now"
+        />
+        <StatCard
+          label="Admins"
+          value={number(totals.admins)}
+          hint={`${plural(totals.disabledUsers, "disabled account")}`}
         />
       </div>
 
@@ -138,7 +159,7 @@ export default function Overview() {
           <ul className="admin-rank">
             {Object.entries(totals.listingsByStatus).map(([key, count]) => (
               <li key={key}>
-                <span>{key.replace("_", " ")}</span>
+                <span>{titleCase(key)}</span>
                 <b>{number(count)}</b>
               </li>
             ))}
@@ -151,7 +172,7 @@ export default function Overview() {
           <ul className="admin-rank">
             {Object.entries(totals.requestsByStatus).map(([key, count]) => (
               <li key={key}>
-                <span>{key}</span>
+                <span>{titleCase(key)}</span>
                 <b>{number(count)}</b>
               </li>
             ))}

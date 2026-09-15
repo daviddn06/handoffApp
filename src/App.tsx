@@ -51,7 +51,12 @@ function GuestOnly({ children }: { children: React.ReactElement }) {
  */
 function NewListing() {
   const [params] = useSearchParams();
+  const { aiReady } = useApp();
   const mode = params.get("mode");
+  // The chooser shows these two as being set up, so the routes behind them
+  // are gated the same way rather than opening a screen that cannot finish.
+  if ((mode === "import" || mode === "chat") && !aiReady)
+    return <ListingStart />;
   if (mode === "import") return <ListingImport />;
   if (mode === "chat") return <ListingChat />;
   if (mode === "manual" || params.get("from") === "import")
@@ -117,8 +122,8 @@ export default function App() {
                 element={
                   <div className="page-container">
                     <EmptyState
-                      title="This page has moved on."
-                      description="Let’s get you back to finding your next place."
+                      title="We could not find that page."
+                      description="The link may be broken or the listing may have been taken down."
                     >
                       <Link className="button primary" to="/browse">
                         Back to browse

@@ -17,6 +17,8 @@ import {
   number,
   useDebounced,
   when,
+  titleCase,
+  CopyId,
   type Column,
   type Pending,
 } from "./parts";
@@ -181,6 +183,114 @@ export default function Users() {
         {detail.error && <ErrorBox message={detail.error} retry={detail.refresh} />}
         {row && detail.data && (
           <>
+            <Group title="Account">
+              <KeyValues
+                items={[
+                  ["Id", <CopyId key="id" value={row.id} />],
+                  ["School", row.school || "Unknown"],
+                  ["Posting campus", row.campusId || "Not open"],
+                  ["Verified", row.verified ? when(row.verifiedAt) : "No"],
+                  ["Terms accepted", row.termsAccepted ? when(row.termsAcceptedAt) : "No"],
+                  ["Gender", titleCase(row.gender) || "Not recorded"],
+                  ["Admin", row.isAdmin ? "Yes" : "No"],
+                  ["Disabled", row.disabledAt ? when(row.disabledAt) : "No"],
+                  ["Signed up", when(row.createdAt)],
+                  ["Last sign in", when(row.lastSignIn)],
+                  ["Bio", row.bio || "Empty"],
+                  [
+                    "AI usage",
+                    detail.data.aiUsage
+                      ? `${number(detail.data.aiUsage.calls)} calls, ${number(detail.data.aiUsage.tokens)} tokens`
+                      : "Not tracked",
+                  ],
+                ]}
+              />
+            </Group>
+            <Group title={`Listings (${detail.data.listings.length})`}>
+              <ul className="admin-list">
+                {detail.data.listings.map((listing) => (
+                  <li key={listing.id}>
+                    <span>{listing.title}</span>
+                    <Status value={listing.status} />
+                  </li>
+                ))}
+                {!detail.data.listings.length && (
+                  <li className="admin-empty">Nothing here yet.</li>
+                )}
+              </ul>
+            </Group>
+            <Group title={`Requests sent (${detail.data.requestsSent.length})`}>
+              <ul className="admin-list">
+                {detail.data.requestsSent.map((request) => (
+                  <li key={request.id}>
+                    <span>{request.listingTitle}</span>
+                    <Status value={request.status} />
+                  </li>
+                ))}
+                {!detail.data.requestsSent.length && (
+                  <li className="admin-empty">Nothing here yet.</li>
+                )}
+              </ul>
+            </Group>
+            <Group title={`Requests received (${detail.data.requestsReceived.length})`}>
+              <ul className="admin-list">
+                {detail.data.requestsReceived.map((request) => (
+                  <li key={request.id}>
+                    <span>
+                      {request.requesterName}, {request.listingTitle}
+                    </span>
+                    <Status value={request.status} />
+                  </li>
+                ))}
+                {!detail.data.requestsReceived.length && (
+                  <li className="admin-empty">Nothing here yet.</li>
+                )}
+              </ul>
+            </Group>
+            <Group title={`Sessions (${detail.data.sessions.length})`}>
+              <ul className="admin-list">
+                {detail.data.sessions.map((session) => (
+                  <li key={session.createdAt}>
+                    <span>{when(session.createdAt)}</span>
+                    <Status
+                      value={session.active ? "active" : "archived"}
+                      label={session.active ? "Active" : "Expired"}
+                    />
+                  </li>
+                ))}
+                {!detail.data.sessions.length && (
+                  <li className="admin-empty">Nothing here yet.</li>
+                )}
+              </ul>
+            </Group>
+            <Group title={`Boosts (${detail.data.boosts.length})`}>
+              <ul className="admin-list">
+                {detail.data.boosts.map((boost) => (
+                  <li key={boost.id}>
+                    <span>{boost.listingTitle || boost.listingId}</span>
+                    <small>
+                      {boost.kind}, {when(boost.endsAt, false)}
+                    </small>
+                  </li>
+                ))}
+                {!detail.data.boosts.length && (
+                  <li className="admin-empty">Nothing here yet.</li>
+                )}
+              </ul>
+            </Group>
+            <Group title="Audit trail">
+              <ul className="admin-list">
+                {detail.data.audit.map((entry) => (
+                  <li key={entry.id}>
+                    <span>{entry.action}</span>
+                    <small>{when(entry.createdAt)}</small>
+                  </li>
+                ))}
+                {!detail.data.audit.length && (
+                  <li className="admin-empty">Nothing here yet.</li>
+                )}
+              </ul>
+            </Group>
             <div className="admin-drawer-actions">
               {!row.verified && (
                 <Button
@@ -223,6 +333,7 @@ export default function Users() {
                       ? `${row.name} can sign in again.`
                       : `${row.name} is signed out everywhere and cannot sign in. Their listings and requests are kept.`,
                     label: row.disabledAt ? "Enable" : "Disable",
+                    danger: !row.disabledAt,
                     run: () => act(row.id, row.disabledAt ? "enable" : "disable"),
                   })
                 }
@@ -230,112 +341,6 @@ export default function Users() {
                 {row.disabledAt ? "Enable account" : "Disable account"}
               </Button>
             </div>
-            <Group title="Account">
-              <KeyValues
-                items={[
-                  ["Id", <code key="id">{row.id}</code>],
-                  ["School", row.school || "Unknown"],
-                  ["Posting campus", row.campusId || "Not open"],
-                  ["Verified", row.verified ? when(row.verifiedAt) : "No"],
-                  ["Terms accepted", row.termsAccepted ? when(row.termsAcceptedAt) : "No"],
-                  ["Gender", row.gender || "Not recorded"],
-                  ["Admin", row.isAdmin ? "Yes" : "No"],
-                  ["Disabled", row.disabledAt ? when(row.disabledAt) : "No"],
-                  ["Signed up", when(row.createdAt)],
-                  ["Last sign in", when(row.lastSignIn)],
-                  ["Bio", row.bio || "Empty"],
-                  [
-                    "AI usage",
-                    detail.data.aiUsage
-                      ? `${number(detail.data.aiUsage.calls)} calls, ${number(detail.data.aiUsage.tokens)} tokens`
-                      : "Not tracked",
-                  ],
-                ]}
-              />
-            </Group>
-            <Group title={`Listings (${detail.data.listings.length})`}>
-              <ul className="admin-list">
-                {detail.data.listings.map((listing) => (
-                  <li key={listing.id}>
-                    <span>{listing.title}</span>
-                    <Status value={listing.status} />
-                  </li>
-                ))}
-                {!detail.data.listings.length && (
-                  <li className="admin-empty">No listings.</li>
-                )}
-              </ul>
-            </Group>
-            <Group title={`Requests sent (${detail.data.requestsSent.length})`}>
-              <ul className="admin-list">
-                {detail.data.requestsSent.map((request) => (
-                  <li key={request.id}>
-                    <span>{request.listingTitle}</span>
-                    <Status value={request.status} />
-                  </li>
-                ))}
-                {!detail.data.requestsSent.length && (
-                  <li className="admin-empty">None sent.</li>
-                )}
-              </ul>
-            </Group>
-            <Group title={`Requests received (${detail.data.requestsReceived.length})`}>
-              <ul className="admin-list">
-                {detail.data.requestsReceived.map((request) => (
-                  <li key={request.id}>
-                    <span>
-                      {request.requesterName}, {request.listingTitle}
-                    </span>
-                    <Status value={request.status} />
-                  </li>
-                ))}
-                {!detail.data.requestsReceived.length && (
-                  <li className="admin-empty">None received.</li>
-                )}
-              </ul>
-            </Group>
-            <Group title={`Sessions (${detail.data.sessions.length})`}>
-              <ul className="admin-list">
-                {detail.data.sessions.map((session) => (
-                  <li key={session.createdAt}>
-                    <span>{when(session.createdAt)}</span>
-                    <Status
-                      value={session.active ? "active" : "archived"}
-                      label={session.active ? "Active" : "Expired"}
-                    />
-                  </li>
-                ))}
-                {!detail.data.sessions.length && (
-                  <li className="admin-empty">No sessions.</li>
-                )}
-              </ul>
-            </Group>
-            <Group title={`Boosts (${detail.data.boosts.length})`}>
-              <ul className="admin-list">
-                {detail.data.boosts.map((boost) => (
-                  <li key={boost.id}>
-                    <span>{boost.listingTitle || boost.listingId}</span>
-                    <small>
-                      {boost.kind}, {when(boost.endsAt, false)}
-                    </small>
-                  </li>
-                ))}
-                {!detail.data.boosts.length && <li className="admin-empty">None.</li>}
-              </ul>
-            </Group>
-            <Group title="Audit trail">
-              <ul className="admin-list">
-                {detail.data.audit.map((entry) => (
-                  <li key={entry.id}>
-                    <span>{entry.action}</span>
-                    <small>{when(entry.createdAt)}</small>
-                  </li>
-                ))}
-                {!detail.data.audit.length && (
-                  <li className="admin-empty">No admin action yet.</li>
-                )}
-              </ul>
-            </Group>
           </>
         )}
       </Drawer>

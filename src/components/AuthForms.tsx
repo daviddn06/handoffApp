@@ -65,21 +65,27 @@ function actionPhrase(next: string, reason?: AuthReason) {
   if (path.startsWith("/listings/new")) return "to list your place";
   return "";
 }
-export function signUpHeadline(next: string, reason?: AuthReason) {
+export function signUpHeadline(_next: string, _reason?: AuthReason) {
+  return "Confirm your student email.";
+}
+/** The reason the student is here, shown as the support line under the h1. */
+export function signUpLead(next: string, reason?: AuthReason) {
   const phrase = actionPhrase(next, reason);
-  return `Confirm you are a student ${phrase || "to continue"}.`;
+  return phrase
+    ? `Handoff is students only. Confirm with your school email ${phrase}.`
+    : STUDENTS_ONLY_LINE;
 }
 /** The terms footnote, the same words under every signed out form. */
 export function TermsFootnote() {
   return (
     <p className="auth-fineprint">
-      By continuing you agree to the{" "}
+      By continuing you agree to our{" "}
       <a href="/terms" target="_blank" rel="noreferrer">
-        Terms of Service
+        Terms
       </a>{" "}
       and{" "}
       <a href="/privacy" target="_blank" rel="noreferrer">
-        Privacy Policy
+        Privacy
       </a>
       .
     </p>
@@ -727,7 +733,7 @@ export function SignUpForm({
     <div className={blockClass(compact)}>
       <header className="auth-head">
         <h1>{signUpHeadline(next, reason)}</h1>
-        <p>{STUDENTS_ONLY_LINE}</p>
+        <p>{signUpLead(next, reason)}</p>
       </header>
       <div className="auth-steps">
         <p className="auth-step-name">
@@ -778,7 +784,7 @@ export function SignUpForm({
                   {onSwitch ? (
                     <button
                       type="button"
-                      className="button secondary small"
+                      className="button primary small"
                       tabIndex={step === 1 ? undefined : -1}
                       onClick={() => onSwitch("signin")}
                     >
@@ -786,7 +792,7 @@ export function SignUpForm({
                       <ArrowRight size={15} />
                     </button>
                   ) : (
-                    <Link className="button secondary small" to={toSignIn}>
+                    <Link className="button primary small" to={toSignIn}>
                       Sign in
                       <ArrowRight size={15} />
                     </Link>
@@ -799,7 +805,9 @@ export function SignUpForm({
             <Button
               type="submit"
               busy={busy && step === 1}
+              variant={exists ? "secondary" : "primary"}
               className="auth-cta"
+              disabled={exists}
               tabIndex={step === 1 ? undefined : -1}
             >
               Continue
@@ -896,9 +904,9 @@ export function SignUpForm({
             </Field>
             <PasswordMeter check={strength} />
             {!emailReady && (
-              <p className="auth-hint">
-                Email delivery is paused on this server, so the code may not
-                arrive.
+              <p className="auth-hint is-notice">
+                <AlertCircle size={15} />
+                Email is paused on this server. The code may not arrive.
               </p>
             )}
             <Button
@@ -1061,8 +1069,9 @@ export function ForgotForm({
           />
         </Field>
         {!emailReady && (
-          <p className="auth-hint">
-            Email delivery is paused on this server, so the link may not arrive.
+          <p className="auth-hint is-notice">
+            <AlertCircle size={15} />
+            Email is paused on this server. The link may not arrive.
           </p>
         )}
         <Button type="submit" busy={busy} className="auth-cta">
