@@ -2186,3 +2186,32 @@ test("a profile photo is optional, square, replaceable and removable", async (t)
     401,
   );
 });
+
+
+test("owners can delete a listing and everything attached to it", async (t) => {
+  const env = await setup(t);
+  const owner = await env.signup("del.owner@usc.edu", "Del Owner");
+  await owner.call("/api/auth/verify", {
+    method: "POST",
+    body: { token: env.tokenFor("del.owner@usc.edu") },
+  });
+  const photos = await env.upload(owner);
+  const created = await owner.call("/api/listings", {
+    method: "POST",
+    body: validListing(photos, { status: "draft" }),
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const id = created.body.listing.id;
+  const other = await env.signup("not.owner@usc.edu", "Not Owner");
+  const refused = await other.call(`/api/listings/${id}`, { method: "DELETE" });
+  assert.equal(refused.status, 404);
+  const deleted = await owner.call(`/api/listings/${id}`, { method: "DELETE" });
+  assert.equal(deleted.status, 200, JSON.stringify(deleted.body));
+  const gone = await owner.call(`/api/listings/${id}`);
+  assert.equal(gone.status, 404);
+  const mine = await owner.call("/api/my-listings");
+  assert.equal(mine.status, 200);
+  assert.ok(!mine.body.listings.some((l) => l.id === id));
+  const file = await owner.call(photos[0]);
+  assert.equal(file.status, 404);
+});

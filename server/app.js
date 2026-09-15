@@ -1187,6 +1187,43 @@ ${button}
         .json({ listing: serializeListing(getListing(id), req.user.id) });
     },
   );
+  // Owners can delete a listing for good. Everything that hangs off it goes
+  // too, and photo files nobody else references are removed from disk.
+  app.delete(
+    "/api/listings/:id",
+    requireUser,
+    limit("listing-delete", 30, HOUR, (req) => req.user.id),
+    async (req, res) => {
+      const row = getListing(req.params.id);
+      assertOwner(row, req.user);
+      const photos = JSON.parse(row.photos || "[]");
+      const orphaned = db.transaction(() => {
+        for (const table of [
+          "saved_listings",
+          "handoff_requests",
+          "reports",
+          "boosts",
+          "listing_views",
+        ])
+          db.prepare(`DELETE FROM ${table} WHERE listing_id=?`).run(row.id);
+        db.prepare("DELETE FROM listings WHERE id=?").run(row.id);
+        const gone = [];
+        for (const photo of photos) {
+          const filename = photo.slice("/uploads/".length);
+          const stillUsed = db
+            .prepare("SELECT 1 FROM listings WHERE photos LIKE ? LIMIT 1")
+            .get(`%${filename}%`);
+          if (stillUsed) continue;
+          db.prepare("DELETE FROM uploads WHERE filename=?").run(filename);
+          gone.push(filename);
+        }
+        return gone;
+      })();
+      for (const filename of orphaned)
+        await unlink(join(uploadDir, filename)).catch(() => {});
+      res.json({ deleted: true });
+    },
+  );
   app.patch(
     "/api/listings/:id",
     requireUser,

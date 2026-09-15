@@ -590,7 +590,7 @@ export default function ListingEditor() {
     miss(key) ? (
       <span className="field-add">
         <Sparkles size={12} aria-hidden="true" />
-        Add this
+        Needs your input
       </span>
     ) : null;
   const stepHasMissing = (index: number) =>
@@ -711,10 +711,10 @@ export default function ListingEditor() {
             <div className="import-banner" role="status">
               <Sparkles size={16} aria-hidden="true" />
               <p>
-                Imported. Check the highlighted fields.{" "}
+                <strong>Imported from your post.</strong>{" "}
                 {stillMissing.length
-                  ? `${stillMissing.length} still to add.`
-                  : "Everything is filled in."}
+                  ? `${stillMissing.length} ${stillMissing.length === 1 ? "field needs" : "fields need"} your input, highlighted in amber.`
+                  : "Everything is filled in, review and publish."}
               </p>
               <button
                 type="button"
@@ -1045,7 +1045,8 @@ export default function ListingEditor() {
                       </div>
                       <div className="field-row">
                         <Field
-                          label="Monthly rent"
+                          label="Monthly rent you are asking"
+                          hint="What the student taking over pays you each month."
                           error={errors.price}
                           className={`${errors.price ? "is-error" : ""}${flag("price")}`}
                         >
@@ -1089,8 +1090,8 @@ export default function ListingEditor() {
                       </div>
                       <div className="savings-field">
                         <Field
-                          label="What you pay now (optional)"
-                          hint="Your rent on the original lease, shown as the savings."
+                          label="Your rent on the original lease"
+                          hint="Optional but recommended. The gap shows on your card as the savings."
                           error={errors.originalPrice}
                           className={errors.originalPrice ? "is-error" : ""}
                         >
@@ -1105,7 +1106,7 @@ export default function ListingEditor() {
                               onChange={(e) =>
                                 update("originalPrice", e.target.value)
                               }
-                              placeholder="Same as rent"
+                              placeholder="What you pay now"
                             />
                           </div>
                         </Field>
@@ -1123,6 +1124,20 @@ export default function ListingEditor() {
                               )}
                               % below your lease. Listings with savings are
                               highlighted on the map and sort to the top.
+                            </span>
+                          </div>
+                        )}
+                        {savingsAmount <= 0 && (
+                          <div className="savings-callout recommend">
+                            <strong>
+                              <Sparkles size={15} aria-hidden="true" />
+                              Recommended
+                            </strong>
+                            <span>
+                              Students go for places where they save against
+                              the original lease. Add what you pay now and,
+                              when you ask for less, the savings tag puts your
+                              listing at the top of the list.
                             </span>
                           </div>
                         )}

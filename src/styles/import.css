@@ -481,29 +481,45 @@
 }
 
 /* ── Editor integration ──────────────────────────────────────── */
+/* Sits in the reading column with the step, never as a full width strip. */
 .import-banner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--s-3);
-  margin: 0 0 var(--s-5);
-  padding: var(--s-3) var(--s-4);
+  width: min(680px, 100% - 64px);
+  margin: var(--s-3) auto 0;
+  padding: var(--s-2) var(--s-3) var(--s-2) var(--s-2);
   border-radius: var(--r-md);
   background: var(--amber-soft);
   color: var(--amber-ink);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13.5px;
+  line-height: 1.45;
 }
-.import-banner svg {
+.import-banner > svg {
   flex: none;
-  margin-top: 1px;
+  box-sizing: content-box;
+  padding: 7px;
+  border-radius: var(--r-pill);
+  background: rgb(255 255 255 / 0.7);
 }
 .import-banner p {
   margin: 0;
   flex: 1;
 }
+.import-banner p strong {
+  font-weight: 600;
+}
 .import-banner .icon-button {
   flex: none;
+  min-width: 32px;
+  min-height: 32px;
   color: inherit;
+}
+@media (max-width: 760px) {
+  .import-banner {
+    width: auto;
+    margin: var(--s-3) var(--gutter, 16px) 0;
+  }
 }
 .field.is-missing > input,
 .field.is-missing > select,
@@ -517,8 +533,12 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
-  font-weight: 500;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--amber-soft);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--amber-ink);
 }
 .mobile-progress span.has-missing,
@@ -535,16 +555,10 @@
   background: var(--amber-ring);
   box-shadow: 0 0 0 2px var(--surface);
 }
-.mobile-progress span.has-missing::after {
-  content: "";
-  position: absolute;
-  top: -5px;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  margin-left: -3px;
-  border-radius: var(--r-pill);
+/* A step with gaps tints its own segment instead of hanging a dot above it. */
+.mobile-progress span.has-missing:not(.is-current) {
   background: var(--amber-ring);
+  opacity: 0.55;
 }
 
 /* ── Responsive ──────────────────────────────────────────────── */

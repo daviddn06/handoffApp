@@ -934,6 +934,10 @@
   line-height: 1.5;
   animation: rise-in var(--duration-slow) var(--ease-smooth-out) both;
 }
+.savings-callout.recommend {
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+}
 .savings-callout strong {
   display: flex;
   align-items: center;
