@@ -1,0 +1,65 @@
+# Every push to main deploys the app (app.handofflease.com) and the homepage (handofflease.com)
+# through the shared system in daviddn06/deploy. Run by hand (Actions, Deploy, Run workflow) to
+# deploy again, roll back or see the status, for both or just one of them. Rolling back the app
+# also puts its data back to the backup taken before that deploy.
+# Off switch: set the Actions variable AUTODEPLOY to "off".
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        options: [deploy, rollback, status]
+        default: deploy
+      only:
+        description: Which part
+        type: choice
+        options: [both, app, homepage]
+        default: both
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+jobs:
+  app:
+    if: inputs.only != 'homepage'
+    uses: daviddn06/deploy/.github/workflows/deploy.yml@main
+    with:
+      project: handoff
+      targets: app
+      action: ${{ inputs.action || 'deploy' }}
+      install: npm ci --no-audit --no-fund
+      check: npm test
+      build: |
+        npm run build
+        node --input-type=module -e 'import {writeFileSync} from "node:fs"; const release = process.env.GITHUB_SHA; if (!/^[0-9a-f]{40}$/.test(release || "")) throw new Error("GITHUB_SHA is not a full commit"); writeFileSync("dist/release.json", JSON.stringify({release}));'
+      pack: tar -czf "$RELEASE" dist server deploy src/data package.json package-lock.json
+    secrets: inherit
+
+  homepage:
+    if: inputs.only != 'app'
+    uses: daviddn06/deploy/.github/workflows/deploy.yml@main
+    with:
+      project: handoff
+      targets: homepage
+      action: ${{ inputs.action || 'deploy' }}
+      node-version: "22"
+      check: test -s marketing/index.html && node --check marketing/home.js
+      # The same release stamp deploy-homepage.sh adds, named by the full commit.
+      build: |
+        rm -rf qa/homepage && mkdir -p qa/homepage
+        rsync -a --exclude 'README.md' marketing/ qa/homepage/
+        node --input-type=module - qa/homepage "$GITHUB_SHA" <<'BUILD'
+        import {readFileSync, writeFileSync} from 'node:fs';
+        import {join} from 'node:path';
+        const [stage, release] = process.argv.slice(2);
+        if (!/^[0-9a-f]{40}$/.test(release || '')) throw new Error('GITHUB_SHA is not a full commit.');
+        const path = join(stage, 'index.html');
+        const html = readFileSync(path, 'utf8');
+        if (!html.includes('<head>')) throw new Error('Homepage head is missing.');
+        writeFileSync(path, html.replace('<head>', `<head>\n    <meta name="handoff-release" content="${release}">`));
+        writeFileSync(join(stage, 'release.json'), JSON.stringify({release}));
+        BUILD
+      pack: tar -C qa/homepage -czf "$RELEASE" .
+    secrets: inherit

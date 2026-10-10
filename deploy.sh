@@ -7,7 +7,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 npm test
 npm run build
-handoff_host=root@srv1765772.hstgr.cloud
+handoff_host=root@interserver-vps
 handoff_key=/Users/david/.ssh/hostinger_dashboard
 handoff_release="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
 node --input-type=module -e 'import {writeFileSync} from "node:fs"; writeFileSync("dist/release.json", JSON.stringify({release:process.argv[1]}));' "$handoff_release"

@@ -32,6 +32,6 @@ Local QA uses an isolated temporary database and captured mail. No sample listin
 
 ## Release operations
 
-Deployment requires a clean committed checkout, reruns checks, uploads a new isolated release, stops only Handoff, creates a matched backup where data already exists, atomically switches the release, and verifies health, release identity, and process working directory. Failure restores prior code and data where available, preserving the failed data directory.
+Deployment runs on every push to `main` through `daviddn06/deploy` (see the README). It reruns checks on GitHub, uploads a new isolated release, stops only Handoff, creates a matched backup where data already exists, atomically switches the release, and verifies health, release identity, and process working directory. Failure restores prior code and data where available, preserving the failed data directory.
 
 Production verification results are recorded in the Handoff zone migration deliverable after cutover. SMTP configuration alone is not proof of delivery. Same-VPS backups do not cover loss of the VPS. The old Supabase hostname is unavailable, so no prior accounts or listings have been migrated.

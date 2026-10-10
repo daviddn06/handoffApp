@@ -30,11 +30,13 @@ The internal dashboard is a separate host, https://internal.handofflease.com, se
 
 ## Deployment
 
-Private repository on GitHub, `daviddn06/handoff-app`. Handoff runs on Vecka's Hostinger VPS under its own `handoff` service user and systemd unit, port 4742 bound to localhost. Caddy terminates HTTPS.
+Private repository on GitHub, `daviddn06/handoff-app`. Handoff runs on Vecka's InterServer VPS under its own `handoff` service user and systemd unit, port 4742 bound to localhost. Caddy terminates HTTPS.
 
 Application releases live at `/opt/handoff/releases`, selected through `/opt/handoff/current`. Database and photos are in `/var/lib/handoff`. SMTP configuration is `/etc/handoff/app.env`, owned by root and readable only by the Handoff group. Backups are in `/var/backups/handoff`.
 
-`bash deploy.sh` runs integration tests and production build, transfers only app files to a new release directory, backs up an existing database, switches the release, restarts Handoff, and checks health. A failed start or health check restores the prior release and matched data backup where available, while preserving the failed data directory. Never use this script to deploy Vecka or the old Handoff working tree.
+Deploys are automatic. Every push to `main` runs `.github/workflows/deploy.yml`, which calls the shared deploy in `daviddn06/deploy` (project `handoff`, targets `app` and `homepage`). GitHub runs the tests and the build, then deployd on the server unpacks a new release under `/opt/handoff/releases` (named by date and short commit; `dist/release.json` carries the full commit), runs `npm ci --omit=dev`, stops Handoff, takes a verified data backup, switches `/opt/handoff/current`, starts Handoff and checks health, the release and the working directory. A failed check puts back the prior release and the data backup on its own. To pause automatic deploys set the Actions variable `AUTODEPLOY` to `off`. To roll back, open Actions, Deploy, Run workflow, choose `rollback` and the part (`app`, `homepage` or both). An app rollback also restores the data backup taken before that deploy.
+
+`bash deploy.sh` is the old manual path, kept as a fallback from a clean git checkout on the Mac. Never use it to deploy Vecka or the old Handoff working tree.
 
 `handoff-backup.timer` creates a daily dated set containing a matched database snapshot, upload archive, and hash manifest. Copies on the same VPS are recovery aids, not protection against loss of the VPS. Offsite backup configuration remains a separate operational concern.
 
@@ -56,4 +58,4 @@ Plain CSS under `src/styles/`, imported in order by `src/styles/index.css`. `mot
 
 The static homepage lives in `marketing/` and shares the app wordmark, typography, and blue. Preview it with `python3 -m http.server 4744 --bind 127.0.0.1 --directory marketing`. Its sample product preview is illustrative; campus links and all account/listing actions open the live app. It makes no enrollment or inventory claims beyond the actual supported campuses.
 
-`bash deploy-homepage.sh` publishes a committed static release at `/opt/handoff-marketing-releases`, atomically points `/opt/handoff-marketing` at it, and verifies the HTML, CSS, JavaScript, and app health. Previous releases are preserved for rollback. It does not change Caddy, DNS, or the app service. Use the regular app deployment only when the app source also changed.
+The homepage deploys automatically with every push to `main`, as the `homepage` job of the same workflow. It publishes `marketing/` with the `handoff-release` meta tag and `release.json` naming the commit as a new release under `/opt/handoff-marketing-releases`, points `/opt/handoff-marketing` at it, and checks that `home.css`, `home.js` and `release.json` are the new ones. It does not change Caddy, DNS, or the app service. `bash deploy-homepage.sh` is the old manual fallback.

@@ -9,7 +9,7 @@ fi
 test -s marketing/index.html
 node --check marketing/home.js
 
-handoff_host=root@srv1765772.hstgr.cloud
+handoff_host=root@interserver-vps
 handoff_key=/Users/david/.ssh/hostinger_dashboard
 handoff_release="$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short HEAD)"
 handoff_stage="qa/homepage-release-$handoff_release"
