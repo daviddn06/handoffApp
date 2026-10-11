@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Handoff | Take over a student lease, or hand off yours.</title>
+    <meta
+      name="description"
+      content="The student sublease market. Campus email verified, savings on every card, walk times from campus, free to list and browse. Live at University of Southern California."
+    />
+    <meta
+      property="og:title"
+      content="Handoff | Take over a student lease, or hand off yours."
+    />
+    <meta
+      property="og:description"
+      content="One lease, two students, nobody overpays. Browse student subleases near campus or list your place in a few minutes."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://handofflease.com/" />
+    <link rel="canonical" href="https://handofflease.com/" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="preconnect" href="https://app.handofflease.com" />
+    <link
+      rel="preload"
+      href="assets/geist-regular.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="assets/jakarta-bold.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="home.css" />
+    <script src="home.js" defer></script>
+  </head>
+  <body>
+    <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></symbol>
+        <symbol id="arrow-up" viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10" /></symbol>
+        <symbol id="chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+        <symbol id="check" viewBox="0 0 24 24"><path d="m5 13 4 4 10-10" /></symbol>
+        <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4 5 8 8 9 3-1 8-5 8-9V6l-8-3Z" /><path d="m8 12 3 3 5-6" /></symbol>
+        <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" /></symbol>
+        <symbol id="pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></symbol>
+        <symbol id="key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="5" /><path d="m12 12 9 9m-3-3 3-3m-6 0 3-3" /></symbol>
+        <symbol id="mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m4 7 8 6 8-6" /></symbol>
+        <symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></symbol>
+        <symbol id="home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7M5 9v11h14V9M9 20v-7h6v7" /></symbol>
+        <symbol id="cap" viewBox="0 0 24 24"><path d="m2 8 10-5 10 5-10 5L2 8Zm4 2v7l6 3 6-3v-7m4-2v8" /></symbol>
+        <symbol id="calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /></symbol>
+        <symbol id="image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="2" /><path d="m4 18 5-4 4 3 3-2 4 3" /></symbol>
+        <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+        <symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
+        <symbol id="wallet" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3" /><path d="M3 10h18M16 14.5h2" /></symbol>
+        <symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></symbol>
+        <symbol id="users" viewBox="0 0 24 24"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 20v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11" /></symbol>
+        <symbol id="send" viewBox="0 0 24 24"><path d="M21 3 10.5 13.5M21 3l-6.5 18-4-8-8-4L21 3Z" /></symbol>
+        <symbol id="spark" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" /></symbol>
+        <symbol id="sparkles" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" /><path d="M19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7L19 16Z" /></symbol>
+        <symbol id="bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" /></symbol>
+        <symbol id="heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z" /></symbol>
+        <symbol id="user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></symbol>
+        <symbol id="walk" viewBox="0 0 24 24"><circle cx="13" cy="4" r="2" /><path d="m9 22 2-7-2-2v-4l4-1 3 3 3 1M11 13l-3 9M13 12l3 4v6" /></symbol>
+        <symbol id="car" viewBox="0 0 24 24"><path d="M5 17h14M4 13l2-6h12l2 6v5H4v-5Z" /><circle cx="7.5" cy="17" r="1.5" /><circle cx="16.5" cy="17" r="1.5" /></symbol>
+        <symbol id="phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M10 18h4" /></symbol>
+        <symbol id="eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10 10 0 0 1 12 5c5 0 9 4.5 10 7-0.4 1-1.3 2.4-2.6 3.6M6.6 6.6C4.3 8 2.7 10.1 2 12c1 2.5 5 7 10 7 1.8 0 3.4-.5 4.8-1.3" /></symbol>
+        <symbol id="clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 11h6M9 15h4" /></symbol>
+        <symbol id="upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 20h16" /></symbol>
+        <symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></symbol>
+        <symbol id="inbox" viewBox="0 0 24 24"><path d="M4 13V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8M4 13h5l1.5 2h3L15 13h5M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" /></symbol>
+        <symbol id="list-icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></symbol>
+        <symbol id="locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></symbol>
+        <symbol id="sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></symbol>
+        <symbol id="bed" viewBox="0 0 24 24"><path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 15h18M6 9V6h12v3" /></symbol>
+      </defs>
+    </svg>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <div class="page-sky" aria-hidden="true">
+      <span class="bank far"></span><span class="bank near"></span>
+    </div>
+
+    <!-- =========================== Header =========================== -->
+    <header class="site-header">
+      <div class="nav-pill">
+        <a class="wordmark" href="https://handofflease.com/" aria-label="Handoff home"
+          ><span class="mark" aria-hidden="true"><svg class="icon"><use href="#key" /></svg></span>Handoff</a
+        >
+        <nav class="header-nav" aria-label="Main navigation">
+          <a href="#both-sides">Savings</a><a href="#how-it-works">How it works</a
+          ><a href="#features">Features</a><a href="#compare">Compare</a
+          ><a href="#campuses">Campuses</a>
+        </nav>
+        <div class="header-actions" data-session>
+          <a class="sign-in" href="https://app.handofflease.com/sign-in" data-guest>Sign in</a
+          ><a class="header-user" href="https://app.handofflease.com/profile" data-member hidden
+            ><span class="header-avatar" data-avatar></span><span class="header-name" data-name></span></a
+          ><a class="button primary small" href="https://app.handofflease.com/browse" data-app-link
+            >Open the app<svg class="icon" aria-hidden="true"><use href="#arrow" /></svg
+          ></a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ============================ Hero ============================ -->
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="wrap hero-inner">
+          <div class="hero-copy">
+            <a class="hero-eyebrow line l1" href="#campuses">
+              <img class="eyebrow-logo" src="assets/usc.svg" alt="" width="14" height="20" />
+              <span class="small-dot"></span>Live across Los Angeles, from University of Southern California to Pepperdine University
+            </a>
+            <h1 id="hero-title">
+              <span class="line l2">Take over a student's lease,</span>
+              <span class="line l3 accent">or hand off yours.</span>
+            </h1>
+            <p class="hero-description line l4">
+              Verified students, semester dates, and the savings on every card.
+            </p>
+            <div class="hero-actions line l5">
+              <a class="button primary large" href="https://app.handofflease.com/browse"
+                >Browse listings<svg class="icon" aria-hidden="true"><use href="#arrow" /></svg
+              ></a><a class="button secondary large" href="https://app.handofflease.com/listings/new">List your place</a>
+            </div>
+            <ul class="proof-chips line l6">
+              <li><svg class="icon" aria-hidden="true"><use href="#shield" /></svg>Campus email verified</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#wallet" /></svg>Free to list and browse</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#lock" /></svg>Contact shared after accept</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- The stage. A sky panel (Emino) holding the flat app replica, with
+             detail cards floating at its edges (Taskible, Hibo). -->
+        <div class="wrap wide hero-stage">
+          <div class="stage-panel" data-rise>
+            <div class="sky" aria-hidden="true">
+              <span class="bank far"></span><span class="bank near"></span>
+              <span class="cloud c1" data-parallax="0.16"></span>
+              <span class="cloud c2" data-parallax="0.26"></span>
+              <span class="cloud c3" data-parallax="0.12"></span>
+            </div>
+
+            <div class="device">
+              <div class="device-notch" aria-hidden="true"></div>
+              <div class="device-bar" aria-hidden="true">
+                <span class="device-dots"><i></i><i></i><i></i></span>
+                <span class="device-url"><svg class="icon"><use href="#lock" /></svg>app.handofflease.com/browse</span>
+              </div>
+              <div class="device-frame">
+                <div class="app-shot" data-shot aria-hidden="true">
+                  <div class="shot-top">
+                    <span class="shot-word">Handoff</span>
+                    <span class="shot-tabs"><b>Browse</b><i>Saved</i><i>Requests</i><i>My listings</i></span>
+                    <span class="shot-list-btn"><svg class="icon"><use href="#plus" /></svg>List your place</span>
+                    <span class="shot-signin">Sign in</span>
+                  </div>
+                  <div class="shot-body">
+                    <div class="shot-panel">
+                      <div class="shot-head">
+                        <div class="search-field">
+                          <span class="school-chip"><img src="assets/usc.svg" alt="" width="12" height="18" /><svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                          <span class="search-text">Search near University of Southern California</span>
+                        </div>
+                        <div class="shot-chips">
+                          <span class="chip"><svg class="icon"><use href="#calendar" /></svg>Dates<svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                          <span class="chip"><svg class="icon"><use href="#sliders" /></svg>Price<svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                          <span class="chip"><svg class="icon"><use href="#bed" /></svg>Rooms<svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                          <span class="chip">Amenities<svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                        </div>
+                        <div class="shot-banner"><svg class="icon"><use href="#shield" /></svg>Sign in with your .edu to save places and request handoffs.</div>
+                        <div class="shot-toolbar">
+                          <span class="head-count"><b>22</b> places</span>
+                          <span class="shot-sort">Closest to campus<svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                        </div>
+                      </div>
+                      <div class="shot-list" data-cycle-list>
+                        <article class="listing-card compact is-active" data-card="1">
+                          <div class="card-photo beige">
+                            <span class="photo-badges"><i class="badge-boost"><svg class="icon"><use href="#bolt" /></svg></i><i class="badge-mate"><svg class="icon"><use href="#users" /></svg></i></span>
+                            <span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span>
+                            <span class="photo-dots"><i></i><i></i><i></i></span>
+                          </div>
+                          <div class="card-body">
+                            <div class="card-topline"><div class="card-price"><strong>$1,150</strong><span>/mo</span></div><span class="savings-tag">Save $125</span></div>
+                            <p class="card-title">Private room on West 30th, 5 min to campus</p>
+                            <p class="card-meta">Private room · 1 bd · 1 ba</p>
+                            <p class="card-meta">Jan 10 to May 15 · <span class="card-distance">8 min walk</span></p>
+                          </div>
+                        </article>
+                        <article class="listing-card compact" data-card="2">
+                          <div class="card-photo sage">
+                            <span class="photo-badges"><i class="badge-boost"><svg class="icon"><use href="#bolt" /></svg></i></span>
+                            <span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span>
+                            <span class="photo-dots"><i></i><i></i><i></i><i></i></span>
+                          </div>
+                          <div class="card-body">
+                            <div class="card-topline"><div class="card-price"><strong>$1,850</strong><span>/mo</span></div></div>
+                            <p class="card-title">Lorenzo studio with parking, furnished</p>
+                            <p class="card-meta">Entire place · Studio · 1 ba</p>
+                            <p class="card-meta">Jan 10 to May 15 · <span class="card-distance">9 min walk</span></p>
+                          </div>
+                        </article>
+                        <article class="listing-card compact" data-card="3">
+                          <div class="card-photo terracotta">
+                            <span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span>
+                            <span class="photo-dots"><i></i><i></i></span>
+                          </div>
+                          <div class="card-body">
+                            <div class="card-topline"><div class="card-price"><strong>$650</strong><span>/mo</span></div><span class="savings-tag">Save $75</span></div>
+                            <p class="card-title">Shared room on West 32nd, two roommates</p>
+                            <p class="card-meta">Shared room · 1 bd · 1 ba</p>
+                            <p class="card-meta">Oct 1 to May 31 · <span class="card-distance">3 min walk</span></p>
+                          </div>
+                        </article>
+                        <article class="listing-card compact" data-card="4">
+                          <div class="card-photo beige">
+                            <span class="photo-badges"><i class="badge-mate"><svg class="icon"><use href="#users" /></svg></i></span>
+                            <span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span>
+                            <span class="photo-dots"><i></i><i></i><i></i></span>
+                          </div>
+                          <div class="card-body">
+                            <div class="card-topline"><div class="card-price"><strong>$950</strong><span>/mo</span></div><span class="savings-tag">Save $200</span></div>
+                            <p class="card-title">Shared room at University Gateway</p>
+                            <p class="card-meta">Shared room · 1 bd · 1 ba</p>
+                            <p class="card-meta">Jan 10 to May 15 · <span class="card-distance">5 min walk</span></p>
+                          </div>
+                        </article>
+                      </div>
+                    </div>
+
+                    <div class="shot-map map-canvas">
+                      <svg class="map-art" viewBox="0 0 720 560" preserveAspectRatio="xMidYMid slice">
+                        <rect width="720" height="560" fill="#f8f9fa" />
+                        <g fill="#eef0f2">
+                          <rect x="24" y="22" width="120" height="96" rx="3" /><rect x="168" y="22" width="150" height="96" rx="3" /><rect x="342" y="22" width="132" height="96" rx="3" /><rect x="498" y="22" width="118" height="96" rx="3" /><rect x="640" y="22" width="80" height="96" rx="3" /><rect x="24" y="142" width="120" height="110" rx="3" /><rect x="640" y="142" width="80" height="110" rx="3" /><rect x="24" y="276" width="120" height="104" rx="3" /><rect x="168" y="404" width="150" height="132" rx="3" /><rect x="342" y="404" width="132" height="132" rx="3" /><rect x="498" y="404" width="118" height="132" rx="3" /><rect x="640" y="404" width="80" height="132" rx="3" /><rect x="24" y="404" width="120" height="132" rx="3" />
+                        </g>
+                        <rect x="168" y="142" width="448" height="238" rx="6" fill="#e6eee2" />
+                        <g fill="#eef0f2"><rect x="214" y="178" width="96" height="60" rx="3" /><rect x="336" y="178" width="120" height="60" rx="3" /><rect x="482" y="178" width="92" height="60" rx="3" /><rect x="214" y="288" width="120" height="58" rx="3" /><rect x="360" y="288" width="96" height="58" rx="3" /><rect x="482" y="288" width="92" height="58" rx="3" /></g>
+                        <g stroke="#e3e6ea" stroke-width="15" fill="none"><path d="M0 130H720M0 264H720M0 392H720M156 0V560M330 0V560M486 0V560M628 0V560" /></g>
+                        <g stroke="#fff" stroke-width="11" fill="none"><path d="M0 130H720M0 264H720M0 392H720M156 0V560M330 0V560M486 0V560M628 0V560" /></g>
+                        <path d="M-20 44 L180 52 L360 96 L520 92 L740 64" stroke="#e8d9b8" stroke-width="18" fill="none" />
+                        <path d="M-20 44 L180 52 L360 96 L520 92 L740 64" stroke="#fbf3e2" stroke-width="13" fill="none" />
+                        <g stroke="#eceef1" stroke-width="5" fill="none"><path d="M0 196H720M0 330H720M244 0V560M408 0V560M560 0V560" /></g>
+                        <path class="dps-zone" d="M196 168 L444 156 L596 214 L584 344 L392 366 L212 330 Z" fill="rgb(21 154 106 / 0.07)" stroke="#159a6a" stroke-width="2" stroke-dasharray="7 6" />
+                        <g font-family="Geist, sans-serif" font-size="10" fill="#9aa2ab" letter-spacing="0.6">
+                          <text x="182" y="122">PICO UNION</text><text x="520" y="122">HISTORIC SOUTH CENTRAL</text>
+                          <text x="30" y="258" transform="rotate(-90 30 258)">VERMONT AVENUE</text>
+                          <text x="200" y="386">JEFFERSON BOULEVARD</text>
+                          <text x="636" y="330" transform="rotate(-90 636 330)">FIGUEROA STREET</text>
+                          <text x="30" y="470">EXPOSITION PARK</text>
+                        </g>
+                      </svg>
+                      <span class="campus-glow"></span>
+                      <span class="campus-dot"></span>
+                      <span class="campus-marker shot-campus">University of Southern California</span>
+                      <span class="pin p1" data-pin="1"><span class="price-marker has-savings" data-map-pin="4">$950</span></span>
+                      <span class="pin p2" data-pin="2"><span class="price-marker" data-map-pin="2">$1,850</span></span>
+                      <span class="pin p3" data-pin="3"><span class="price-marker has-savings is-active" data-map-pin="1">$1,150</span></span>
+                      <span class="pin p4" data-pin="4"><span class="price-marker has-savings" data-map-pin="3">$650</span></span>
+                      <span class="pin c-eight" data-pin="5"><span class="cluster-marker">7</span></span>
+                      <span class="pin c-three" data-pin="6"><span class="cluster-marker small">3</span></span>
+                      <span class="split-group">
+                        <span class="cluster-marker split-bubble">4</span>
+                        <span class="price-marker split-pin sp-a">$1,050</span>
+                        <span class="price-marker split-pin sp-b">$1,325</span>
+                      </span>
+                      <div class="map-preview" data-map-preview>
+                        <span class="mp-photo beige"></span>
+                        <span class="mp-body"><b data-mp-price>$1,150 <small>/mo</small></b><span data-mp-title>Private room on West 30th</span><em data-mp-meta>8 min walk</em></span>
+                      </div>
+                      <div class="map-zoom"><span>+</span><span>&minus;</span></div>
+                      <div class="map-key"><svg class="icon"><use href="#pin" /></svg>Map key<svg class="icon chip-chevron"><use href="#chevron" /></svg></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Floating detail cards -->
+            <div class="float-card fc-verified" data-float>
+              <span class="fc-icon green"><svg class="icon"><use href="#shield" /></svg></span>
+              <span class="fc-text"><strong>Verified student</strong><small>maya@usc.edu</small></span>
+            </div>
+            <div class="float-card fc-savings" data-float>
+              <span class="fc-big">Save <b data-float-count>$300</b><small>/mo</small></span>
+              <span class="fc-sub">versus the original lease</span>
+            </div>
+            <div class="float-card fc-request" data-float>
+              <span class="fc-avatar">M</span>
+              <span class="fc-text"><strong>Maya accepted your request</strong><small>Emails shared, say hi.</small></span>
+              <span class="fc-check"><svg class="icon"><use href="#check" /></svg></span>
+            </div>
+            <div class="float-card fc-walk" data-float>
+              <span class="fc-toggle" data-walk-toggle>
+                <span class="is-on"><svg class="icon"><use href="#walk" /></svg>8 min</span>
+                <span><svg class="icon"><use href="#car" /></svg>4 min</span>
+              </span>
+              <span class="fc-sub">from campus</span>
+            </div>
+          </div>
+          <p class="device-caption">
+            <span>Browsing near University of Southern California, one of the Los Angeles campuses that are open. Every card is a student's own place.</span>
+            <a class="button secondary small" href="https://app.handofflease.com/browse">Open the app<svg class="icon" aria-hidden="true"><use href="#arrow" /></svg></a>
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================= Campus strip ======================== -->
+      <section class="strip" aria-label="Campuses on Handoff">
+        <p class="strip-title">Open at every campus in the Los Angeles area</p>
+        <div class="marquee" data-marquee>
+          <ul class="marquee-track">
+            <li class="is-live"><img src="assets/usc.svg" alt="" width="12" height="18" />University of Southern California<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">University of California, Los Angeles<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Loyola Marymount University<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">California State University, Long Beach<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">California State University, Los Angeles<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">California State University, Northridge<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Pepperdine University<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Occidental College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">California Institute of Technology<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Pomona College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Claremont McKenna College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Harvey Mudd College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Pitzer College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Whittier College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Biola University<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Azusa Pacific University<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Santa Monica College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+            <li class="is-live">Pasadena City College<span class="pill green"><span class="live-dot"></span>Live</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ======================= Both sides win ======================= -->
+      <section class="section wrap" id="both-sides" aria-labelledby="win-title">
+        <div class="section-heading center reveal">
+          <p class="eyebrow-pill">Both sides win</p>
+          <h2 id="win-title">One lease. Two students. <span class="accent">Nobody overpays.</span></h2>
+          <p class="lede">A $1,500 lease with three months left. The student leaving stops paying. The student arriving pays less than the going rate.</p>
+        </div>
+
+        <div class="win-grid reveal stagger" data-savings-card>
+          <article class="win-panel leaving">
+            <header class="win-head">
+              <span class="win-role"><svg class="icon"><use href="#send" /></svg>Handing off</span>
+              <h3>Stop paying for months you will not use</h3>
+            </header>
+            <div class="month-strip" aria-hidden="true">
+              <ul class="month-bar">
+                <li>Apr</li><li class="is-off">May</li><li class="is-off">Jun</li><li class="is-off">Jul</li><li>Aug</li><li>Sep</li>
+              </ul>
+              <p class="strip-total"><b data-count-total data-from="0" data-to="3600">$0</b> covered by the student taking over</p>
+            </div>
+          </article>
+          <article class="win-panel taking">
+            <header class="win-head">
+              <span class="win-role"><svg class="icon"><use href="#home" /></svg>Taking over</span>
+              <h3>Pay the student's price, not the market's</h3>
+            </header>
+            <article class="listing-card compact demo-card">
+              <div class="card-photo sage">
+                <span class="photo-badges"><i class="badge-mate"><svg class="icon"><use href="#users" /></svg></i></span>
+                <span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span>
+              </div>
+              <div class="card-body">
+                <div class="card-topline">
+                  <div class="card-price"><strong data-count data-from="1500" data-to="1200">$1,500</strong><span>/mo</span><s class="card-original" data-original>$1,500</s></div>
+                  <span class="savings-tag" data-pop><svg class="icon" aria-hidden="true"><use href="#check" /></svg>Save $300</span>
+                </div>
+                <p class="card-title">A sunny room near campus</p>
+                <p class="card-meta">Private room · 1 bd · 1 ba</p>
+                <p class="card-meta">May 15 to Aug 20 · <span class="card-distance">12 min walk</span></p>
+              </div>
+            </article>
+            <p class="win-note">The savings tag is on every card, computed from what the lister paid on the original lease.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ======================= How it works ========================= -->
+      <section class="section wrap" id="how-it-works" aria-labelledby="how-title">
+        <div class="section-heading center reveal">
+          <p class="eyebrow-pill">How it works</p>
+          <h2 id="how-title">Three steps, either direction.</h2>
+          <p class="lede">Handoff makes the introduction. You keep the lease.</p>
+        </div>
+
+        <div class="steps-layout">
+          <ol class="steps-rail reveal" data-rail>
+            <li class="rail-step is-active" data-rail-step="1">
+              <span class="rail-num">01</span>
+              <span class="rail-text"><strong>Post in minutes</strong><small>Paste your old post or a screenshot. Smart import fills the form.</small></span>
+            </li>
+            <li class="rail-step" data-rail-step="2">
+              <span class="rail-num">02</span>
+              <span class="rail-text"><strong>Browse on the map</strong><small>Walk and drive times from campus, prices on the pins, the safety zone drawn in.</small></span>
+            </li>
+            <li class="rail-step" data-rail-step="3">
+              <span class="rail-num">03</span>
+              <span class="rail-text"><strong>Request, then talk</strong><small>Emails stay private until the lister accepts. Then you both see each other.</small></span>
+            </li>
+            <li class="rail-line" aria-hidden="true"><i data-rail-fill></i></li>
+          </ol>
+
+          <div class="steps-frames">
+            <!-- 01 Smart import -->
+            <div class="step-frame reveal" data-step-frame="1">
+              <div class="frame-chrome"><span class="frame-crumb">List your place</span><span class="frame-progress"><i style="--w: 38%"></i></span><span class="frame-save">Save and exit</span></div>
+              <div class="import-demo" data-import-demo>
+                <div class="import-source">
+                  <p class="import-label"><svg class="icon"><use href="#clipboard" /></svg>Your post</p>
+                  <div class="import-paste"><span data-type-target></span><i class="caret"></i></div>
+                  <span class="import-status" data-import-status><svg class="icon"><use href="#sparkles" /></svg>Reading your post</span>
+                </div>
+                <div class="import-arrow" aria-hidden="true"><svg class="icon"><use href="#arrow" /></svg></div>
+                <div class="import-fields">
+                  <div class="i-field" data-i-field="1"><label>Monthly rent you are asking</label><span class="i-value">$1,200</span></div>
+                  <div class="i-field" data-i-field="2"><label>Room type</label><span class="i-value">Private room</span></div>
+                  <div class="i-field" data-i-field="3"><label>Available from</label><span class="i-value">May 15</span></div>
+                  <div class="i-field needs" data-i-field="4"><label>Move out date</label><span class="i-value muted">Needs your input</span><span class="field-add">Needs your input</span></div>
+                  <div class="i-field" data-i-field="5"><label>Address</label><span class="i-value">1234 West 30th Street</span></div>
+                </div>
+              </div>
+              <p class="frame-caption"><span class="frame-num">01</span>Imported from your post. One field needs your input, highlighted in amber.</p>
+            </div>
+
+            <!-- 02 Map -->
+            <div class="step-frame reveal" data-step-frame="2">
+              <div class="map-demo map-canvas" data-map-demo>
+                <svg class="map-art" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice">
+                  <rect width="640" height="360" fill="#f8f9fa" />
+                  <g fill="#eef0f2"><rect x="20" y="18" width="110" height="80" rx="3" /><rect x="150" y="18" width="140" height="80" rx="3" /><rect x="310" y="18" width="120" height="80" rx="3" /><rect x="450" y="18" width="170" height="80" rx="3" /><rect x="20" y="118" width="110" height="120" rx="3" /><rect x="20" y="258" width="110" height="90" rx="3" /><rect x="150" y="258" width="140" height="90" rx="3" /><rect x="310" y="258" width="120" height="90" rx="3" /><rect x="450" y="258" width="170" height="90" rx="3" /><rect x="450" y="118" width="170" height="120" rx="3" /></g>
+                  <rect x="150" y="118" width="280" height="120" rx="6" fill="#e6eee2" />
+                  <g stroke="#e3e6ea" stroke-width="13" fill="none"><path d="M0 108H640M0 248H640M140 0V360M440 0V360M300 0V360" /></g>
+                  <g stroke="#fff" stroke-width="9" fill="none"><path d="M0 108H640M0 248H640M140 0V360M440 0V360M300 0V360" /></g>
+                  <path d="M160 130 L420 124 L428 232 L164 236 Z" fill="rgb(21 154 106 / 0.07)" stroke="#159a6a" stroke-width="1.8" stroke-dasharray="7 6" />
+                  <g font-family="Geist, sans-serif" font-size="9.5" fill="#9aa2ab" letter-spacing="0.6"><text x="160" y="104">JEFFERSON BOULEVARD</text><text x="452" y="330">EXPOSITION PARK</text></g>
+                </svg>
+                <span class="campus-glow"></span>
+                <span class="campus-dot"></span>
+                <span class="campus-marker shot-campus">University of Southern California</span>
+                <span class="pin p1" data-pin="1"><span class="price-marker has-savings">$975</span></span>
+                <span class="pin p2" data-pin="2"><span class="price-marker">$2,650</span></span>
+                <span class="pin p3" data-pin="3"><span class="price-marker has-savings is-active">$1,150</span></span>
+                <span class="pin p4" data-pin="4"><span class="price-marker">$800</span></span>
+                <span class="pin c-eight" data-pin="5"><span class="cluster-marker">4</span></span>
+                <div class="walk-pop" data-walk-pop>
+                  <span class="walk-tabs"><b class="is-on"><svg class="icon"><use href="#walk" /></svg>Walk</b><b><svg class="icon"><use href="#car" /></svg>Drive</b></span>
+                  <span class="walk-time"><strong data-walk-time>8 min</strong> from campus</span>
+                </div>
+                <div class="map-key open"><svg class="icon"><use href="#pin" /></svg>Map key<svg class="icon chip-chevron"><use href="#chevron" /></svg>
+                  <ul class="key-list"><li><i class="k-dot"></i>Campus</li><li><i class="k-zone"></i>Campus safety patrol zone</li><li><i class="k-save"></i>Savings on the original lease</li></ul>
+                </div>
+              </div>
+              <p class="frame-caption"><span class="frame-num">02</span>The list follows the map. Move to another campus and the times update.</p>
+            </div>
+
+            <!-- 03 Request -->
+            <div class="step-frame reveal" data-step-frame="3">
+              <div class="request-demo" data-request-demo>
+                <div class="rq-modal">
+                  <header class="rq-head"><strong>Request a handoff</strong><span class="rq-close"><svg class="icon"><use href="#x" /></svg></span></header>
+                  <div class="rq-body">
+                    <div class="rq-listing"><span class="rq-photo sage"></span><span><b>A sunny room near campus</b><small>$1,200 /mo · May 15 to Aug 20</small></span></div>
+                    <label class="rq-label">A note to Maya</label>
+                    <div class="rq-textarea"><span data-rq-type></span><i class="caret"></i></div>
+                    <div class="rq-foot"><span class="rq-privacy"><svg class="icon"><use href="#lock" /></svg>Your email stays hidden until Maya accepts.</span><span class="button primary small rq-send" data-rq-send><svg class="icon"><use href="#send" /></svg>Send request</span></div>
+                  </div>
+                </div>
+                <div class="rq-states">
+                  <div class="rq-state sent" data-rq-state="sent"><span class="rq-dot"></span><strong>Request sent</strong><small>Waiting on Maya</small></div>
+                  <div class="rq-state ok" data-rq-state="ok"><span class="rq-dot"></span><strong>Accepted</strong><small>Emails shared</small></div>
+                  <div class="rq-emails" data-rq-emails>
+                    <span class="rq-email"><i class="fc-avatar">M</i><span class="rq-blur" data-rq-blur>maya@usc.edu</span></span>
+                    <span class="rq-email"><i class="fc-avatar you">J</i><span class="rq-blur" data-rq-blur>jordan@usc.edu</span></span>
+                  </div>
+                </div>
+              </div>
+              <p class="frame-caption"><span class="frame-num">03</span>Private until accepted. Then both students see each other's email.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= Features bento ====================== -->
+      <section class="section wrap" id="features" aria-labelledby="features-title">
+        <div class="section-heading center reveal">
+          <p class="eyebrow-pill">Built for students</p>
+          <h2 id="features-title">Everything the sublet needs. <span class="accent">Nothing it does not.</span></h2>
+        </div>
+
+        <div class="bento reveal stagger">
+          <article class="bento-card wide">
+            <div class="bento-art art-locked" data-locked-demo>
+              <div class="locked-card">
+                <div class="lk-line w70"></div><div class="lk-line w40"></div><div class="lk-line w85"></div><div class="lk-line w55"></div>
+                <div class="lk-photo"></div>
+                <div class="lk-veil"><span class="lk-lock"><svg class="icon"><use href="#lock" /></svg></span><strong>Students only</strong><small>Confirm you are a student to see the address, photos, and who is listing.</small></div>
+              </div>
+            </div>
+            <h3>Verified students only</h3>
+            <p>Signed out visitors see a blurred preview. Address, photos, and the lister stay hidden until you confirm your campus email.</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-art art-savings">
+              <span class="art-price"><b>$1,200</b><small>/mo</small><s>$1,500</s></span>
+              <span class="savings-tag big"><svg class="icon"><use href="#check" /></svg>Save $300</span>
+            </div>
+            <h3>Savings on every card</h3>
+            <p>Listers enter what they pay on the original lease. The difference shows on the card, the pin, and the page.</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-art art-dates">
+              <div class="mini-cal">
+                <span class="mc-head">May 2027</span>
+                <span class="mc-grid">
+                  <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                  <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                  <i class="is-start">15</i><i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i>
+                  <i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i><i class="in"></i>
+                </span>
+                <span class="mc-range"><svg class="icon"><use href="#calendar" /></svg>May 15 to Aug 20</span>
+              </div>
+            </div>
+            <h3>Semester dates first</h3>
+            <p>Pick a range that matches the term, not a nightly calendar.</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-art art-mates">
+              <span class="mate-chip tone-rose"><svg class="icon"><use href="#user" /></svg>Woman</span>
+              <span class="mate-chip tone-blue"><svg class="icon"><use href="#user" /></svg>Man</span>
+              <span class="mate-chip tone-violet"><svg class="icon"><use href="#sparkles" /></svg>Non-binary</span>
+              <span class="mate-chip tone-green is-on"><svg class="icon"><use href="#users" /></svg>Anyone</span>
+            </div>
+            <h3>Roommate preferences</h3>
+            <p>Shared rooms can say who they are looking for, and the filter respects it.</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-art art-import">
+              <span class="imp-doc"><svg class="icon"><use href="#image" /></svg>screenshot.png</span>
+              <span class="imp-spark"><svg class="icon"><use href="#sparkles" /></svg></span>
+              <span class="imp-out"><i></i><i class="short"></i><i class="amber"></i></span>
+            </div>
+            <h3>Smart import</h3>
+            <p>Paste a post, a screenshot, or a PDF. The form fills itself and flags the gaps.</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-art art-walk">
+              <span class="walk-tabs" data-walk-toggle><b class="is-on"><svg class="icon"><use href="#walk" /></svg>Walk</b><b><svg class="icon"><use href="#car" /></svg>Drive</b></span>
+              <span class="walk-time"><strong data-walk-value>8 min</strong> from campus</span>
+            </div>
+            <h3>Walk and drive times</h3>
+            <p>Every card and pin shows the time from campus, and it updates as you move the map.</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-art art-zone">
+              <svg class="zone-map" viewBox="0 0 360 172" preserveAspectRatio="xMidYMid slice">
+                <rect width="360" height="172" fill="#f8f9fa" />
+                <g fill="#eef0f2"><rect x="14" y="12" width="70" height="52" rx="3" /><rect x="100" y="12" width="90" height="52" rx="3" /><rect x="206" y="12" width="70" height="52" rx="3" /><rect x="292" y="12" width="60" height="52" rx="3" /><rect x="14" y="108" width="70" height="52" rx="3" /><rect x="292" y="108" width="60" height="52" rx="3" /></g>
+                <rect x="100" y="78" width="176" height="82" rx="5" fill="#e6eee2" />
+                <g stroke="#e3e6ea" stroke-width="9" fill="none"><path d="M0 70H360M92 0V172M284 0V172" /></g>
+                <g stroke="#fff" stroke-width="6" fill="none"><path d="M0 70H360M92 0V172M284 0V172" /></g>
+                <path class="zone-path" d="M70 40 L300 30 L318 140 L60 150 Z" fill="rgb(21 154 106 / 0.08)" stroke="#159a6a" stroke-width="2" stroke-dasharray="7 6" />
+              </svg>
+              <span class="zone-label"><i></i>Campus safety patrol zone</span>
+            </div>
+            <h3>The safety zone, drawn in</h3>
+            <p>The campus patrol boundary sits on the map, so you know before you visit.</p>
+          </article>
+          <article class="bento-card">
+            <div class="bento-art art-boost">
+              <span class="boost-pill"><svg class="icon"><use href="#bolt" /></svg>Boosted</span>
+              <span class="boost-bar"><i></i></span>
+              <span class="boost-days">7 days at the top for $9</span>
+            </div>
+            <h3>Boost when it matters</h3>
+            <p>Optional. Everything else stays free, and Handoff never takes a cut of rent.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- =========================== Numbers ========================== -->
+      <section class="section wrap numbers-section" aria-label="What it costs">
+        <div class="numbers reveal stagger">
+          <div class="num-tile"><b data-num="0" data-prefix="$">$0</b><span>to list your place</span></div>
+          <div class="num-tile"><b data-num="0" data-prefix="$">$0</b><span>to browse and request</span></div>
+          <div class="num-tile"><b data-num="0" data-suffix="%">0%</b><span>of your rent taken</span></div>
+          <div class="num-tile"><b data-num="9" data-prefix="$">$9</b><span>for a 7 day boost, optional</span></div>
+        </div>
+      </section>
+
+      <!-- ====================== How Handoff compares ================== -->
+      <section class="section wrap" id="compare" aria-labelledby="compare-title">
+        <div class="section-heading center reveal">
+          <p class="eyebrow-pill">How Handoff compares</p>
+          <h2 id="compare-title">Built for one job.</h2>
+          <p class="lede">Six products, the same job, checked side by side.</p>
+        </div>
+
+        <div class="table-scroll reveal">
+          <table class="vs-table">
+            <caption class="sr-only">Handoff compared with five student sublet startups, feature by feature</caption>
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">Feature</span></th>
+                <th scope="col" class="col-us"><span class="us-head"><strong>Handoff</strong><span class="us-tag"><svg class="icon" aria-hidden="true"><use href="#check" /></svg>That is us</span></span></th>
+                <th scope="col">SubLeaps<small>verified .edu students</small></th>
+                <th scope="col">UniLet<small>university email sign up</small></th>
+                <th scope="col">Snag<small>sublets and monthly rentals</small></th>
+                <th scope="col">The Student Sublet<small>student sublets, US and Canada</small></th>
+                <th scope="col">Find My Place<small>campus housing, Utah first</small></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Student email verified</th>
+                <td class="col-us"><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">ID checked on listings, not a campus email</span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Says verified, method not shown</span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+              </tr>
+              <tr>
+                <th scope="row">Shows the savings versus the original lease</th>
+                <td class="col-us"><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Compares sublets to each other, not the lease</span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+              </tr>
+              <tr>
+                <th scope="row">Map with walk and drive time from campus, plus the campus safety zone</th>
+                <td class="col-us"><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Map view, no campus walk time or safety layer</span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Walk time written into listings, no map</span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Distance to campus filter, no map shown</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Free to list, browse and message, with no cut of your rent</th>
+                <td class="col-us"><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Booking and payment run through the app</span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Owners pay 20 dollars a unit each month</span></td>
+              </tr>
+              <tr>
+                <th scope="row">Contact shared only after a handoff request is accepted</th>
+                <td class="col-us"><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">In app chat, some listings verified users only</span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+              </tr>
+              <tr>
+                <th scope="row">Built for semester timing, dates first</th>
+                <td class="col-us"><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Date ranges, no semester presets</span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">One to three month stays, not semesters</span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Dates on listings, no semester filter</span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+              </tr>
+              <tr>
+                <th scope="row">Live across the Los Angeles area today</th>
+                <td class="col-us"><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">Has a campus page, its Los Angeles listings sit in Westwood</span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">LA listings, the nearest are by UCLA</span></td>
+                <td><span class="mark-some" role="img" aria-label="Partly"></span><span class="cell-note">LA sublets, no campus view</span></td>
+                <td><span class="mark-yes" role="img" aria-label="Yes"><svg class="icon" aria-hidden="true"><use href="#check" /></svg></span></td>
+                <td><span class="mark-no" role="img" aria-label="No"></span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="scroll-hint">Swipe the table sideways to see every column.</p>
+        <div class="vs-legend">
+          <span><span class="mark-yes" aria-hidden="true"><svg class="icon"><use href="#check" /></svg></span>Yes</span><span><span class="mark-some" aria-hidden="true"></span>Depends on the platform</span><span><span class="mark-no" aria-hidden="true"></span>No</span>
+        </div>
+        <p class="compare-note">Reflects public product pages on 14 September 2026.</p>
+      </section>
+
+      <!-- ========================= On your phone ======================= -->
+      <section class="section wrap" id="phone" aria-labelledby="phone-title">
+        <div class="phone-layout">
+          <div class="phone-copy reveal">
+            <p class="eyebrow-pill">On your phone</p>
+            <h2 id="phone-title">The map in one hand.</h2>
+            <p class="lede">No top bar, a floating nav, the search and your school on one line. Cards ride along the bottom and follow the map.</p>
+            <ul class="phone-points stagger">
+              <li><span class="pt-icon"><svg class="icon"><use href="#search" /></svg></span><span><strong>Search this area</strong><small>Your school sits in the field. Tap it to switch.</small></span></li>
+              <li><span class="pt-icon"><svg class="icon"><use href="#list-icon" /></svg></span><span><strong>Map or list</strong><small>One button in the filter strip, nothing else to learn.</small></span></li>
+              <li><span class="pt-icon"><svg class="icon"><use href="#plus" /></svg></span><span><strong>List from the nav</strong><small>The blue button in the pill starts a listing.</small></span></li>
+            </ul>
+          </div>
+
+          <div class="phone-stage reveal">
+            <span class="ring r1" aria-hidden="true"></span><span class="ring r2" aria-hidden="true"></span>
+            <div class="phone" data-phone aria-hidden="true">
+              <div class="phone-notch"></div>
+              <div class="phone-screen map-canvas">
+                <svg class="map-art" viewBox="0 0 360 700" preserveAspectRatio="xMidYMid slice">
+                  <rect width="360" height="700" fill="#f8f9fa" />
+                  <g fill="#eef0f2"><rect x="14" y="120" width="80" height="90" rx="3" /><rect x="14" y="230" width="80" height="110" rx="3" /><rect x="270" y="120" width="80" height="90" rx="3" /><rect x="270" y="230" width="80" height="110" rx="3" /><rect x="14" y="380" width="80" height="120" rx="3" /><rect x="110" y="380" width="140" height="120" rx="3" /><rect x="270" y="380" width="80" height="120" rx="3" /><rect x="14" y="520" width="80" height="120" rx="3" /><rect x="270" y="520" width="80" height="120" rx="3" /></g>
+                  <rect x="110" y="120" width="140" height="220" rx="6" fill="#e6eee2" />
+                  <g stroke="#e3e6ea" stroke-width="12" fill="none"><path d="M0 110H360M0 360H360M0 510H360M100 0V700M260 0V700" /></g>
+                  <g stroke="#fff" stroke-width="8" fill="none"><path d="M0 110H360M0 360H360M0 510H360M100 0V700M260 0V700" /></g>
+                  <path d="M60 170 L250 150 L280 320 L80 340 Z" fill="rgb(21 154 106 / 0.07)" stroke="#159a6a" stroke-width="1.6" stroke-dasharray="6 5" />
+                  <g font-family="Geist, sans-serif" font-size="9" fill="#9aa2ab" letter-spacing="0.6"><text x="20" y="470">EXPOSITION PARK</text><text x="268" y="460">HISTORIC SOUTH</text></g>
+                </svg>
+                <span class="campus-glow"></span><span class="campus-dot"></span>
+                <span class="campus-marker shot-campus">University of Southern California</span>
+                <span class="pin p1"><span class="price-marker has-savings">$975</span></span>
+                <span class="pin p2"><span class="price-marker has-savings">$1,950</span></span>
+                <span class="pin p3"><span class="cluster-marker">4</span></span>
+                <span class="pin p4"><span class="cluster-marker">7</span></span>
+                <span class="pin p5"><span class="price-marker">$800</span></span>
+                <span class="pin p6"><span class="price-marker has-savings is-active">$1,650</span></span>
+                <div class="ph-top">
+                  <div class="search-field"><span class="school-chip"><img src="assets/usc.svg" alt="" width="12" height="18" /><svg class="icon chip-chevron"><use href="#chevron" /></svg></span><span class="search-text">Search this area</span></div>
+                  <span class="ph-signup">Sign up</span>
+                </div>
+                <div class="ph-chips">
+                  <span class="chip"><svg class="icon"><use href="#calendar" /></svg>Dates<svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                  <span class="chip"><svg class="icon"><use href="#sliders" /></svg>Price<svg class="icon chip-chevron"><use href="#chevron" /></svg></span>
+                  <span class="chip"><svg class="icon"><use href="#bed" /></svg>Rooms</span>
+                  <span class="chip ph-view"><svg class="icon"><use href="#list-icon" /></svg>List</span>
+                </div>
+                <div class="ph-ctrl"><span><svg class="icon"><use href="#plus" /></svg></span><span><svg class="icon"><use href="#minus" /></svg></span><span class="loc"><svg class="icon"><use href="#locate" /></svg></span></div>
+                <div class="ph-carousel" data-ph-carousel>
+                  <article class="listing-card compact ph-card">
+                    <div class="card-photo beige"><span class="photo-badges"><i class="badge-boost"><svg class="icon"><use href="#bolt" /></svg></i><i class="badge-mate"><svg class="icon"><use href="#users" /></svg></i></span><span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span></div>
+                    <div class="card-body"><div class="card-topline"><div class="card-price"><strong>$1,150</strong><span>/mo</span></div><span class="savings-tag">Save $125</span></div><p class="card-title">Private room on West 30th</p><p class="card-meta">Private room · 1 bd · 1 ba</p><p class="card-meta">Jan 10 to May 15 · <span class="card-distance">8 min walk</span></p></div>
+                  </article>
+                  <article class="listing-card compact ph-card">
+                    <div class="card-photo sage"><span class="photo-badges"><i class="badge-boost"><svg class="icon"><use href="#bolt" /></svg></i></span><span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span></div>
+                    <div class="card-body"><div class="card-topline"><div class="card-price"><strong>$1,650</strong><span>/mo</span></div><span class="savings-tag">Save $150</span></div><p class="card-title">Lorenzo studio with parking</p><p class="card-meta">Entire place · Studio · 1 ba</p><p class="card-meta">Jan 10 to May 15 · <span class="card-distance">9 min walk</span></p></div>
+                  </article>
+                  <article class="listing-card compact ph-card">
+                    <div class="card-photo terracotta"><span class="photo-heart"><svg class="icon"><use href="#heart" /></svg></span></div>
+                    <div class="card-body"><div class="card-topline"><div class="card-price"><strong>$800</strong><span>/mo</span></div></div><p class="card-title">Shared room on West 32nd</p><p class="card-meta">Shared room · 1 bd · 1 ba</p><p class="card-meta">Oct 1 to May 31 · <span class="card-distance">3 min walk</span></p></div>
+                  </article>
+                </div>
+                <nav class="ph-nav">
+                  <span class="is-on"><svg class="icon"><use href="#search" /></svg>Browse</span>
+                  <span><svg class="icon"><use href="#heart" /></svg>Saved</span>
+                  <span class="ph-plus"><i><svg class="icon"><use href="#plus" /></svg></i>List</span>
+                  <span><svg class="icon"><use href="#inbox" /></svg>Requests</span>
+                  <span><svg class="icon"><use href="#home" /></svg>My listings</span>
+                </nav>
+              </div>
+            </div>
+            <div class="callout co-1"><b>Search and school</b><small>one field, one line</small></div>
+            <div class="callout co-2"><b>Floating nav</b><small>steps aside as you scroll</small></div>
+            <div class="callout co-3"><b>Cards follow the map</b><small>swipe, the pin lights up</small></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= Campuses =========================== -->
+      <section class="section wrap" id="campuses" aria-labelledby="campuses-title">
+        <div class="campus-layout">
+          <div class="campus-copy reveal">
+            <p class="eyebrow-pill">Campuses</p>
+            <h2 id="campuses-title">Live across the Los Angeles area.</h2>
+            <p class="lede">Every campus from University of Southern California to Pepperdine University is open for posting. Students anywhere can sign up and browse, and other cities join the waitlist.</p>
+            <a class="button primary" href="https://app.handofflease.com/browse">Find your school<svg class="icon" aria-hidden="true"><use href="#arrow" /></svg></a>
+          </div>
+          <div class="campus-demo reveal" data-campus-demo>
+            <div class="school-search"><svg class="icon"><use href="#search" /></svg><span class="ss-text"><span data-campus-type></span><i class="caret"></i></span><span class="ss-hint">Search your school</span></div>
+            <ul class="school-results" data-campus-results>
+              <li class="sr-row is-live"><img src="assets/usc.svg" alt="" width="14" height="21" /><span><strong>University of Southern California</strong><small>University Park, Los Angeles</small></span><span class="pill green"><span class="live-dot"></span>Live</span></li>
+              <li class="sr-row"><span class="sr-mono">UC</span><span><strong>University of California, Los Angeles</strong><small>Westwood, Los Angeles</small></span><span class="pill green"><span class="live-dot"></span>Live</span></li>
+              <li class="sr-row"><span class="sr-mono">US</span><span><strong>University of San Francisco</strong><small>San Francisco</small></span><span class="pill">Coming soon</span></li>
+              <li class="sr-row"><span class="sr-mono">US</span><span><strong>University of San Diego</strong><small>San Diego</small></span><span class="pill">Coming soon</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ FAQ ============================= -->
+      <section class="section wrap" id="faq" aria-labelledby="faq-title">
+        <div class="faq-grid">
+          <div class="faq-intro reveal">
+            <p class="eyebrow-pill">Good questions</p>
+            <h2 id="faq-title">A few questions.</h2>
+            <a class="text-link" href="https://app.handofflease.com/browse">Take a look around<svg class="icon" aria-hidden="true"><use href="#arrow" /></svg></a>
+          </div>
+          <div class="faq-list reveal stagger" data-accordion>
+            <div class="faq-item" data-open="true">
+              <button class="faq-head" type="button" aria-expanded="true" aria-controls="faq-1">How does student verification work?<span class="faq-chevron" aria-hidden="true"><svg class="icon"><use href="#chevron" /></svg></span></button>
+              <div class="faq-panel" id="faq-1" role="region"><div class="faq-panel-inner"><p>Confirm you are a student with your school email, once, before you list a place or send a request.</p><p>It confirms access to that email, not identity, enrollment, or the lease.</p></div></div>
+            </div>
+            <div class="faq-item" data-open="false">
+              <button class="faq-head" type="button" aria-expanded="false" aria-controls="faq-2">Is Handoff free to use?<span class="faq-chevron" aria-hidden="true"><svg class="icon"><use href="#chevron" /></svg></span></button>
+              <div class="faq-panel" id="faq-2" role="region"><div class="faq-panel-inner"><p>Yes. Browsing, listing, and requests are free, and Handoff never touches rent or deposits. A boost is optional, $9 for 7 days at the top.</p></div></div>
+            </div>
+            <div class="faq-item" id="contact-privacy" data-open="false">
+              <button class="faq-head" type="button" aria-expanded="false" aria-controls="faq-3">When is my email shared?<span class="faq-chevron" aria-hidden="true"><svg class="icon"><use href="#chevron" /></svg></span></button>
+              <div class="faq-panel" id="faq-3" role="region"><div class="faq-panel-inner"><p>Your email stays hidden on public listings and pending requests.</p><p>Once the listing owner accepts, both students see each other's email in the app.</p></div></div>
+            </div>
+            <div class="faq-item" data-open="false">
+              <button class="faq-head" type="button" aria-expanded="false" aria-controls="faq-4">Can I list a room in a shared apartment?<span class="faq-chevron" aria-hidden="true"><svg class="icon"><use href="#chevron" /></svg></span></button>
+              <div class="faq-panel" id="faq-4" role="region"><div class="faq-panel-inner"><p>Yes. Choose a private room, shared room, or entire place, then add photos, dates, and who you are looking for as a roommate.</p></div></div>
+            </div>
+            <div class="faq-item" data-open="false">
+              <button class="faq-head" type="button" aria-expanded="false" aria-controls="faq-5">Which campuses are supported?<span class="faq-chevron" aria-hidden="true"><svg class="icon"><use href="#chevron" /></svg></span></button>
+              <div class="faq-panel" id="faq-5" role="region"><div class="faq-panel-inner"><p>Handoff is open at every campus in the Los Angeles area, from University of Southern California and University of California, Los Angeles to the Claremont colleges and Pepperdine University. Students from any school can sign up and browse, and other cities join the waitlist.</p></div></div>
+            </div>
+            <div class="faq-item" data-open="false">
+              <button class="faq-head" type="button" aria-expanded="false" aria-controls="faq-6">What should we handle before moving in?<span class="faq-chevron" aria-hidden="true"><svg class="icon"><use href="#chevron" /></svg></span></button>
+              <div class="faq-panel" id="faq-6" role="region"><div class="faq-panel-inner"><p>Visit the place, read the lease, and confirm any landlord approval.</p><p>Handoff connects students and does not inspect properties, sign leases, or process payments.</p></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= Final CTA ========================== -->
+      <section class="final-section wrap">
+        <div class="final-card reveal">
+          <div class="sky" aria-hidden="true"><span class="bank far"></span><span class="bank near"></span></div>
+          <div class="final-copy">
+            <h2>Your next chapter needs a place.</h2>
+            <p>Or your place needs its next student. Either way, it starts here.</p>
+          </div>
+          <div class="final-actions">
+            <a class="button primary large" href="https://app.handofflease.com/browse">Find a place<svg class="icon" aria-hidden="true"><use href="#arrow" /></svg></a><a class="button secondary large" href="https://app.handofflease.com/listings/new">List your place</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer wrap">
+      <div class="footer-top">
+        <div>
+          <a href="https://handofflease.com/" class="wordmark" aria-label="Handoff home"><span class="mark" aria-hidden="true"><svg class="icon"><use href="#key" /></svg></span>Handoff</a>
+          <p>A place for your next chapter. Built at University of Southern California by students.</p>
+        </div>
+        <nav aria-label="Footer navigation">
+          <a href="https://app.handofflease.com/browse">Browse listings</a><a href="https://app.handofflease.com/listings/new">List your place</a><a href="#how-it-works">How it works</a><a href="#compare">Compare</a><a href="#faq">FAQ</a><a href="https://app.handofflease.com/terms">Terms</a><a href="https://app.handofflease.com/privacy">Privacy</a>
+        </nav>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year">2026</span> Handoff</span><span>For students, between chapters.</span><a href="#contact-privacy">How contact sharing works<svg class="icon" aria-hidden="true"><use href="#arrow-up" /></svg></a>
+      </div>
+    </footer>
+  </body>
+</html>

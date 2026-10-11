@@ -1,0 +1,1617 @@
+/* Handoff on a phone. Everything below 761px, nothing above it.
+   Full bleed screens on --soft, iOS style grouped inset lists and forms,
+   bottom sheets instead of centered dialogs, pinned action bars that clear
+   the tab bar and the safe area. Loaded last so it wins on specificity ties. */
+
+/* Elements that only exist for the phone layout stay out of the way elsewhere. */
+.m-account,
+.sheet-grip,
+.gallery-counter,
+.mg-row-link,
+.mg-chevron,
+.pf-signout {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --page-x: var(--s-4);
+    --gutter: var(--s-4);
+    /* The nav pill is inset, so everything pinned to the bottom clears the
+       pill, its own gap and the home bar, with 8px of air left over. */
+    --nav-inset: var(--s-4);
+    --nav-gap: var(--s-3);
+    --tabbar: calc(
+      var(--mobile-nav-h) + var(--nav-gap) + 8px + env(safe-area-inset-bottom)
+    );
+    --group-r: 14px;
+  }
+
+  /* ---------- Shell ---------- */
+  /* No top bar on a phone. Every screen carries its own large title and the
+     account entry, which is worth more than 60px of chrome. */
+  .site-header {
+    display: none;
+  }
+  body {
+    background: var(--soft);
+  }
+  main {
+    background: var(--soft);
+    padding-bottom: var(--tabbar);
+    min-height: 100dvh;
+  }
+  /* Each screen owns the status bar inset, so a full height page like browse
+     is never pushed past the bottom of the viewport. */
+  html:has(.verify-banner) .browse-page {
+    height: calc(100dvh - 44px);
+  }
+  /* Browse fills the viewport and floats its own carousel above the nav, so
+     the shared bottom padding would only paint a gray band under the pill. */
+  main:has(> .browse-page) {
+    padding-bottom: 0;
+    min-height: 0;
+  }
+  .toast-region {
+    bottom: calc(var(--tabbar) + var(--s-2));
+    max-width: calc(100% - var(--s-8));
+  }
+  .toast {
+    border-radius: var(--group-r);
+    font-size: 14px;
+  }
+
+  /* ---------- Floating nav pill ---------- */
+  .mobile-nav {
+    left: var(--nav-inset);
+    right: var(--nav-inset);
+    bottom: calc(var(--nav-gap) + env(safe-area-inset-bottom));
+    height: var(--mobile-nav-h);
+    padding-bottom: 0;
+    border-top: 0;
+    border-radius: 28px;
+    background: rgb(255 255 255 / 0.92);
+    backdrop-filter: saturate(1.8) blur(20px);
+    -webkit-backdrop-filter: saturate(1.8) blur(20px);
+    box-shadow: var(--shadow-lg), var(--ring);
+    transition: transform var(--duration-quick) var(--ease-smooth-out);
+  }
+  .mobile-nav.is-hidden {
+    transform: translateY(
+      calc(100% + var(--nav-gap) + env(safe-area-inset-bottom) + 8px)
+    );
+  }
+  .mobile-nav a {
+    position: relative;
+    font-size: 11px;
+    border-radius: 24px;
+  }
+  .mobile-nav a > * {
+    position: relative;
+    z-index: 1;
+  }
+  /* The soft dot behind the icon marks where the student is. */
+  .mobile-nav a.active::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    width: 32px;
+    height: 24px;
+    border-radius: var(--r-pill);
+    background: var(--blue-soft);
+  }
+  .mobile-list-action.active::before {
+    display: none;
+  }
+  .mobile-list-button {
+    margin-top: -16px;
+  }
+
+  /* ---------- Account entry, the header replacement ---------- */
+  .m-account {
+    display: block;
+    position: relative;
+    flex: none;
+  }
+  /* The button is the 44px target. The ring inside it is 32px, so nothing
+     spills past the header row the way a negative inset pseudo did. */
+  .m-account-avatar {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    transition: transform var(--duration-quick) var(--ease-out);
+  }
+  .m-account-avatar:active {
+    transform: scale(0.94);
+  }
+  .m-account-avatar .avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+  .m-account-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 var(--s-4);
+    border-radius: var(--r-pill);
+    background: var(--blue);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    transition: transform var(--duration-quick) var(--ease-out);
+  }
+  .m-account-pill:active {
+    transform: scale(0.96);
+  }
+  /* In a title row the avatar sits on the right of the heading line. */
+  .page-heading {
+    position: relative;
+    padding-right: 48px;
+  }
+  .page-heading > .m-account {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  /* Over a full bleed surface it floats instead. */
+  .m-account.is-floating {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + var(--s-3));
+    right: var(--s-3);
+    z-index: 30;
+  }
+  .m-account.is-floating .m-account-avatar,
+  .m-account.is-floating .m-account-pill,
+  .browse-page.mobile-map .browse-account .m-account-avatar,
+  .browse-page.mobile-map .browse-account .m-account-pill {
+    background: rgb(255 255 255 / 0.92);
+    backdrop-filter: saturate(1.6) blur(18px);
+    -webkit-backdrop-filter: saturate(1.6) blur(18px);
+    box-shadow: var(--shadow-lg), var(--ring);
+  }
+  .m-account.is-floating .m-account-pill,
+  .browse-page.mobile-map .browse-account .m-account-pill {
+    background: var(--blue);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* The account menu as a bottom sheet. */
+  .m-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .m-sheet-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgb(16 24 40 / 0.4);
+    animation: m-sheet-fade var(--modal-open-dur) var(--modal-ease);
+  }
+  .m-sheet-panel {
+    position: relative;
+    background: var(--surface);
+    border-top-left-radius: var(--r-xl);
+    border-top-right-radius: var(--r-xl);
+    padding: var(--s-2) var(--s-4)
+      calc(var(--s-5) + env(safe-area-inset-bottom));
+    box-shadow: var(--shadow-lg);
+    animation: m-sheet-up var(--modal-open-dur) var(--modal-ease);
+  }
+  .m-sheet-grip {
+    display: block;
+    width: 40px;
+    height: 5px;
+    margin: var(--s-2) auto var(--s-3);
+    border-radius: var(--r-pill);
+    background: var(--line-2);
+  }
+  .m-sheet-panel .menu-identity {
+    border-bottom: 1px solid var(--line);
+    padding: 0 var(--s-2) var(--s-3);
+    margin-bottom: var(--s-2);
+  }
+  /* The sheet reuses the account menu rows, but not its dropdown framing. */
+  .m-sheet-list.account-menu {
+    position: static;
+    width: auto;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+  }
+  .m-sheet-list > a,
+  .m-sheet-list > button {
+    min-height: 48px;
+    font-size: 16px;
+    border-radius: var(--r-sm);
+  }
+  .m-sheet-list .menu-legal {
+    justify-content: center;
+    gap: var(--s-5);
+    padding: var(--s-3) var(--s-2) 0;
+  }
+  .m-sheet-list .menu-legal a {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+  }
+  @keyframes m-sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes m-sheet-fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* No page may scroll sideways. */
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  /* ---------- Type and page furniture ---------- */
+  .page-container {
+    padding: calc(env(safe-area-inset-top) + var(--s-5)) var(--gutter)
+      var(--s-10);
+    max-width: none;
+  }
+  .page-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-3);
+    margin-bottom: var(--s-6);
+  }
+  .page-heading h1 {
+    font-family: "Plus Jakarta Sans", "Geist", sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    text-align: left;
+  }
+  .page-heading p {
+    font-size: 14px;
+    line-height: 1.55;
+    margin-top: 6px;
+  }
+  .page-heading .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+  }
+  .heading-actions {
+    flex-shrink: 1;
+  }
+  .heading-actions > .button {
+    flex: 1;
+  }
+  .empty-state {
+    padding: var(--s-10) var(--s-4);
+    min-height: 260px;
+  }
+  .empty-state p {
+    font-size: 15px;
+  }
+  .empty-actions .button {
+    min-height: 48px;
+  }
+
+  /* ---------- Controls, tap targets, no iOS zoom ---------- */
+  input,
+  select,
+  textarea,
+  .auth-panel input,
+  .auth-panel select,
+  .editor-fields input,
+  .editor-fields select,
+  .editor-fields textarea {
+    font-size: 16px;
+  }
+  .button {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  .button.small {
+    min-height: 40px;
+    font-size: 13px;
+  }
+  .button.full-width,
+  .button.large,
+  .auth-cta {
+    min-height: 50px;
+    border-radius: var(--r-md);
+    font-size: 16px;
+  }
+  .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .text-button,
+  .back-link,
+  .report-link {
+    min-height: 44px;
+  }
+  .field-label {
+    font-size: 14px;
+  }
+  .field-hint,
+  .field-error {
+    font-size: 13px;
+  }
+  .muted,
+  .error-box,
+  .notice {
+    font-size: 14px;
+  }
+  .field-row {
+    gap: var(--s-5);
+  }
+
+  /* Reusable iOS grouping: one white card, hairlines between its rows. */
+  .m-group {
+    background: var(--surface);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+    overflow: hidden;
+  }
+
+  /* ---------- Modals become bottom sheets ---------- */
+  .modal,
+  .modal.wide {
+    width: 100%;
+    max-width: none;
+    inset: 0;
+    margin: auto auto 0;
+    padding: 0;
+    border-top-left-radius: var(--r-xl);
+    border-top-right-radius: var(--r-xl);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: 88dvh;
+  }
+  .modal-scroll {
+    padding: var(--s-2) var(--pad-modal)
+      calc(var(--s-5) + env(safe-area-inset-bottom));
+  }
+  /* The sheet rises from the bottom, the backdrop does exactly what it does
+     on a desktop, so opening reads the same on both. */
+  .modal[open] {
+    animation: sheet-in var(--modal-in) var(--modal-ease) 60ms both;
+  }
+  .modal.is-closing {
+    animation: sheet-out var(--modal-out) var(--modal-ease) both;
+  }
+  @keyframes sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes sheet-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+  }
+  .sheet-grip {
+    display: grid;
+    place-items: center;
+    flex: none;
+    height: 26px;
+    padding-top: var(--s-2);
+    background: var(--surface);
+  }
+  .sheet-grip > span {
+    width: 40px;
+    height: 5px;
+    border-radius: var(--r-pill);
+    background: var(--line-2);
+  }
+  .modal-heading {
+    padding: var(--s-1) 0 var(--s-3);
+    margin: 0 0 var(--s-5);
+  }
+  .modal-heading h2 {
+    font-size: 20px;
+  }
+  /* The same 36px button as everywhere, with a 44px tap target around it. */
+  .modal-close {
+    top: var(--s-4);
+    right: var(--s-3);
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+  .modal-close::after {
+    inset: -4px;
+  }
+  .modal-actions,
+  .modal-actions.spread {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--s-2);
+  }
+  .modal-actions .button {
+    width: 100%;
+  }
+  .request-sent .modal-actions {
+    flex-direction: column-reverse;
+  }
+  .photo-viewer > img {
+    height: 56dvh;
+  }
+
+  /* ---------- Pinned bottom action areas ---------- */
+  .detail-bar,
+  .editor-bar,
+  .auth-pinned {
+    position: fixed;
+    left: 0;
+    right: 0;
+    /* Above the inset nav pill, with a 12px gap, never on top of it. */
+    bottom: calc(var(--tabbar) + var(--s-3));
+    z-index: 55;
+    padding: var(--s-3) var(--gutter);
+    background: rgb(255 255 255 / 0.86);
+    backdrop-filter: saturate(1.5) blur(18px);
+    -webkit-backdrop-filter: saturate(1.5) blur(18px);
+    border-top: 1px solid var(--line);
+  }
+
+  /* ---------- Auth ---------- */
+  .auth-page {
+    display: block;
+    padding: 0;
+    background: var(--soft);
+    min-height: calc(100dvh - var(--header-h) - var(--tabbar));
+  }
+  .auth-box {
+    display: block;
+    max-width: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .auth-panel {
+    display: block;
+    padding: var(--s-5) var(--gutter) var(--s-8);
+    background: transparent;
+  }
+  /* The app header already carries the wordmark. */
+  .auth-brand {
+    display: none;
+  }
+  .auth-panel-inner {
+    gap: var(--s-6);
+  }
+  .auth-head h1 {
+    font-size: 28px;
+    letter-spacing: -0.03em;
+  }
+  .auth-head p {
+    font-size: 15px;
+  }
+  .auth-check {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--r-lg);
+  }
+  .auth-form {
+    gap: var(--s-3);
+  }
+  /* Fields read as one inset group row each. */
+  .auth-form .field {
+    background: var(--surface);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+    padding: var(--s-3) var(--s-4);
+    gap: var(--s-1);
+  }
+  .auth-form .field-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .auth-form .field input,
+  .auth-form .field textarea {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    min-height: 30px;
+    padding: 0;
+    font-size: 16px;
+  }
+  .auth-form .field input:focus,
+  .auth-form .field textarea:focus {
+    box-shadow: none;
+  }
+  .auth-form .password-input input {
+    padding-right: 48px;
+  }
+  .auth-form .password-input button {
+    right: -4px;
+  }
+  .auth-form .field .field-hint,
+  .auth-form .field .field-error {
+    font-size: 12.5px;
+  }
+  .auth-school-line {
+    padding: 0 2px;
+    font-size: 14px;
+  }
+  .auth-otp {
+    gap: var(--s-2);
+  }
+  .auth-school-line small {
+    padding-left: 32px;
+    font-size: 13px;
+  }
+  .forgot-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: -10px;
+    font-size: 14px;
+  }
+  .auth-switch {
+    text-align: center;
+    font-size: 14px;
+    padding-top: 4px;
+  }
+  .auth-hint,
+  .auth-fineprint {
+    font-size: 13px;
+    padding: 0 2px;
+  }
+  .auth-back {
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .auth-otp input {
+    min-height: 52px;
+    border-radius: var(--r-md);
+    font-size: 22px;
+  }
+  .auth-verify-aside .text-button {
+    font-size: 14px;
+  }
+  .auth-meter-block {
+    margin-top: 2px;
+    gap: var(--s-2);
+  }
+  .auth-meter span {
+    height: 5px;
+  }
+  .auth-meter-note {
+    font-size: 13px;
+    padding: 0 2px;
+  }
+  /* The stagger puts will-change and filter on the shake wrapper, and either
+     one traps a position: fixed descendant. Move the stagger one level in. */
+  .auth-shake {
+    will-change: auto;
+  }
+  .auth-panel-inner.enter-stagger > * {
+    animation: none;
+    filter: none;
+  }
+  .auth-panel-inner .auth-block > * {
+    animation: rise-in var(--duration-slow) var(--ease-smooth-out) both;
+  }
+  .auth-panel-inner .auth-block > *:nth-child(2) {
+    animation-delay: var(--duration-stagger);
+  }
+  .auth-panel-inner .auth-block > *:nth-child(3) {
+    animation-delay: calc(var(--duration-stagger) * 2);
+  }
+  .auth-panel-inner .auth-block > *:nth-child(n + 4) {
+    animation-delay: calc(var(--duration-stagger) * 3);
+  }
+  /* The verify step pins its primary action above the tab bar. */
+  .auth-pinned {
+    display: flex;
+  }
+  .auth-pinned .auth-cta {
+    width: 100%;
+  }
+  .auth-page:has(.auth-pinned) .auth-panel {
+    padding-bottom: 96px;
+  }
+
+  /* ---------- Listing detail ---------- */
+  .detail-page {
+    /* Clear the pinned price bar and the nav pill under it. */
+    padding: 0 0 calc(var(--tabbar) + 84px);
+  }
+  .detail-top {
+    padding: calc(env(safe-area-inset-top) + var(--s-2)) var(--gutter) var(--s-2);
+    margin-bottom: 0;
+    min-height: 44px;
+  }
+  .gallery-wrap {
+    position: relative;
+  }
+  .gallery {
+    display: flex;
+    height: 290px;
+    gap: 0;
+    border-radius: 0;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .gallery .gallery-photo,
+  .gallery .gallery-photo:first-child {
+    flex: 0 0 100%;
+    height: 100%;
+    border-radius: 0;
+    scroll-snap-align: start;
+  }
+  .gallery-photo img {
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .all-photos {
+    display: none;
+  }
+  .gallery-counter {
+    display: inline-flex;
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 2;
+    padding: 4px 10px;
+    border-radius: var(--r-pill);
+    background: rgb(16 24 40 / 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .detail-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    margin-top: 0;
+    padding: 0 var(--gutter);
+  }
+  .detail-main {
+    gap: var(--s-4);
+  }
+  .detail-head {
+    padding: var(--s-5) 2px 0;
+    gap: var(--s-2);
+  }
+  .detail-head h1 {
+    font-size: 28px;
+  }
+  .detail-address,
+  .detail-distance {
+    font-size: 14px;
+  }
+  /* Facts scroll sideways instead of wrapping into a block. */
+  /* The strip scrolls inside the content column. It used to bleed past the
+     gutter with a negative margin, which made .detail-main 16px wider than
+     its own box and left the page relying on an overflow clip. */
+  .fact-strip {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0;
+    padding: 2px 0;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 calc(100% - 24px),
+      transparent
+    );
+  }
+  .fact-strip::after {
+    content: "";
+    flex: 0 0 var(--s-3);
+  }
+  .fact-strip::-webkit-scrollbar,
+  .gallery::-webkit-scrollbar {
+    display: none;
+  }
+  .fact-strip li {
+    min-height: 38px;
+    background: var(--surface);
+    font-size: 13px;
+  }
+  .detail-section {
+    border-top: 0;
+    padding: var(--pad-card);
+    background: var(--surface);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+  }
+  .detail-section h2 {
+    font-size: 18px;
+    margin-bottom: var(--s-3);
+  }
+  .detail-section > p {
+    font-size: 15px;
+  }
+  .detail-map {
+    height: 190px;
+    border-radius: var(--r-md);
+    box-shadow: none;
+  }
+  .amenity-grid li {
+    min-height: 34px;
+    font-size: 13px;
+  }
+  .host-card,
+  .detail-guidance {
+    padding: var(--pad-card);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+  }
+  .detail-guidance {
+    background: var(--blue-soft);
+    color: var(--blue-ink);
+    box-shadow: none;
+  }
+  .detail-guidance p {
+    color: var(--blue-ink);
+    font-size: 13px;
+  }
+  .report-link {
+    align-self: center;
+    font-size: 14px;
+  }
+  .request-card {
+    position: static;
+    padding: var(--pad-card);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+  }
+  .request-note,
+  .request-line {
+    font-size: 14px;
+  }
+  .detail-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+  }
+  .detail-bar .request-price strong {
+    font-size: 20px;
+  }
+  .detail-bar-actions {
+    flex: 1;
+    min-width: 0;
+  }
+  .detail-bar-actions .button {
+    width: 100%;
+    min-height: 46px;
+  }
+  .sk-card {
+    height: 240px;
+  }
+
+  /* ---------- Listing editor ---------- */
+  /* The wizard becomes one step per screen, a native feeling flow. */
+  .editor-shell {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: calc(env(safe-area-inset-top) + var(--s-2)) var(--gutter)
+      calc(var(--tabbar) + 84px);
+    background: var(--soft);
+  }
+  .editor-rail {
+    padding: 0;
+    gap: 0;
+    overflow: visible;
+    background: transparent;
+    border-right: 0;
+  }
+  .rail-back {
+    min-height: 36px;
+    font-size: 14px;
+    color: var(--blue);
+  }
+  .step-rail,
+  .draft-note,
+  .rail-head h1,
+  .rail-head .pill {
+    display: none;
+  }
+  .editor-main {
+    background: transparent;
+  }
+  .editor-head {
+    display: block;
+    position: relative;
+    padding: 2px 48px 0 2px;
+    background: transparent;
+    border-bottom: 0;
+  }
+  .editor-head > .m-account {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  .step-count {
+    margin-bottom: 3px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+  .head-text h2 {
+    font-family: "Plus Jakarta Sans", "Geist", sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
+  }
+  .head-text p {
+    font-size: 14px;
+    margin-top: var(--s-2);
+  }
+  /* The step count carries the position now. No bar, matching the chooser
+     and the assisted paths, which have none. */
+  .mobile-progress {
+    display: none;
+  }
+  .editor-head {
+    margin-bottom: var(--s-6);
+  }
+  .mobile-progress > span {
+    flex: 1;
+    height: 4px;
+    border-radius: var(--r-pill);
+    background: var(--line-2);
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .mobile-progress > span.is-done {
+    background: var(--blue-soft-2);
+  }
+  .mobile-progress > span.is-current {
+    background: var(--blue);
+  }
+  /* One step at a time, pushed in like a native stack. */
+  .editor-body {
+    overflow: visible;
+  }
+  .editor-body > .t-page {
+    position: static;
+    padding: 0;
+    overflow: visible;
+  }
+  .editor-body > .t-page[data-pos="current"] {
+    animation: editor-step-in var(--duration-fast) var(--ease-smooth-out) both;
+  }
+  .editor-body[data-dir="back"] > .t-page[data-pos="current"] {
+    --step-from-x: calc(var(--page-slide-distance) * -1);
+  }
+  @keyframes editor-step-in {
+    from {
+      opacity: 0;
+      transform: translateX(var(--step-from-x, 8px));
+      filter: blur(var(--blur-medium));
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+      filter: blur(0);
+    }
+  }
+  .step-inner {
+    max-width: none;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  /* Each step is one grouped inset form with hairlines between rows. */
+  .step-inner > .stack {
+    gap: 0;
+    background: var(--surface);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+    overflow: hidden;
+  }
+  .step-inner > .stack > *,
+  .step-inner > .stack > .field-row > .field,
+  .step-inner > .stack > .savings-field > .field {
+    padding: var(--s-3) var(--s-4);
+    box-shadow: inset 0 1px 0 var(--line);
+  }
+  .step-inner > .stack > .field-row,
+  .step-inner > .stack > .savings-field {
+    padding: 0;
+    gap: 0;
+    box-shadow: none;
+    grid-template-columns: 1fr;
+  }
+  .step-inner > .stack > :first-child,
+  .step-inner > .stack > .field-row:first-child > .field:first-child,
+  .step-inner > .stack > .savings-field:first-child > .field:first-child {
+    box-shadow: none;
+  }
+  .step-inner > .stack .field-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .step-inner > .stack .field > input,
+  .step-inner > .stack .field > textarea,
+  .step-inner > .stack .field > select,
+  .step-inner > .stack .input-prefix > input {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    min-height: 30px;
+  }
+  .step-inner > .stack .input-prefix > input {
+    padding-left: 14px;
+  }
+  .step-inner > .stack .input-prefix > span {
+    left: 0;
+  }
+  .step-inner > .stack .field > select {
+    padding-right: 26px;
+    background-position: right 0 center;
+  }
+  .step-inner > .stack .field > textarea {
+    min-height: 104px;
+    resize: none;
+  }
+  .step-inner > .stack .field > input:focus,
+  .step-inner > .stack .field > textarea:focus,
+  .step-inner > .stack .field > select:focus {
+    box-shadow: none;
+  }
+  .step-inner .field.is-error input,
+  .step-inner .field.is-error select,
+  .step-inner .field.is-error textarea,
+  .step-inner .field.is-error .input-prefix > input {
+    box-shadow: none;
+  }
+  .step-inner .field.is-error .field-label {
+    color: var(--red-ink);
+  }
+  .step-inner .savings-callout {
+    margin: 0 var(--s-4) var(--s-3);
+  }
+  .step-inner .error-box {
+    margin-top: var(--s-4);
+  }
+  .room-options {
+    grid-template-columns: 1fr;
+    gap: var(--s-2);
+  }
+  .room-options > label {
+    background: var(--soft);
+    box-shadow: inset 0 0 0 1px var(--line-2);
+    min-height: 54px;
+  }
+  .amenity-chips {
+    gap: var(--s-2);
+  }
+  .amenity-chip {
+    min-height: 38px;
+  }
+  .editor-map {
+    height: 240px;
+    border-radius: var(--r-md);
+  }
+  .editor-map .loading {
+    min-height: 240px;
+  }
+  .map-foot {
+    gap: 8px;
+  }
+  .photo-dropzone {
+    min-height: 148px;
+    padding: var(--s-5);
+  }
+  .uploaded-photos {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--s-3);
+  }
+  .photo-remove,
+  .photo-tools {
+    opacity: 1;
+    transform: none;
+  }
+  .photo-tool.cover-tool {
+    font-size: 11px;
+    padding: 0 7px;
+  }
+  .review-listing {
+    gap: var(--s-5);
+  }
+  .review-facts {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-3) var(--s-4);
+  }
+  .terms-box {
+    border-radius: var(--group-r);
+    padding: var(--pad-card);
+  }
+  .terms-check {
+    font-size: 14px;
+  }
+  /* Pinned bottom bar, above the tab bar and the home bar. */
+  .editor-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--tabbar);
+    z-index: 55;
+    padding: var(--s-3) var(--gutter);
+    background: rgb(255 255 255 / 0.86);
+    backdrop-filter: saturate(1.5) blur(18px);
+    -webkit-backdrop-filter: saturate(1.5) blur(18px);
+    border-top: 1px solid var(--line);
+  }
+  .editor-foot .button {
+    min-height: 46px;
+    padding: 8px 12px;
+  }
+  .foot-actions {
+    flex: 1;
+    min-width: 0;
+    gap: var(--s-2);
+  }
+  .foot-actions > :last-child {
+    flex: 1;
+    min-width: 0;
+  }
+  .editor-success {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+  }
+
+  /* ---------- Account: saved ---------- */
+  .listings-grid {
+    grid-template-columns: 1fr;
+    gap: var(--s-3);
+  }
+  .listing-card.grid {
+    border-radius: var(--group-r);
+  }
+  .listing-card.grid .card-photo {
+    aspect-ratio: 16 / 10;
+  }
+  .listing-card.grid .card-title {
+    font-size: 16px;
+  }
+  .listing-card.grid .card-meta {
+    font-size: 13px;
+  }
+  .save-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* ---------- Account: my listings ---------- */
+  .tab-bar {
+    align-self: stretch;
+    margin-bottom: var(--s-4);
+  }
+  .tab {
+    min-height: 36px;
+    font-size: 13px;
+  }
+  .mg-list {
+    gap: 0;
+    background: var(--surface);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+    overflow: hidden;
+  }
+  .mg-row {
+    position: relative;
+    grid-template-columns: 64px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: var(--s-2) var(--s-3);
+    padding: var(--s-4);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .mg-row + .mg-row {
+    box-shadow: inset 0 1px 0 var(--line);
+  }
+  .mg-row-link {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .mg-thumb {
+    position: relative;
+    z-index: 1;
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+  }
+  .mg-main {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+    gap: 3px;
+  }
+  .mg-title h2 {
+    font-size: 15px;
+  }
+  .mg-facts {
+    gap: 2px var(--s-2);
+    font-size: 13px;
+  }
+  /* inline-flex cannot ellipsize, so the address becomes its own block line. */
+  .mg-facts > span:nth-of-type(2) {
+    display: block;
+    flex-basis: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mg-facts > span:nth-of-type(n + 3) {
+    display: none;
+  }
+  .mg-updated {
+    display: none;
+  }
+  .mg-chevron {
+    display: grid;
+    place-items: center;
+    color: var(--muted-2);
+  }
+  .mg-actions {
+    position: relative;
+    z-index: 1;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-top: 1px solid var(--line);
+    padding-top: var(--s-3);
+    margin-top: var(--s-1);
+    /* The row scrolls sideways, so the last action fades instead of clipping. */
+    mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  }
+  .mg-actions::-webkit-scrollbar,
+  .tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .mg-actions .button.small {
+    flex-shrink: 0;
+  }
+  .row-skeleton {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .row-skeleton > .skeleton {
+    width: 64px;
+    height: 64px;
+  }
+  .row-skeleton > div:last-child {
+    grid-column: 1 / -1;
+    flex-direction: row;
+  }
+
+  /* ---------- Account: requests ---------- */
+  .requests-page {
+    max-width: none;
+  }
+  .rq-list {
+    gap: 0;
+    background: var(--surface);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+    overflow: hidden;
+  }
+  .rq-card {
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: var(--pad-card);
+    gap: var(--s-3);
+  }
+  .rq-card + .rq-card {
+    box-shadow: inset 0 1px 0 var(--line);
+  }
+  .rq-head {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: var(--s-1) var(--s-3);
+    flex-wrap: nowrap;
+  }
+  .rq-thumb {
+    grid-row: span 2;
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
+  .rq-head-text {
+    flex-basis: auto;
+  }
+  .rq-head-text h2 {
+    font-size: 15px;
+  }
+  .rq-head-text p {
+    font-size: 13px;
+  }
+  .rq-head > .pill {
+    justify-self: start;
+    margin-left: 0;
+  }
+  .rq-quote {
+    padding: var(--s-3) var(--s-4);
+  }
+  .rq-quote p {
+    font-size: 14px;
+  }
+  .rq-actions {
+    justify-content: stretch;
+    gap: var(--s-2);
+  }
+  .rq-actions p {
+    flex-basis: 100%;
+    margin-right: 0;
+    font-size: 13px;
+  }
+  .rq-actions .button {
+    flex: 1 1 auto;
+  }
+  .rq-contact {
+    border-radius: var(--r-md);
+  }
+  .rq-contact .button {
+    width: 100%;
+  }
+  .rq-skeleton {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* ---------- Account: profile ---------- */
+  .profile-page {
+    max-width: none;
+  }
+  .profile-page .page-heading {
+    margin-bottom: 8px;
+  }
+  .pf-layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+  }
+  .pf-identity {
+    align-items: center;
+    text-align: center;
+    gap: var(--s-1);
+    padding: var(--s-3) var(--s-2) var(--s-1);
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  .avatar.pf-avatar {
+    width: 84px;
+    height: 84px;
+    font-size: 28px;
+    margin-bottom: var(--s-3);
+  }
+  .pf-identity h2 {
+    font-size: 20px;
+  }
+  .pf-email,
+  .pf-campus {
+    font-size: 14px;
+  }
+  .pf-note {
+    margin-top: var(--s-4);
+    padding-top: var(--s-4);
+    text-align: center;
+    font-size: 13px;
+  }
+  .pf-card {
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    gap: var(--s-3);
+  }
+  .pf-card > h2 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    padding: 0 4px;
+  }
+  .pf-card .stack {
+    gap: 0;
+    background: var(--surface);
+    border-radius: var(--group-r);
+    box-shadow: var(--ring);
+    overflow: hidden;
+  }
+  .pf-card .stack > *,
+  .pf-card .stack > .field-row > .field {
+    padding: var(--s-3) var(--s-4);
+    box-shadow: inset 0 1px 0 var(--line);
+  }
+  .pf-card .stack > .field-row {
+    padding: 0;
+    gap: 0;
+    box-shadow: none;
+    grid-template-columns: 1fr;
+  }
+  .pf-card .stack > :first-child {
+    box-shadow: none;
+  }
+  .pf-card .field-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .pf-card .field > input,
+  .pf-card .field > textarea {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    min-height: 30px;
+    font-size: 16px;
+  }
+  .pf-card .field > input:focus,
+  .pf-card .field > textarea:focus {
+    box-shadow: none;
+  }
+  .pf-card .field > input:disabled {
+    color: var(--muted);
+    opacity: 1;
+  }
+  .pf-card .field > textarea {
+    min-height: 90px;
+    resize: none;
+  }
+  .pf-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--s-3);
+    border-top: 0;
+    padding-top: var(--s-1);
+  }
+  .pf-actions .button {
+    width: 100%;
+  }
+  .pf-actions .text-button {
+    justify-content: center;
+    font-size: 14px;
+  }
+  .pf-signout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 50px;
+    border-radius: var(--group-r);
+    background: var(--surface);
+    box-shadow: var(--ring);
+    color: var(--red);
+    font-size: 16px;
+    font-weight: 500;
+    transition:
+      background-color var(--duration-quick) var(--ease-out),
+      transform var(--duration-quick) var(--ease-out);
+  }
+  .pf-signout:active {
+    transform: scale(0.98);
+    background: var(--red-soft);
+  }
+}
+
+/* Touch devices keep no hover residue after a tap. */
+@media (max-width: 760px) and (hover: none) {
+  .mg-row:hover,
+  .rq-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .mg-row:hover .mg-thumb img,
+  .listing-card:hover .card-photo img,
+  .gallery-photo:hover img {
+    transform: none;
+    filter: none;
+  }
+  .chip:hover,
+  .button.secondary:hover:not(:disabled),
+  .button.ghost:hover:not(:disabled),
+  .check-label:hover,
+  .photo-dropzone:hover:not(:disabled),
+  .step-item > button:not(:disabled):hover,
+  .account-menu > a:hover,
+  .account-menu > button:hover,
+  .icon-button:hover,
+  .avatar-button:hover {
+    background: none;
+    border-color: var(--line-2);
+    box-shadow: none;
+  }
+  .button.secondary:hover:not(:disabled) {
+    background: var(--surface);
+    box-shadow: var(--shadow-xs);
+  }
+  .save-button:hover,
+  .photo-step:hover {
+    transform: none;
+    color: var(--ink-2);
+  }
+  .save-button.is-saved:hover {
+    color: var(--red);
+  }
+  .text-button:hover,
+  .forgot-link:hover,
+  .auth-switch a:hover {
+    text-decoration: none;
+  }
+  .back-link:hover svg {
+    transform: none;
+  }
+  .report-link:hover {
+    color: var(--muted);
+  }
+  .mg-actions .button.small.quiet:hover {
+    color: var(--muted);
+    background: none;
+  }
+}
+
+/* ---------- Touch targets ----------
+   On a coarse pointer every control clears 44px. Where the visual size has
+   to stay small the hit area is extended with a pseudo element instead. */
+@media (pointer: coarse) {
+  .chip,
+  .chip-row .chip,
+  .amenity-chip {
+    min-height: 44px;
+  }
+  .sort-select select,
+  .popover-body input,
+  .mobile-view-fab {
+    min-height: 44px;
+    height: auto;
+  }
+  .save-button {
+    width: 44px;
+    height: 44px;
+  }
+  .save-button::after {
+    inset: 0;
+  }
+  .map-control,
+  .cal-nav {
+    width: 44px;
+    height: 44px;
+  }
+  .icon-button,
+  .search-field .clear {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .cal-day {
+    min-height: 44px;
+  }
+  .cal-day-inner {
+    min-height: 40px;
+  }
+  .check-label,
+  .popover-body .check-label,
+  .gender-option {
+    min-height: 44px;
+  }
+  .check-label input[type="checkbox"],
+  .check-label input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+  }
+  .tab,
+  .popover-footer .text-button,
+  .text-button,
+  .back-link {
+    min-height: 44px;
+  }
+  .photo-tool {
+    width: 44px;
+    height: 44px;
+  }
+  .admin-pager button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* Inline links inside prose keep their size and grow their hit area. */
+  .auth-fineprint a,
+  .forgot-link,
+  .legal-contact a,
+  .menu-legal a {
+    position: relative;
+    display: inline-block;
+  }
+  .auth-fineprint a::after,
+  .forgot-link::after,
+  .legal-contact a::after,
+  .menu-legal a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+}
+
+/* The save affordance is never hover revealed on a phone. */
+@media (max-width: 760px) {
+  .save-button {
+    opacity: 1;
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (pointer: coarse) {
+  .chat-composer .button,
+  .button.small {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Every phone specific transform based motion is guarded here too, not only
+   by the global reset in base.css. */
+@media (prefers-reduced-motion: reduce) {
+  .m-sheet-panel,
+  .m-sheet-scrim,
+  .mobile-nav,
+  .mobile-view-fab,
+  .mobile-carousel,
+  .m-account-avatar {
+    animation: none !important;
+    transition: none !important;
+  }
+}

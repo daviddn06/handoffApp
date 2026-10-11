@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+/data/
+uploads/
+*.tsbuildinfo
+qa/
+.DS_Store
+
+# local working notes, kept out of the public repo
+AGENTS.md
+CLAUDE.md

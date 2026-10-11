@@ -1,0 +1,114 @@
+/* Terms and privacy */
+.legal-page {
+  padding-top: var(--s-6);
+}
+.legal-head {
+  margin-bottom: var(--s-8);
+}
+.legal-head h1 {
+  font-size: 26px;
+  margin: var(--s-4) 0 var(--s-2);
+}
+.legal-tabs {
+  display: inline-flex;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  border-radius: var(--r-pill);
+  background: var(--soft-2);
+}
+.legal-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.legal-tabs a.is-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-xs), var(--ring);
+}
+.legal-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+  counter-reset: legal;
+}
+.legal-sections h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font-size: 18px;
+  margin-bottom: var(--s-3);
+}
+.legal-number {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+.legal-sections p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  /* 84 to 90 characters was too long a line for body copy. */
+  max-width: 66ch;
+}
+.legal-sections p + p {
+  margin-top: var(--s-3);
+}
+.legal-contact {
+  margin-top: var(--s-8);
+  padding: var(--pad-card);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.legal-contact strong {
+  display: block;
+  margin-bottom: var(--s-1);
+  color: var(--ink);
+}
+.legal-contact a {
+  position: relative;
+  display: inline-block;
+  color: var(--blue-ink);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-contact a::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 50%;
+  height: 40px;
+  transform: translateY(-50%);
+}
+@media (max-width: 760px) {
+  .legal-head h1 {
+    font-size: 28px;
+  }
+  .legal-sections p {
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legal-tabs a {
+    transition: none;
+  }
+}

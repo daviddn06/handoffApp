@@ -1,0 +1,106 @@
+# Every push to main deploys the app (app.handofflease.com) and the homepage (handofflease.com).
+# GitHub tests and builds, then sends the build over one SSH connection to the server's deploy
+# service, which backs up, switches in a new release, checks it and rolls back on its own if a check
+# fails. The deploy key in this repo's secrets can only hand the server a build of Handoff.
+# Run by hand (Actions, Deploy, Run workflow) to deploy again, roll back or see the status, for both
+# or one part. Rolling back the app also puts its data back to the backup taken before that deploy.
+# Off switch: set the Actions variable AUTODEPLOY to "off".
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        options: [deploy, rollback, status]
+        default: deploy
+      only:
+        description: Which part
+        type: choice
+        options: [both, app, homepage]
+        default: both
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+permissions:
+  contents: read
+env:
+  ACTION: ${{ inputs.action || 'deploy' }}
+
+jobs:
+  app:
+    if: inputs.only != 'homepage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        if: env.ACTION == 'deploy'
+      - uses: actions/setup-node@v5
+        if: env.ACTION == 'deploy'
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        if: env.ACTION == 'deploy'
+        run: npm ci --no-audit --no-fund
+      - name: Test
+        if: env.ACTION == 'deploy'
+        run: npm test
+      - name: Build
+        if: env.ACTION == 'deploy'
+        run: |
+          npm run build
+          node --input-type=module -e 'import {writeFileSync} from "node:fs"; const release = process.env.GITHUB_SHA; if (!/^[0-9a-f]{40}$/.test(release || "")) throw new Error("GITHUB_SHA is not a full commit"); writeFileSync("dist/release.json", JSON.stringify({release}));'
+      - name: Pack
+        if: env.ACTION == 'deploy'
+        run: tar -czf "$RUNNER_TEMP/release.tgz" dist server deploy src/data package.json package-lock.json
+      - name: Ship
+        if: vars.AUTODEPLOY != 'off' || github.event_name == 'workflow_dispatch'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          TARGET: app
+        run: bash .github/ship.sh
+        shell: bash
+
+  homepage:
+    if: inputs.only != 'app'
+    needs: app
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        if: env.ACTION == 'deploy'
+        with:
+          node-version: "22"
+      - name: Check
+        if: env.ACTION == 'deploy'
+        run: test -s marketing/index.html && node --check marketing/home.js
+      - name: Build
+        if: env.ACTION == 'deploy'
+        # the release stamp, named by the full commit
+        run: |
+          rm -rf qa/homepage && mkdir -p qa/homepage
+          rsync -a --exclude 'README.md' marketing/ qa/homepage/
+          node --input-type=module - qa/homepage "$GITHUB_SHA" <<'BUILD'
+          import {readFileSync, writeFileSync} from 'node:fs';
+          import {join} from 'node:path';
+          const [stage, release] = process.argv.slice(2);
+          if (!/^[0-9a-f]{40}$/.test(release || '')) throw new Error('GITHUB_SHA is not a full commit.');
+          const path = join(stage, 'index.html');
+          const html = readFileSync(path, 'utf8');
+          if (!html.includes('<head>')) throw new Error('Homepage head is missing.');
+          writeFileSync(path, html.replace('<head>', `<head>\n    <meta name="handoff-release" content="${release}">`));
+          writeFileSync(join(stage, 'release.json'), JSON.stringify({release}));
+          BUILD
+      - name: Pack
+        if: env.ACTION == 'deploy'
+        run: tar -C qa/homepage -czf "$RUNNER_TEMP/release.tgz" .
+      - name: Ship
+        if: vars.AUTODEPLOY != 'off' || github.event_name == 'workflow_dispatch'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          TARGET: homepage
+        run: bash .github/ship.sh
+        shell: bash

@@ -1,0 +1,293 @@
+/* Boost. The one paid product: seven days at the top of the map area.
+   Blue soft surfaces, same tokens as the rest of the app. */
+
+.boost-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: normal;
+  color: var(--blue-ink);
+  background: var(--blue-soft);
+  border-radius: var(--r-pill);
+  padding: 1px 7px 1px 5px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.boost-tag svg {
+  flex-shrink: 0;
+}
+.card-topline .boost-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.card-topline .boost-tag + .savings-tag {
+  margin-left: 0;
+}
+.request-price .boost-tag {
+  margin-left: auto;
+}
+
+/* Pill used on the my listings row and inside the modal */
+.boost-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    transform var(--duration-quick) var(--ease-smooth-out);
+}
+button.boost-pill:hover {
+  background: var(--blue-hover);
+}
+button.boost-pill:active {
+  transform: scale(0.98);
+}
+
+/* Offer */
+.boost-offer {
+  display: grid;
+  gap: var(--s-5);
+}
+.boost-price-card {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--pad-card);
+  border-radius: var(--r-lg);
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 1px var(--blue-soft-2);
+}
+.boost-price {
+  display: grid;
+  gap: 1px;
+  justify-items: center;
+  min-width: 62px;
+}
+.boost-price s {
+  font-size: 15px;
+  color: var(--muted);
+  text-decoration-thickness: 1.5px;
+}
+.boost-price strong {
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--blue-ink);
+}
+.boost-price-copy {
+  display: grid;
+  gap: var(--s-1);
+}
+.boost-price-copy > strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+.boost-launch {
+  font-size: 13px;
+  color: var(--blue-ink);
+  font-weight: 500;
+}
+.boost-benefits {
+  display: grid;
+  gap: var(--s-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.boost-benefits li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: var(--s-3);
+  align-items: start;
+}
+.boost-benefit-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+}
+.boost-benefits li div {
+  display: grid;
+  gap: 1px;
+}
+.boost-benefits strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.boost-benefits span {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+.boost-actions {
+  display: grid;
+  gap: var(--s-3);
+}
+.boost-free {
+  justify-content: center;
+}
+.boost-fineprint {
+  margin: 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Boosted, with stats */
+.boost-live {
+  display: grid;
+  gap: var(--s-5);
+}
+.boost-live-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.boost-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-3);
+}
+.boost-stat {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: var(--s-4) var(--s-2);
+  border-radius: var(--r-md);
+  background: var(--soft);
+  box-shadow: var(--ring);
+}
+.boost-stat strong {
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.boost-stat span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.boost-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* Success */
+.boost-done {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: center;
+  text-align: center;
+  padding: var(--s-1) 0 0;
+}
+.boost-done .t-success-check {
+  color: var(--blue);
+}
+.boost-done h3 {
+  margin: var(--s-1) 0 0;
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.boost-done p {
+  margin: 0;
+  max-width: 40ch;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Detail page owner callout */
+.boost-callout {
+  display: grid;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding: var(--pad-card);
+  border-radius: var(--r-lg);
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 1px var(--blue-soft-2);
+}
+.boost-callout-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--blue-ink);
+}
+.boost-callout p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.boost-callout .button {
+  justify-content: center;
+}
+
+.editor-success-boost {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+/* Boosted map pin, the active look made permanent */
+.price-marker-wrap.is-boosted:not(.is-merged) .price-marker {
+  background: var(--blue);
+  color: #fff;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 3px 10px rgb(47 104 196 / 0.35);
+}
+.price-marker-wrap.is-boosted.has-savings .price-marker::after {
+  box-shadow: 0 0 0 2px var(--blue);
+}
+.legend-swatch.price.boosted {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 0 0 1px rgb(47 104 196 / 0.35);
+}
+
+@media (max-width: 760px) {
+  .boost-stats {
+    gap: var(--s-2);
+  }
+  .boost-stat {
+    padding: var(--s-3) var(--s-2);
+  }
+  .boost-stat strong {
+    font-size: 20px;
+  }
+}
+
+/* In the listings row the boost pill is a status marker, not a control. */
+.boost-pill.is-static {
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boost-pill,
+  .boost-stat,
+  .boost-done {
+    animation: none !important;
+    transition: none !important;
+  }
+}

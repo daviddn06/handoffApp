@@ -1,0 +1,827 @@
+/* Auth: one centered box on the soft page, form on the left, a flat scaled
+   replica of the real browse screen on the right. Sign in, stepped sign up,
+   verification, forgot and reset. Self contained. */
+.auth-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(100dvh - var(--header-h));
+  padding: var(--s-8) var(--page-x) var(--s-12);
+  background: var(--soft);
+}
+.auth-box {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 980px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg), var(--ring);
+}
+
+/* Left section, the form */
+.auth-panel {
+  flex: 0 0 460px;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--s-12);
+  background: var(--surface);
+}
+.auth-panel-inner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+.auth-brand {
+  font-family: "Plus Jakarta Sans", "Geist", sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--ink);
+  align-self: flex-start;
+}
+.auth-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+.auth-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+.auth-head h1 {
+  font-family: "Plus Jakarta Sans", "Geist", sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.auth-head p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
+.auth-head strong {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.auth-check {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  display: grid;
+  place-items: center;
+  background: var(--green-soft);
+  color: var(--green);
+  margin-bottom: var(--s-1);
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+.auth-panel .field-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.auth-panel input,
+.auth-panel select {
+  font-size: 15px;
+  min-height: 46px;
+}
+.auth-panel .field-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.auth-cta {
+  min-height: 48px;
+  width: 100%;
+  margin-top: var(--s-1);
+  font-size: 15px;
+}
+.auth-hint {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0;
+}
+/* Server state is a notice, not another sentence in the form. */
+.auth-hint.is-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+}
+.auth-hint.is-notice svg {
+  margin-top: 1px;
+}
+.forgot-link {
+  position: relative;
+  align-self: flex-end;
+  margin-top: -6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--blue);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.forgot-link::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 50%;
+  height: 40px;
+  transform: translateY(-50%);
+}
+.forgot-link:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* One small centred footnote under the form, the same on every screen. */
+.auth-fineprint {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+  text-align: center;
+  text-wrap: pretty;
+}
+/* Inline legal links keep their type size and get a real hit area. */
+.auth-fineprint a {
+  position: relative;
+  display: inline-block;
+}
+.auth-fineprint a::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  height: 40px;
+  transform: translateY(-50%);
+}
+.auth-fineprint a {
+  color: var(--muted);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--line-2);
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.auth-fineprint a:hover {
+  color: var(--blue);
+  text-decoration-color: currentColor;
+}
+.auth-switch {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  white-space: nowrap;
+}
+.auth-switch .text-button {
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 0;
+  color: var(--blue);
+}
+.auth-switch .text-button:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth-switch a {
+  color: var(--blue);
+  font-weight: 500;
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.auth-switch a:hover {
+  color: var(--blue-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* Under the primary button, one row: the way back on the left, the way
+   across to sign in on the right. */
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-top: calc(var(--s-2) * -1);
+}
+.auth-row.is-single {
+  justify-content: center;
+}
+.auth-back {
+  font-size: 13px;
+  min-height: 36px;
+  padding: 0 10px;
+  margin-left: -10px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.auth-row.is-single .auth-back {
+  margin-left: 0;
+}
+.auth-back:hover {
+  color: var(--ink);
+}
+.auth-back svg {
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.auth-back:hover svg {
+  transform: translateX(-2px);
+}
+/* Sign up is one screen that keeps changing, not a numbered wizard, so there
+   is no step count and no progress bar at any width. */
+.auth-slide {
+  position: relative;
+  /* The off screen steps are laid out beside the visible one, so the track
+     clips instead of widening the card. clip with a 6px margin keeps the
+     focus rings visible without adding width to the card. */
+  overflow: visible;
+  clip-path: inset(-6px -10px);
+  /* Animated on a step change with the card resize tokens, then released
+     back to auto so nothing is ever held at a stale height. */
+  transition: height var(--resize-dur) var(--resize-ease);
+}
+.auth-slide .t-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(var(--t-page-from-x, 8px));
+  filter: blur(var(--blur-medium));
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    transform var(--duration-fast) var(--ease-smooth-out),
+    filter var(--duration-fast) var(--ease-smooth-out),
+    visibility 0s linear var(--duration-fast);
+  will-change: opacity, transform, filter;
+}
+.auth-slide[data-step="1"] .t-page[data-page-id="1"],
+.auth-slide[data-step="2"] .t-page[data-page-id="2"],
+.auth-slide[data-step="3"] .t-page[data-page-id="3"],
+.auth-slide[data-step="4"] .t-page[data-page-id="4"],
+.auth-slide[data-step="5"] .t-page[data-page-id="5"],
+.auth-slide[data-step="6"] .t-page[data-page-id="6"] {
+  /* The step on screen is the one in flow, so the track measures itself. */
+  position: relative;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+  filter: blur(0);
+  transition-delay: 0s;
+}
+.auth-campus-chip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-top: -4px;
+  border-radius: var(--r-pill);
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+/* The slot is the same height whether or not a school has been recognised,
+   so the logo and the name fade in without pushing the button, the footer and
+   the fine print down the card. */
+.auth-school-slot {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  margin: -4px 0 0;
+}
+/* One quiet line, not a card. The email decided the school, so there is
+   nothing here to change. */
+.auth-school-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.auth-school-line > span {
+  font-weight: 500;
+}
+.auth-school-line small {
+  flex-basis: 100%;
+  padding-left: 30px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.auth-school-line .school-logo {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+/* Inside the slot the line owns no margin, the slot holds the space. */
+.auth-school-slot .auth-school-line {
+  margin: 0;
+  width: 100%;
+}
+/* Recognising the school is a small rise out of a blur, nothing moves for it. */
+.auth-school-line.is-in {
+  animation: auth-school-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+@keyframes auth-school-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
+    filter: blur(var(--blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Password strength, four segments plus one line of advice */
+.auth-meter-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: calc(var(--s-2) * -1);
+}
+.auth-meter {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.auth-meter span {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--line);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.auth-meter[data-level="weak"] span[data-on="yes"] {
+  background: var(--red);
+}
+.auth-meter[data-level="okay"] span[data-on="yes"] {
+  background: var(--amber);
+}
+.auth-meter[data-level="good"] span[data-on="yes"] {
+  background: var(--blue);
+}
+.auth-meter[data-level="strong"] span[data-on="yes"] {
+  background: var(--green);
+}
+.auth-meter-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  min-height: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.auth-meter-note strong {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.auth-meter-note[data-level="weak"] strong {
+  color: var(--red-ink);
+}
+.auth-meter-note[data-level="good"] strong {
+  color: var(--blue-ink);
+}
+.auth-meter-note[data-level="strong"] strong {
+  color: var(--green-ink);
+}
+
+/* Verification */
+.auth-otp {
+  display: flex;
+  gap: var(--s-2);
+}
+.auth-otp input {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 2px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0;
+  border-radius: var(--r-sm);
+}
+.auth-verify-aside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.auth-verify-aside .text-button {
+  font-size: 13px;
+  min-height: 40px;
+}
+
+/* Right section, a flat replica of the real browse screen. Soft cloud
+   gradient behind it, the replica scaled down inside an overflow hidden
+   frame so it reads as the product and not a drawing. */
+.auth-preview {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--s-5);
+  overflow: hidden;
+  background:
+    radial-gradient(70% 55% at 18% 8%, rgb(255 255 255 / 0.95) 0%, transparent 70%),
+    radial-gradient(60% 45% at 88% 18%, rgb(255 255 255 / 0.85) 0%, transparent 72%),
+    radial-gradient(120% 90% at 85% 0%, #dcebff 0%, transparent 62%),
+    linear-gradient(180deg, #e9f1fd 0%, #f5f8fb 100%);
+  box-shadow: inset 1px 0 0 var(--line);
+}
+.auth-replica-frame {
+  position: absolute;
+  inset: 26px 0 0 26px;
+  overflow: hidden;
+  border-top-left-radius: var(--r-lg);
+  box-shadow:
+    0 18px 50px rgb(16 24 40 / 0.16),
+    0 0 0 1px rgb(16 24 40 / 0.06);
+  pointer-events: none;
+}
+.auth-replica {
+  width: 900px;
+  height: 640px;
+  transform: scale(var(--auth-replica-scale, 0.62));
+  transform-origin: top left;
+  background: var(--surface);
+}
+/* The real browse page sizes itself to the viewport, here it fills the frame. */
+.auth-replica .browse-page {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: 440px minmax(0, 1fr);
+}
+.auth-replica .listing-list {
+  padding-top: 10px;
+}
+/* The price never gives way to the tags beside it. */
+.auth-replica .card-price {
+  flex: none;
+}
+.auth-replica .listing-card {
+  box-shadow: var(--shadow-xs), var(--ring);
+}
+.auth-replica .chip-row {
+  mask-image: none;
+  -webkit-mask-image: none;
+  overflow: hidden;
+}
+.auth-replica .results-toolbar {
+  position: static;
+}
+.auth-replica-placeholder {
+  font-size: 14px;
+  color: var(--muted-2);
+}
+.auth-replica-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.auth-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 118px;
+  background: linear-gradient(145deg, #e3d7c3 0%, #cbb896 58%, #b9a37c 100%);
+}
+.auth-photo.two {
+  background: linear-gradient(145deg, #dbe7d6 0%, #accba3 60%, #8ab581 100%);
+}
+.auth-photo.three {
+  background: linear-gradient(145deg, #eedcd2 0%, #d8ac96 58%, #c4907a 100%);
+}
+
+/* The map half, a still picture with the app's own markers on top */
+.auth-replica-map {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: #f4f6f8;
+}
+.auth-replica-art {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.auth-replica-map .price-marker,
+.auth-replica-map .cluster-marker,
+.auth-replica-map .campus-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  cursor: default;
+  transition: none;
+}
+.auth-replica-map .price-marker.is-active {
+  background: var(--blue);
+  color: #fff;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 4px 12px rgb(47 104 196 / 0.4);
+}
+
+/* transitions.dev 12, error state shake on the form block */
+.auth-shake {
+  will-change: transform;
+}
+.auth-shake.is-shaking {
+  animation: auth-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2)
+    linear;
+}
+@keyframes auth-shake {
+  0% {
+    transform: translateX(0);
+    animation-timing-function: var(--shake-ease);
+  }
+  28.57% {
+    transform: translateX(var(--shake-distance));
+    animation-timing-function: var(--shake-ease);
+  }
+  57.14% {
+    transform: translateX(calc(var(--shake-distance) * -1));
+    animation-timing-function: var(--shake-ease);
+  }
+  78.57% {
+    transform: translateX(var(--shake-overshoot));
+    animation-timing-function: var(--shake-ease);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 899px) {
+  .auth-preview {
+    display: none;
+  }
+  .auth-page {
+    align-items: flex-start;
+    padding: var(--s-6) var(--page-x) var(--s-10);
+    min-height: calc(100dvh - var(--header-h) - var(--mobile-nav-h));
+  }
+  .auth-box {
+    max-width: 460px;
+  }
+  .auth-panel {
+    flex: 1 1 auto;
+    padding: var(--s-6);
+  }
+  .auth-head h1 {
+    font-size: 26px;
+  }
+  .auth-otp {
+    gap: var(--s-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-replica *,
+  .auth-preview * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .auth-shake {
+    animation: none !important;
+    transform: none !important;
+  }
+  .auth-slide .t-page {
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .auth-head-swap,
+  .auth-school-line.is-in {
+    animation: none !important;
+  }
+}
+
+.auth-hint a {
+  color: var(--blue);
+  font-weight: 500;
+}
+.auth-hint a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ------------------------------------------------- confirming, in motion */
+
+/* The heading belongs to the screen, so it swaps with the same cross blur the
+   step body uses rather than jumping to the next words. */
+.auth-head-swap {
+  animation: auth-head-swap var(--duration-fast) var(--ease-smooth-out) both;
+}
+@keyframes auth-head-swap {
+  from {
+    opacity: 0;
+    transform: translateX(var(--distance-base));
+    filter: blur(var(--blur-medium));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+}
+/* A quiet way past an optional screen. A text link, never a button. */
+.auth-quiet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-top: calc(var(--s-2) * -1);
+}
+.auth-quiet-row.is-single {
+  justify-content: center;
+}
+.auth-quiet-row .text-button {
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 36px;
+}
+.auth-quiet-row .auth-later {
+  color: var(--muted);
+  font-weight: 400;
+}
+.auth-quiet-row .auth-later:hover {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* The code screen reuses the verify page input, sized for the card. */
+.code-step .auth-otp {
+  margin-top: calc(var(--s-1) * -1);
+}
+
+/* A message that appears in place fades up rather than snapping in. */
+.auth-fade-in {
+  animation: auth-fade-in var(--duration-fast) var(--ease-smooth-out) both;
+}
+@keyframes auth-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* transitions.dev 12, only the field that failed moves. */
+.auth-field-shake {
+  will-change: transform;
+}
+.auth-field-shake.shake-0,
+.auth-field-shake.shake-1 {
+  animation: auth-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2)
+    linear;
+}
+.field-error {
+  animation: auth-fade-in var(--duration-quick) var(--ease-smooth-out) both;
+}
+/* The password meter fills from the left instead of blinking on. */
+.auth-meter span {
+  position: relative;
+  overflow: hidden;
+}
+.auth-meter span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--duration-fast) var(--ease-smooth-out);
+}
+.auth-meter span[data-on="yes"]::after {
+  transform: scaleX(1);
+}
+.auth-meter[data-level="weak"] span {
+  color: var(--red);
+}
+.auth-meter[data-level="okay"] span {
+  color: var(--amber);
+}
+.auth-meter[data-level="good"] span {
+  color: var(--blue);
+}
+.auth-meter[data-level="strong"] span {
+  color: var(--green);
+}
+/* The fill is the layer above now, so the segment itself stays the track. */
+.auth-meter[data-level] span[data-on="yes"] {
+  background: var(--line);
+}
+.auth-meter span:nth-child(2)::after {
+  transition-delay: 40ms;
+}
+.auth-meter span:nth-child(3)::after {
+  transition-delay: 80ms;
+}
+.auth-meter span:nth-child(4)::after {
+  transition-delay: 120ms;
+}
+
+/* The account that already exists. Not a dead end, a door. */
+.auth-exists {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin-top: calc(var(--s-2) * -1);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--amber-soft);
+  color: var(--amber-ink);
+  box-shadow: var(--ring);
+}
+.auth-exists > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.auth-exists > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.auth-exists p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-exists .button {
+  background: var(--surface);
+}
+
+/* The settled success moment, held before the dialog steps aside. */
+.auth-block.is-settled {
+  align-items: flex-start;
+  min-height: 132px;
+  justify-content: center;
+}
+.auth-block.is-settled .auth-head h1 {
+  font-size: 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-fade-in,
+  .auth-field-shake.shake-0,
+  .auth-field-shake.shake-1,
+  .field-error {
+    animation: none !important;
+  }
+  .auth-meter span::after {
+    transition: none !important;
+  }
+}
+
+/* The one line that introduces the contact step. */
+.auth-step-lead {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0 0 var(--s-2);
+}
+.contact-step .contact-section {
+  gap: var(--s-4);
+}

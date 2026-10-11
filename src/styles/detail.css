@@ -1,0 +1,860 @@
+/* Listing detail: gallery, two column content, sticky request card. */
+.detail-page {
+  padding-bottom: var(--s-10);
+}
+
+/* Back link row */
+.detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  min-height: 36px;
+}
+.detail-top-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* Gallery */
+.gallery {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: var(--s-2);
+  height: clamp(300px, 34vw, 430px);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--soft-2);
+}
+.gallery-photo {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  background: var(--soft-2);
+  grid-column: span 1;
+  grid-row: span 1;
+}
+.gallery-photo:first-child {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.gallery.count-1 .gallery-photo:first-child {
+  grid-column: 1 / -1;
+}
+.gallery.count-2 .gallery-photo {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.gallery.count-3 .gallery-photo:not(:first-child) {
+  grid-column: span 2;
+}
+.gallery.count-4 .gallery-photo:nth-child(2) {
+  grid-column: span 2;
+}
+.gallery .gallery-photo:nth-child(n + 6) {
+  display: none;
+}
+.gallery-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  transition:
+    transform var(--duration-slow) var(--ease-smooth-out),
+    filter var(--duration-quick) var(--ease-out);
+}
+.gallery-photo:hover img {
+  filter: brightness(0.94);
+  transform: scale(1.02);
+}
+.gallery-photo:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -3px;
+}
+.gallery-empty {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted-2);
+  font-size: 13px;
+}
+.all-photos {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  background: rgb(255 255 255 / 0.94);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-sm), var(--ring);
+}
+
+/* Two column layout */
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  align-items: stretch;
+  gap: var(--s-8);
+  margin-top: var(--s-6);
+}
+.detail-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* 16 here plus 16 inside .detail-section is 32 between sections. */
+  gap: var(--s-4);
+}
+/* Prose gets a measure. The gallery, the map and the fact strip stay full
+   width, only the lines a reader has to track are capped. */
+.detail-address,
+.detail-distance,
+.detail-preference,
+.detail-section > p,
+.detail-guidance p,
+.locked-text {
+  max-width: 66ch;
+}
+
+/* Heading */
+.detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.detail-head h1 {
+  font-size: 26px;
+  line-height: 1.2;
+}
+.detail-address,
+.detail-distance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.detail-address svg,
+.detail-distance svg {
+  color: var(--muted-2);
+}
+.detail-distance {
+  color: var(--blue-ink);
+  font-weight: 500;
+}
+.detail-distance svg {
+  color: var(--blue);
+}
+
+/* Fact strip */
+.fact-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.fact-strip li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-pill);
+  background: var(--soft);
+  box-shadow: var(--ring);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.fact-strip svg {
+  color: var(--muted);
+}
+
+/* Sections */
+.detail-section {
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.detail-section h2 {
+  font-size: 18px;
+  margin-bottom: var(--s-3);
+}
+.detail-section > p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.detail-section > p.field-hint {
+  margin-top: var(--s-2);
+  color: var(--muted);
+}
+.preserve-lines {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.amenity-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.amenity-grid li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.amenity-grid svg {
+  color: var(--blue);
+}
+.detail-map {
+  height: 240px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--ring);
+}
+.detail-map .map-container {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Host */
+.host-card {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--pad-card);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs), var(--ring);
+}
+.host-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.host-text strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.host-verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--green-ink);
+  font-weight: 500;
+}
+
+/* Guidance and report */
+.detail-guidance {
+  display: flex;
+  gap: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--soft);
+  box-shadow: var(--ring);
+  padding: var(--pad-card);
+  color: var(--muted);
+}
+.detail-guidance > svg {
+  margin-top: 1px;
+  color: var(--blue);
+}
+.detail-guidance strong {
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 600;
+}
+.detail-guidance p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin-top: var(--s-1);
+}
+.report-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 36px;
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.report-link:hover {
+  color: var(--red-ink);
+}
+
+/* Sticky request card */
+.detail-aside {
+  min-width: 0;
+}
+.request-card {
+  position: sticky;
+  top: calc(var(--header-h) + var(--s-4));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  border-radius: var(--r-xl);
+  padding: var(--pad-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-md), var(--ring);
+}
+.request-price {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.request-price strong {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.request-price span {
+  font-size: 13px;
+  color: var(--muted);
+}
+/* The boost tag is a span in this row, so it keeps its own ink. */
+.request-price .boost-tag {
+  color: var(--blue-ink);
+}
+.request-dates {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--soft);
+  box-shadow: var(--ring);
+  color: var(--blue);
+}
+.request-dates > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.request-dates small {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  color: var(--muted);
+}
+.request-dates strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.request-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.request-line strong {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.request-note {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.request-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.request-actions > .button,
+.request-actions > a.button {
+  width: 100%;
+}
+.request-fineprint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.request-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--green-soft);
+  color: var(--green-ink);
+}
+.request-status p {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.request-status-note {
+  font-size: 13px;
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+  border-radius: var(--r-sm);
+  padding: var(--s-2) var(--s-3);
+  text-align: center;
+}
+
+/* Request modal */
+.request-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+}
+.request-form .modal-actions .request-fineprint {
+  text-align: left;
+  margin: 0;
+}
+.request-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-2);
+  padding-top: var(--s-1);
+}
+.request-sent h3 {
+  font-size: 18px;
+  margin-top: var(--s-2);
+}
+.request-sent p {
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 340px;
+}
+.request-sent .modal-actions {
+  width: 100%;
+  justify-content: center;
+  gap: var(--s-2);
+}
+
+/* Success check wrapper for the sent request state (snippet lives in base.css) */
+.request-sent .t-success-check {
+  color: var(--green);
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  display: grid;
+  place-items: center;
+}
+.request-sent .t-success-check svg path {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+}
+
+/* Photo lightbox */
+.photo-viewer > img {
+  width: 100%;
+  height: min(64dvh, 620px);
+  object-fit: contain;
+  background: var(--soft);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+.photo-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-5);
+  margin-top: var(--s-4);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Mobile action bar, sits above the fixed mobile nav */
+.detail-bar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--mobile-nav-h);
+  z-index: 55;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: rgb(255 255 255 / 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+.detail-bar .request-price strong {
+  font-size: 20px;
+}
+.detail-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.detail-bar-actions .button {
+  width: auto;
+}
+
+/* Skeleton */
+.gallery-skeleton .sk-photo {
+  grid-column: span 1;
+  grid-row: span 1;
+  border-radius: 0;
+}
+.gallery-skeleton .sk-photo:first-child {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.sk-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sk-line {
+  display: block;
+  height: 13px;
+  width: 100%;
+}
+.sk-back {
+  width: 120px;
+  height: 16px;
+}
+.sk-title {
+  height: 26px;
+  width: 70%;
+}
+.sk-strip {
+  display: block;
+  height: 36px;
+  width: 80%;
+  border-radius: var(--r-pill);
+}
+.sk-map {
+  display: block;
+  height: 240px;
+  border-radius: var(--r-lg);
+}
+.sk-card {
+  display: block;
+  height: 320px;
+  border-radius: var(--r-xl);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: var(--s-6);
+  }
+}
+@media (max-width: 760px) {
+  .detail-page {
+    padding-top: var(--s-5);
+    padding-bottom: 88px;
+  }
+  /* Neutralize leftover legacy ordering and padding for this page. */
+  .detail-main > * {
+    order: 0;
+    margin: 0;
+  }
+  .detail-section {
+    padding-bottom: 0;
+  }
+  .detail-top {
+    margin-bottom: var(--s-3);
+  }
+  .gallery {
+    display: flex;
+    height: 260px;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    border-radius: var(--r-md);
+  }
+  .gallery::-webkit-scrollbar {
+    display: none;
+  }
+  .gallery .gallery-photo,
+  .gallery .gallery-photo:first-child {
+    flex: 0 0 88%;
+    height: 100%;
+    scroll-snap-align: center;
+    border-radius: var(--r-md);
+  }
+  .gallery .gallery-photo:nth-child(n + 6) {
+    display: block;
+  }
+  .gallery-photo img {
+    border-radius: var(--r-md);
+  }
+  .all-photos {
+    right: 10px;
+    bottom: 10px;
+  }
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-6);
+    margin-top: var(--s-5);
+  }
+  .detail-head h1 {
+    font-size: 28px;
+  }
+  .request-card {
+    position: static;
+    padding: var(--pad-card);
+  }
+  .detail-bar {
+    display: flex;
+  }
+  .detail-map {
+    height: 220px;
+  }
+  .sk-card {
+    height: 240px;
+  }
+}
+
+/* Savings against the original lease */
+.request-original {
+  font-size: 14px;
+  color: var(--muted);
+  margin-left: 6px;
+  text-decoration-thickness: 1px;
+}
+.savings-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--green-soft);
+  color: var(--green-ink);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.savings-box strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.detail-bar .savings-tag {
+  margin-left: 8px;
+}
+
+/* ---------- Roommate preference ---------- */
+/* One paragraph, with the tag reading as the first word of it, so the
+   sentence wraps normally instead of running off a narrow screen. */
+.detail-preference {
+  display: block;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.detail-preference .gender-tag {
+  display: inline-flex;
+  vertical-align: -4px;
+  margin-right: 8px;
+}
+.detail-preference > span {
+  display: inline;
+}
+.request-preference-note {
+  display: block;
+  background: var(--soft-2);
+  border-color: var(--line-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: left;
+}
+
+/* ------------------------------------------------ locked, students only */
+/* A signed out visitor sees the shape of the listing, never its words. The
+   server sends null for the address, the description and the lister, and the
+   filler standing in for them is fixed text written into ListingDetail.tsx,
+   blurred, unselectable and hidden from assistive tech. Nothing to unblur. */
+.locked-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  filter: blur(7px);
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+.locked-text.is-inline {
+  display: inline-block;
+  font-size: inherit;
+  line-height: inherit;
+  filter: blur(5px);
+}
+.locked-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: var(--r-pill);
+  background: var(--blue-soft);
+  color: var(--blue-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.locked-chip svg {
+  color: var(--blue);
+}
+.detail-address.is-locked {
+  gap: var(--s-2);
+  align-items: center;
+}
+
+/* One seamless block. The blurred filler fills a fixed minimum height and the
+   lock row sits centered on both axes on a frosted disc above it. */
+.locked-block {
+  position: relative;
+  overflow: hidden;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  padding: var(--s-2) 0;
+}
+.locked-gate {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--s-4);
+  animation: locked-gate-in var(--duration-slow) var(--ease-smooth-out) both;
+}
+.locked-gate-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  max-width: 100%;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-xl);
+  background: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: var(--shadow-md), var(--ring);
+}
+@keyframes locked-gate-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-base));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.locked-gate-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.locked-gate-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.locked-gate-text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.locked-gate-text > span {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.locked-gate .button {
+  min-height: 40px;
+  flex: none;
+}
+
+/* The lister, held back the same way */
+.locked-avatar {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--soft-2);
+  filter: blur(4px);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.06);
+}
+.host-card.is-locked {
+  gap: var(--s-3);
+  align-items: center;
+}
+.host-card.is-locked .button {
+  margin-left: auto;
+  flex: none;
+}
+
+@media (max-width: 760px) {
+  .detail-address.is-locked {
+    flex-wrap: wrap;
+  }
+  .locked-block {
+    min-height: 180px;
+  }
+  .locked-gate {
+    padding: var(--s-3);
+  }
+  /* The row stacks on a phone so the button keeps its full width target. */
+  .locked-gate-row {
+    flex-direction: column;
+    text-align: center;
+    gap: var(--s-2);
+    padding: var(--s-4);
+  }
+  .locked-gate .button {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .locked-gate {
+    animation: none !important;
+  }
+}
+
+
+/* What this request will share, shown before it is sent. */
+.request-share {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--soft);
+}
+.request-contact-chips {
+  margin-bottom: var(--s-3);
+}
