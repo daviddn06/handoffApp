@@ -2,6 +2,13 @@
    base.css and the motion tokens in motion.css. Loaded only by the admin
    bundle, so nothing here reaches a normal student's page. */
 
+/* The document scrolls on a laptop, so the no rubber band rule on body in
+   base.css never reached it and a trackpad bounce pulled the bar down off the
+   top edge. The root element owns the viewport's overscroll. */
+html {
+  overscroll-behavior-y: none;
+}
+
 .admin-shell {
   display: grid;
   grid-template-columns: 208px minmax(0, 1fr);
@@ -179,6 +186,9 @@
   overflow: auto;
   max-height: calc(100vh - var(--header-h) - 190px);
   min-height: 140px;
+  /* A sideways swipe at the edge must not turn into browser back. The axis
+     lock in lib/axisLock.ts keeps each swipe on one axis. */
+  overscroll-behavior-x: contain;
 }
 .admin-table {
   width: 100%;
@@ -560,6 +570,7 @@
   overflow: auto;
   max-height: 420px;
   white-space: pre;
+  overscroll-behavior-x: contain;
 }
 .admin-photos {
   display: grid;
@@ -707,6 +718,9 @@
     flex-direction: row;
     gap: var(--s-1);
     overflow-x: auto;
+    /* A strip, never up and down. */
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
     padding: var(--s-2);
     scrollbar-width: none;
   }
@@ -726,9 +740,12 @@
   .admin-drawer {
     width: 100%;
   }
+  /* On a phone the table is a sideways strip and the page scrolls the rows,
+     so one swipe never moves the table both ways. */
   .admin-table-wrap {
-    overflow: auto;
-    max-height: calc(100vh - var(--header-h) - var(--mobile-nav-h) - 150px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
   }
   .admin-table {
     min-width: 720px;

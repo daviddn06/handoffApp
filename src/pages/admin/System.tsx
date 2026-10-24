@@ -6,6 +6,7 @@ import {
   KeyValues,
   Status,
   bytes,
+  useAxisLock,
   duration,
   number,
   when,
@@ -14,6 +15,7 @@ import type { SystemInfo } from "./types";
 
 export default function System() {
   const { data, error, loading, refresh } = useResource<SystemInfo>("/admin/system");
+  const journalBox = useAxisLock<HTMLPreElement>();
   if (error)
     return (
       <AdminPage title="System">
@@ -140,7 +142,9 @@ export default function System() {
       </div>
       <Group title="Service journal">
         {journal.available ? (
-          <pre className="admin-journal">{journal.lines.join("\n")}</pre>
+          <pre className="admin-journal" ref={journalBox}>
+            {journal.lines.join("\n")}
+          </pre>
         ) : (
           <p className="admin-empty">
             journalctl is not readable from here. On the VPS run

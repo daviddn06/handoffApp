@@ -1,8 +1,9 @@
 /** Shared dashboard primitives. Dense tables, sparklines, drawer, pagination. */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { Button, Modal } from "../../components/ui";
 import type { Point } from "./types";
+import { lockWheelAxis } from "../../lib/axisLock";
 
 export const when = (value: string | null | undefined, time = true) => {
   if (!value) return "Never";
@@ -150,6 +151,15 @@ export function Select({
   );
 }
 
+/** A ref for a box that scrolls both ways, so each swipe moves one axis. */
+export function useAxisLock<T extends HTMLElement>() {
+  const release = useRef<(() => void) | null>(null);
+  return useCallback((node: T | null) => {
+    release.current?.();
+    release.current = node ? lockWheelAxis(node) : null;
+  }, []);
+}
+
 export type Column = {
   key: string;
   label: string;
@@ -171,8 +181,9 @@ export function TableShell({
   emptyLabel?: string;
   rows?: number;
 }) {
+  const wrap = useAxisLock<HTMLDivElement>();
   return (
-    <div className="admin-table-wrap">
+    <div className="admin-table-wrap" ref={wrap}>
       <table className="admin-table">
         <thead>
           <tr>
