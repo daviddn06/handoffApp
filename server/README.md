@@ -70,6 +70,17 @@ The script refuses production data directories unless `HANDOFF_SEED_CONFIRM=prod
 
 The dashboard's sections are at `/`, `/users`, `/listings` and so on on the internal host. Every admin write lands in `admin_audit` and is visible on the dashboard's Audit page. Disabling an account sets `users.disabled_at`, ends every session for it, and refuses both login and every authenticated route with 403. Nothing is deleted. The System page reads the release marker, the schema version, host memory and load, `df -k` on the data directory, the backups directory, and `journalctl -u handoff -n 50 --no-pager` when the service user can read it. The dashboard shows private student details, so treat an open browser tab the same as an operator shell.
 
+## Read only MCP
+
+`POST https://internal.handofflease.com/mcp` takes one JSON-RPC message with `Authorization: Bearer <token>` and answers one tool, `sightpane_overview` (`server/sightpane.js`). It returns counts and the newest public listing titles only, never names, emails or report text. It answers on the internal host only. Tokens are kept as sha256 hashes in `mcp-tokens.json` in the data directory (mode 600). With no token file every call gets 401.
+
+```bash
+cd /opt/handoff/current
+runuser -u handoff -- env HANDOFF_DATA_DIR=/var/lib/handoff node server/mcp-token.js new sightpane   # prints the token once
+runuser -u handoff -- env HANDOFF_DATA_DIR=/var/lib/handoff node server/mcp-token.js list
+runuser -u handoff -- env HANDOFF_DATA_DIR=/var/lib/handoff node server/mcp-token.js revoke sightpane
+```
+
 ## Private USC referrals
 
 An allowlisted administrator can prepare an unpublished USC student sublease draft from a manually reviewed source. This creates no student account and sends no message. A private, reusable link at `HANDOFF_ORIGIN/referral/TOKEN` lets the actual student review it. Tokens contain 32 random bytes and are retained in the private database so the dashboard can always copy the same link. Treat links, source records, and backups as private.

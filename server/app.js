@@ -21,6 +21,7 @@ import {
 } from "./admin.js";
 import { openDatabase } from "./database.js";
 import { createReferrals } from "./referrals.js";
+import { sightpaneMcp } from "./sightpane.js";
 import { geocode } from "./geocode.js";
 import {
   AiInputError,
@@ -329,6 +330,11 @@ export function createApp({
       : next(new HttpError(404, "Endpoint not found.")),
   );
   app.use(express.json({ limit: "96kb", strict: true }));
+  // Read only MCP for Sightpane, internal host only, Bearer token (server/sightpane.js).
+  const mcp = sightpaneMcp({ db, dataDir: resolve(dataDir) });
+  app.post("/mcp", (req, res, next) =>
+    req.surface === "internal" ? mcp(req, res) : next(),
+  );
   app.use((req, res, next) => {
     const sessionToken = cookies(req.get("Cookie"))[cookieName];
     if (sessionToken && /^[A-Za-z0-9_-]{43}$/.test(sessionToken)) {
