@@ -24,8 +24,8 @@ const INTERNAL = "https://internal.handofflease.com";
 export const TOOL = {
   name: "sightpane_overview",
   description:
-    "Read only summary of Handoff. Students, verified students, live listings, pending requests, open reports, waitlist and signups over 7 days, the newest live listings, a status and a note. Counts and public listing titles only.",
-  inputSchema: { type: "object", properties: {} },
+    "Headline numbers for Sightpane. Read only. Students, live listings, pending requests and open reports, the newest live listings, and a warning when a report waits. Counts and public listing titles only.",
+  inputSchema: { type: "object", properties: {}, additionalProperties: false },
   annotations: { readOnlyHint: true },
 };
 
@@ -38,26 +38,19 @@ export function sightpaneOverview(db) {
     }
   };
   const now = new Date().toISOString();
-  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
-  const reportsOpen = count("SELECT COUNT(*) AS count FROM reports WHERE status='open'");
+    const reportsOpen = count("SELECT COUNT(*) AS count FROM reports WHERE status='open'");
   const pending = count("SELECT COUNT(*) AS count FROM handoff_requests WHERE status='pending'");
   const newest = db
     .prepare(
       "SELECT id, title, price, created_at FROM listings WHERE status='active' AND available_to>=? ORDER BY created_at DESC LIMIT 5",
     )
     .all(now.slice(0, 10));
-  const notes = [];
-  if (reportsOpen)
-    notes.push(`${reportsOpen} open ${reportsOpen === 1 ? "report needs" : "reports need"} review`);
   return {
     metrics: [
       { label: "Students", value: count("SELECT COUNT(*) AS count FROM users"), href: `${INTERNAL}/users` },
-      { label: "Verified students", value: count("SELECT COUNT(*) AS count FROM users WHERE verified_at IS NOT NULL"), href: `${INTERNAL}/users` },
-      { label: "Signups, 7 days", value: count("SELECT COUNT(*) AS count FROM users WHERE created_at>=?", weekAgo), href: `${INTERNAL}/users` },
       { label: "Live listings", value: count("SELECT COUNT(*) AS count FROM listings WHERE status='active' AND available_to>=?", now.slice(0, 10)), href: `${INTERNAL}/listings` },
       { label: "Pending requests", value: pending, href: `${INTERNAL}/requests` },
       { label: "Open reports", value: reportsOpen, href: `${INTERNAL}/reports` },
-      { label: "Waitlist", value: count("SELECT COUNT(*) AS count FROM waitlist"), href: `${INTERNAL}/waitlist` },
     ],
     items: newest.map((l) => ({
       title: l.title,
@@ -66,7 +59,9 @@ export function sightpaneOverview(db) {
       at: l.created_at,
     })),
     status: reportsOpen ? "warn" : "ok",
-    ...(notes.length ? { note: `${notes.join(". ")}.` } : {}),
+    ...(reportsOpen
+      ? { note: `${reportsOpen} open ${reportsOpen === 1 ? "report needs" : "reports need"} review.` }
+      : {}),
   };
 }
 

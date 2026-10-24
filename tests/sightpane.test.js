@@ -93,7 +93,7 @@ test("the MCP needs a token, lives on the internal host only, and returns counts
   const o = call.result.structuredContent;
   const m = Object.fromEntries(o.metrics.map((x) => [x.label, x.value]));
   assert.equal(m.Students, 2);
-  assert.equal(m["Verified students"], 1);
+  assert.equal(o.metrics.length, 4);
   assert.equal(m["Live listings"], 1);
   assert.equal(m["Pending requests"], 1);
   assert.equal(m["Open reports"], 1);
